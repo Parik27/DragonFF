@@ -15,118 +15,113 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
-from struct import unpack
+from struct import unpack, unpack_from
 
-Chunk = namedtuple("Chunk", "type size version")
-Clump = namedtuple("Clump", "atomics lights cameras")
-Vector = namedtuple("Vector", "x y z")
-Matrix = namedtuple("Matrix", "right up at")
-HAnimHeader = namedtuple("HAnimHeader", "version id bone_count")
-Bone = namedtuple("Bone", "id index type")
-RGBA = namedtuple("RGBA", "r g b a")
-GeomSurfPro = namedtuple("GeometrySurfaceProperties",
+# Data types
+Chunk       = namedtuple("Chunk"                     , "type size version")
+Clump       = namedtuple("Clump"                     , "atomics lights cameras")
+Vector      = namedtuple("Vector"                    , "x y z")
+Matrix      = namedtuple("Matrix"                    , "right up at")
+HAnimHeader = namedtuple("HAnimHeader"               , "version id bone_count")
+Bone        = namedtuple("Bone"                      , "id index type")
+RGBA        = namedtuple("RGBA"                      , "r g b a")
+GeomSurfPro = namedtuple("GeometrySurfaceProperties" ,
                          "ambient specular diffuse")
-TexCoords = namedtuple("TexCoords", "u v")
-Sphere = namedtuple("Sphere", "x y z radius")
-Triangle = namedtuple("Triangle", "b a material c")
-Atomic = namedtuple("Atomic", "frame geometry flags unk")
+TexCoords   = namedtuple("TexCoords"                 , "u v")
+Sphere      = namedtuple("Sphere"                    , "x y z radius")
+Triangle    = namedtuple("Triangle"                  , "b a material c")
+Atomic      = namedtuple("Atomic"                    , "frame geometry flags unk")
 
 # geometry flags
-rpGEOMETRYTRISTRIP = 0x00000001
-rpGEOMETRYPOSITIONS = 0x00000002
-rpGEOMETRYTEXTURED = 0x00000004
-rpGEOMETRYPRELIT = 0x00000008
-rpGEOMETRYNORMALS = 0x00000010
-rpGEOMETRYLIGHT = 0x00000020
+rpGEOMETRYTRISTRIP              = 0x00000001
+rpGEOMETRYPOSITIONS             = 0x00000002
+rpGEOMETRYTEXTURED              = 0x00000004
+rpGEOMETRYPRELIT                = 0x00000008
+rpGEOMETRYNORMALS               = 0x00000010
+rpGEOMETRYLIGHT                 = 0x00000020
 rpGEOMETRYMODULATEMATERIALCOLOR = 0x00000040
-rpGEOMETRYTEXTURED2 = 0x00000080
-rpGEOMETRYNATIVE = 0x01000000
+rpGEOMETRYTEXTURED2             = 0x00000080
+rpGEOMETRYNATIVE                = 0x01000000
 
+# Block types
+
+types = {
+    "Frame": 39056126,
+    "HAnim PLG": 286,
+    "Struct": 1,
+    "Material": 7,
+    "Texture": 6,
+    "Extension": 3,
+    "Geometry": 15,
+    "Material List": 8,
+    "Bin Mesh PLG": 0x50E,
+    "Frame List": 14,
+    "Geometry List": 26,
+    "Atomic": 20,
+    "Clump": 16
+}
+
+#######################################################
+def strlen(bytes, offset):
+
+    # A helper function to find length of byte null terminated strings
+    
+    i = offset
+    while i < len(bytes):
+       
+        if bytes[i] == 0:
+            break
+
+        i += 1
+        
+    return i-offset
 
 class Sections:
-    #######################################################
-    def read_vector(data):
-        return Vector._make(unpack("<fff", data))
 
+    # Unpack/pack format for above data types
+    unpackers =  {
+        Chunk: "<3I",
+        Clump: "<3I",
+        Vector: "<3f",
+        HAnimHeader: "<3I",
+        Bone: "<3I",
+        RGBA: "<4B",
+        GeomSurfPro: "<3f",
+        Sphere: "<4f",
+        Triangle: "<4H",
+        Atomic: "<4I",
+        TexCoords: "<2f"
+    }
+    
     #######################################################
-    def read_matrix(data):
-        return Matrix._make(
-            [Sections.read_vector(data[:12]),
-             Sections.read_vector(data[12:24]),
-             Sections.read_vector(data[24:])]
-        )
+    def read(type, data, offset=0):
 
-    #######################################################
-    def read_chunk(data):
-        return Chunk._make(unpack("<III", data))
+        # These are simple non-nested data types that can be returned in a single
+        # unpack calls, and thus do not need any special functions
+        if type in Sections.unpackers:
+            unpacker = Sections.unpackers[type]
+            return type._make(unpack_from(unpacker,data,offset))
 
-    #######################################################
-    def read_hanim_header(data):
-        return HAnimHeader._make(unpack("<III", data))
-
-    #######################################################
-    def read_bone(data):
-        return Bone._make(unpack("<III", data))
-
-    #######################################################
+        elif type is Matrix:
+            return Matrix._make(
+                (
+                    Sections.read(Vector, data, offset),
+                    Sections.read(Vector, data, offset+12),
+                    Sections.read(Vector, data, offset+24)
+                )
+            )
+        else:
+            raise NotImplementedError("unknown type", type)
+        
+     ########################################################
     def get_rw_version(library_id):
-        # see https://gtamods.com/wiki/RenderWare
-
+        #see https://gtamods.com/wiki/RenderWare
+        
         if library_id & 0xFFFF0000:
             return (library_id >> 14 & 0x3FF00) + 0x30000 | \
                 (library_id >> 16 & 0x3F)
-        pass
-
-    #######################################################
-    def read_rgba(data):
-        return RGBA._make(unpack("<BBBB", data))
-
-    #######################################################
-    def read_geometry_surface_properties(data):
-        return GeomSurfPro._make(unpack("<fff", data))
-
-    #######################################################
-    def read_tex_coords(data):
-        return TexCoords._make(unpack("<ff", data))
-
-    #######################################################
-    def read_sphere(data):
-        return Sphere._make(unpack("<ffff", data))
-
-    #######################################################
-    def read_triangle(data):
-        return Triangle._make(unpack("<HHHH", data))
-
-    #######################################################
-    def read_texture(data):
-        texture_data = unpack("<HH", data) + ("",) + ("",)
-        return Texture._make(texture_data)
-
-    #######################################################
-    def read_atomic(data):
-        return Atomic._make(unpack("<IIII", data))
-    
-    #######################################################
-    def read_material(data):
-        array_data = [unpack("<I", data[:4]),
-                      Sections.read_rgba(data[4:8]),
-                      unpack("<I", data[8:12]),
-                      unpack("<I", data[12:16])]
-
-        if len(data) > 16:
-            array_data.append(
-                Sections.read_geometry_surface_properties(data[16:]))
-        else:
-            array_data.append(GeomSurfPro._make((0, 0, 0)))
-
-        array_data.append([])  # textures
-        array_data.append([])  # plugins
-
-        return Material._make(array_data)
-
+        
 #######################################################
-
-
 class Texture:
     filters = None
     unknown = None
@@ -136,7 +131,7 @@ class Texture:
     #######################################################
     def __init__(self, data):
         _Texture = namedtuple("_Texture", "filters unk")
-        _tex = _Texture._make(unpack("<HH", data[:4]))
+        _tex = _Texture._make(unpack_from("<2H", data))
  
         self.filters = _tex.filters
         self.unknown = _tex.unk
@@ -154,24 +149,21 @@ class Material:
 
     #######################################################
     def __init__(self, data):
-        array_data = [unpack("<I", data[:4]),
-                      Sections.read_rgba(data[4:8]),
-                      unpack("<I", data[8:12]),
-                      unpack("<I", data[12:16])]
+        array_data = [unpack_from("<I", data),
+                      Sections.read(RGBA, data, 4),
+                      unpack_from("<I", data, 8),
+                      unpack_from("<I", data, 12)]
 
         if len(data) > 16:
-            self.surface_properties = Sections.read_geometry_surface_properties(
-                data[16:])
+            self.surface_properties = Sections.read(GeomSurfPro, data, 16)
 
-        self.flags = array_data[0]
-        self.colour = array_data[1]
+        self.flags       = array_data[0]
+        self.colour      = array_data[1]
         self.is_textured = array_data[2]
-        self.textures = []
-        self.plugins = []
+        self.textures    = []
+        self.plugins     = []
                 
 #######################################################
-
-
 class Frame:
 
     rotation_matrix = None
@@ -183,37 +175,34 @@ class Frame:
 
     def __init__(self, data):
 
-        self.rotation_matrix = Sections.read_matrix(data[:36])
-        self.position = Sections.read_vector(data[36:36+12])
-        self.parent = unpack("<i", data[48:48+4])[0]
-        self.creation_flags = unpack("<I", data[52:52+4])[0]
+        self.rotation_matrix = Sections.read(Matrix,data)
+        self.position        = Sections.read(Vector,data,36)
+        self.parent          = unpack_from("<i", data,48)[0]
+        self.creation_flags  = unpack_from("<I", data,52)[0]
 
     def size():
         return 56
 
 #######################################################
-
-
 class HAnimPLG:
 
     header = 0
     bones = []
 
+    #######################################################
     def __init__(self, data):
 
-        self.header = Sections.read_hanim_header(data[:12])
+        self.header = Sections.read(HAnimHeader,data)
         if self.header.bone_count > 0:
             pos = 20  # offset to bone array
 
             for i in range(self.header.bone_count):
-                bone = Sections.read_bone(data[pos:pos+12])
+                bone = Sections.read(Bone, data, pos)
                 self.bones.append(bone)
 
                 pos += 12
 
 #######################################################
-
-
 class Geometry:
 
     flags = None
@@ -237,19 +226,17 @@ class Geometry:
         #      convert an array to an array of namedtuples.
         #      I have not found a way yet to implement such a function.
 
-        self.flags = unpack("<I", data[:4])[0]
+        self.flags = unpack_from("<I", data)[0]
 
-        num_triangles = unpack("<I", data[4:8])[0]
-        num_vertices = unpack("<I", data[8:12])[0]
-
+        num_triangles = unpack_from("<I", data,4)[0]
+        num_vertices = unpack_from("<I", data,8)[0]
+        
         rw_version = Sections.get_rw_version(parent_chunk.version)
         
         # read surface properties (only on rw below 0x34000)
         pos = 16
         if rw_version < 0x34000:
-            self.surface_properties = Sections.read_geometry_surface_properties(
-                data[16:28]
-            )
+            self.surface_properties = Sections.read(GeomSurfPro, data, pos)
             pos = 28
 
         if self.flags & rpGEOMETRYNATIVE == 0:
@@ -259,12 +246,13 @@ class Geometry:
                 self.prelit_colours = []
                 
                 for i in range(num_vertices):
-                    prelit_colour = Sections.read_rgba(data[pos:pos+4])
+                    prelit_colour = Sections.read(RGBA, data, pos)
                     self.prelit_colours.append(prelit_colour)
 
                     pos += 4
 
             # Read Texture Mapping coordinates
+            # TODO: Fix multiple UV maps
             if self.flags & (rpGEOMETRYTEXTURED | rpGEOMETRYTEXTURED2):
                 texCount = self.flags & 0x00FF0000 % 65536
                 if texCount == 0:
@@ -273,7 +261,7 @@ class Geometry:
 
                 self.tex_coords = []
                 for i in range(num_vertices*texCount):
-                    tex_coord = Sections.read_tex_coords(data[pos:pos+8])
+                    tex_coord = Sections.read(TexCoords, data, pos)
                     self.tex_coords.append(tex_coord)
 
                     pos += 8
@@ -281,32 +269,33 @@ class Geometry:
             # Read Triangles
             self.triangles = []
             for i in range(num_triangles):
-                triangle = Sections.read_triangle(data[pos:pos+8])
+                triangle = Sections.read(Triangle, data, pos)
                 self.triangles.append(triangle)
                 
                 pos += 8
 
         # Read  morph targets (This should be only once)
-        self.bounding_sphere = Sections.read_sphere(data[pos:pos+16])
-
+        self.bounding_sphere = Sections.read(Sphere, data, pos)
+        print(self.bounding_sphere)
+        
         pos += 16
-        self.has_vertices = unpack("<I", data[pos:pos+4])
-        self.has_normals = unpack("<I", data[pos+4:pos+8])
-        pos += 24
+        self.has_vertices = unpack_from("<I", data, pos)[0]
+        self.has_normals = unpack_from("<I", data, pos + 4)[0]
+        pos += 8
 
         # read vertices
-        if self.has_vertices == 1:
+        if self.has_vertices:
             self.vertices = []
             for i in range(num_vertices):
-                vertice = Sections.read_vector(data[pos:pos+12])
+                vertice = Sections.read(Vector, data, pos)
                 self.vertices.append(vertice)
                 pos += 12
             
         # read normals
-        if self.has_normals == 1:
+        if self.has_normals:
             self.normals = []
             for i in range(num_vertices):
-                normal = Sections.read_vector(data[pos:pos+12])
+                normal = Sections.read(Vector, data, pos)
                 self.normals.append(normal)
                 pos += 12
 
@@ -315,26 +304,24 @@ class Geometry:
 
 class dff:
 
-    frame_list = []
-    geometry_list = []
-    atomic_list = []
-    light_list = []
-
-    # read variables
-    pos = 0
-    data = ""
+    #######################################################
+    def _read(self, size):
+        current_pos = self.pos
+        self.pos += size
+        
+        return current_pos
 
     #######################################################
     def raw(self, size, offset=None):
+
         if offset is None:
             offset = self.pos
+        
         return self.data[offset:offset+size]
 
     #######################################################
     def read_chunk(self):
-        chunk = Sections.read_chunk(self.raw(12))
-
-        self.pos += 12
+        chunk = Sections.read(Chunk, self.data, self._read(12))
         return chunk
 
     #######################################################
@@ -345,14 +332,13 @@ class dff:
         frame_list_start = self.pos
 
         # read frames count
-        frames_count = unpack("<I", self.raw(4))[0]
-        self.pos += 4
+        frames_count = unpack_from("<I", self.data, self._read(4))[0]
 
         for i in range(frames_count):
             frame = Frame(self.data[self.pos:])
 
             self.frame_list.append(frame)
-            self.pos += Frame.size()
+            self._read(Frame.size())
 
         self.pos = frame_list_start+chunk.size  # just in case
 
@@ -372,12 +358,13 @@ class dff:
                 name = None
                 bone_data = None
 
-                if chunk.type == 39056126:  # FRAME
-                    name = self.raw(chunk.size).decode("utf-8")
-                elif chunk.type == 286:  # HANIM PLG
+                if chunk.type == types["Frame"]:
+                    name = self.raw(strlen(self.data,self.pos)).decode("utf-8")
+                    
+                elif chunk.type == types["HAnim PLG"]:
                     bone_data = HAnimPLG(self.raw(chunk.size))
 
-                self.pos += chunk.size
+                self._read(chunk.size)
                 if name is not None:
                     self.frame_list[i].name = name
                 if bone_data is not None:
@@ -395,9 +382,9 @@ class dff:
         _SplitHeader = namedtuple("_SplitHeader","indices_count material")
         _Triangle = namedtuple("_Triangle", "a b c")
         
-        header = _Header._make(unpack("<III", self.raw(12)))
-        self.pos += 12
-        
+        header = _Header._make(unpack_from("<III", self.data, self._read(12)))
+
+        # calculate if the indices are stored in 32 bit or 16 bit
         opengl = 12 + header.mesh_count * 8 \
         + (header.total_indices * 4) > parent_chunk.size
         
@@ -405,20 +392,31 @@ class dff:
 
             # Read header
             
-            split_header = _SplitHeader._make(unpack("<II", self.raw(8)))
-            self.pos += 8
+            split_header = _SplitHeader._make(unpack_from("<II",
+                                                          self.data,
+                                                          self._read(8)))
 
             unpack_format = "<HHH" if opengl else "<H2xH2xH2x"
             for j in range(0,split_header.indices_count,3):
 
-                _triangle = _Triangle._make(unpack(unpack_format,
-                                                  self.raw(6 if opengl else 12)))
+                _triangle = _Triangle._make
+                (
+                    unpack_from
+                    (
+                        unpack_format,
+                        self.data,
+                        self._read(6 if opengl else 12)
+                    )
+                )
 
                 self.pos += 6 if opengl else 12
-                triangle = Triangle._make((_triangle.a,
-                                          _triangle.b,
-                                           split_header.material,
-                                           _triangle.c))
+                triangle = Triangle._make
+                (
+                    (_triangle.a,
+                     _triangle.b,
+                     split_header.material,
+                     _triangle.c)
+                )
                     
                 geometry.triangles.append(triangle)
                 pass
@@ -428,26 +426,32 @@ class dff:
         list_end = parent_chunk.size + self.pos
         chunk = self.read_chunk()
 
-        if chunk.type == 1:  # STRUCT
-            materials_count = unpack("<I", self.raw(4))[0]
-            self.pos += 4
-
+        if chunk.type == types["Struct"]:
+            materials_count = unpack_from("<I", self.data, self._read(4))[0]
             materials_indices = []
 
             for i in range(materials_count):
-                materials_indices.append(unpack("<i", self.raw(4))[0])
-                self.pos += 4
 
+                materials_indices.append
+                (
+                    unpack_from
+                    (
+                        "<i",
+                        self.data,
+                        self._read(4)
+                    )[0]
+                )
+                
             while self.pos < list_end:
 
                 chunk = self.read_chunk()
                 chunk_end = self.pos + chunk.size
 
-                if chunk.type == 7:  # MATERIAL
+                if chunk.type == types["Material"]:
                     chunk = self.read_chunk()
 
                     # Read header
-                    if chunk.type == 1:
+                    if chunk.type == types["Struct"]:
                         material = Material(self.data[self.pos:self.pos+chunk.size])
                         self.pos += chunk.size
 
@@ -455,29 +459,35 @@ class dff:
                     while self.pos < chunk_end:
                         chunk = self.read_chunk()
 
-                        if chunk.type == 6:  # TEXTURE
+                        if chunk.type == types["Texture"]:
 
-                            chunk = self.read_chunk()  # STRUCT
+                            chunk = self.read_chunk() 
 
                             # Read a  texture
                             texture = Texture(
                                 self.data[self.pos:self.pos+chunk.size]
                             )
                             
-                            self.pos += chunk.size
-                            
-                            chunk = self.read_chunk()  # Texture Name
-                            texture.name = self.data[self.pos : self.pos +
-                                                     chunk.size].decode("utf-8")
-                            self.pos += chunk.size
+                            self._read(chunk.size)
 
-                            chunk = self.read_chunk()  # Mask Name
-                            texture.mask = self.data[self.pos:self.pos +
-                                                     chunk.size].decode("utf-8")
-                            self.pos += chunk.size
+                            # Texture Name
+                            chunk = self.read_chunk()
+                            texture.name = self.raw(
+                                strlen(self.data,self.pos)
+                            ).decode("utf-8")
+                            
+                            self._read(chunk.size)
+
+                            # Mask Name
+                            chunk = self.read_chunk()  
+                            texture.mask = self.raw(
+                                strlen(self.data,self.pos)
+                            ).decode("utf-8")
+
+                            self._read(chunk.size)
                             material.textures.append(texture)
 
-                        elif chunk.type == 3: #EXTENSION
+                        elif chunk.type == types["Extension"]: 
                             if chunk.size > 0:
                                 
                                 chunk_end = chunk.size + self.pos
@@ -489,10 +499,10 @@ class dff:
                                     #TODO: Extensions
                                     self.pos += chunk.size
                                     
-                            self.pos += chunk.size
+                            self._read(chunk.size)
                             
                         else:
-                            self.pos += chunk.size
+                            self._read(chunk.size)
 
                     self.geometry_list[-1].materials.append(material)
                     
@@ -503,36 +513,43 @@ class dff:
 
         chunk = self.read_chunk()
 
-        if chunk.type == 1:  # STRUCT
-            geometries = unpack("<I", self.raw(4))[0]
-            self.pos += 4
+        if chunk.type == types["Struct"]:
+            geometries = unpack_from("<I", self.data, self._read(4))[0]
 
             # Read geometries
             for i in range(geometries):
                 chunk = self.read_chunk()
-                if chunk.type == 15:  # GEOMETRY
+
+                # GEOMETRY
+                if chunk.type == types["Geometry"]:  
                     chunk_end = self.pos + chunk.size
 
                     chunk = self.read_chunk()
                     geometry = Geometry(self.data[self.pos:], parent_chunk)
 
-                    self.pos += chunk.size
+                    self._read(chunk.size)
 
                     self.geometry_list.append(geometry)
 
                     while self.pos < chunk_end:
+
                         chunk = self.read_chunk()
-                        if chunk.type == 8:  # MATERIAL LIST
+
+                        # MATERIAL LIST
+                        if chunk.type == types["Material List"]:  
                             self.read_material_list(chunk)
-                            
-                        elif chunk.type == 3:  # EXTENSION
+
+                        # EXTENSION
+                        elif chunk.type == types["Extension"]:  
                             pass # will fallthrough
-                        
-                        #elif chunk.type == 0x50E: #BIN MESH PLG
+
+                        #BIN MESH PLG
+                        #elif chunk.type == types["Bin Mesh PLG"]: 
                         #   self.read_mesh_plg(chunk,geometry)
-                            
+
+                        #OTHER
                         else:
-                            self.pos += chunk.size
+                            self._read(chunk.size)
 
                     self.pos = chunk_end
 
@@ -543,8 +560,9 @@ class dff:
         while True:
             chunk = self.read_chunk()
 
-            if chunk.type == 1:
-                atomic = Sections.read_atomic(self.data[self.pos:self.pos+chunk.size])
+            # STRUCT
+            if chunk.type == types["Struct"]:
+                atomic = Sections.read(Atomic, self.data, self.pos)
                 self.atomic_list.append(atomic)
                 break
 
@@ -555,41 +573,48 @@ class dff:
         chunk = self.read_chunk()
         root_end = self.pos + root_chunk.size
 
-        if chunk.type == 1:  # STRUCT
+        # STRUCT
+        if chunk.type == types["Struct"]:  
 
             # read clump data
-            root_clump = Clump._make(unpack("<III",
-                                            self.raw(12)))
-            self.pos += 12
+            root_clump = Sections.read(Clump, self.data, self._read(12))
 
             while self.pos < root_end-12:
                 chunk = self.read_chunk()
 
-                if chunk.type == 14:  # FRAMELIST
+                # FRAMELIST
+                if chunk.type == types["Frame List"]:  
                     self.read_frame_list(chunk)
-                elif chunk.type == 26:  # GEOMETRYLIST
+
+                # GEOMETRYLIST
+                elif chunk.type == types["Geometry List"]:  
                     self.read_geometry_list(chunk)
-                elif chunk.type == 20:  # ATOMIC
+
+                # ATOMIC
+                elif chunk.type == types["Atomic"]:  
                     self.read_atomic(chunk)
-                else: #TODO: Extensions (Collision models)
+
+                #TODO: Extensions (Collision models)
+                else: 
                     self.pos += chunk.size
 
     #######################################################
     def load_memory(self, data: str):
+
         self.data = data
         root = self.read_chunk()
 
-        if root.type == 16:
+        if root.type == types["Clump"]:
             self.read_clump(root)
 
     #######################################################
     def unload(self):
-            self.frame_list = []
+            self.frame_list    = []
             self.geometry_list = []
-            self.atomic_list = []
-            self.light_list = []
-            self.pos = 0
-            self.data = ""
+            self.atomic_list   = []
+            self.light_list    = []
+            self.pos           = 0
+            self.data          = ""
             
     #######################################################
     def load_file(self, filename: str):
@@ -598,6 +623,18 @@ class dff:
             content = file.read()
             self.load_memory(content)
 
-test = dff()
-test.load_file("/home/parik/playa.dff")
+    #######################################################
+    def __init__(self):
+        
+        self.frame_list = []
+        self.geometry_list = []
+        self.atomic_list = []
+        self.light_list = []
+        
+        # read variables
+        self.pos = 0
+        self.data = ""
+
+#test = dff()
+#test.load_file("/home/parik/Downloads/androm.dff")
 #print(test.geometry_list[2].triangles)
