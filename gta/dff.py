@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
-from struct import unpack, unpack_from
+from struct import unpack_from
 
 # Data types
 Chunk       = namedtuple("Chunk"                     , "type size version")
@@ -25,8 +25,7 @@ Matrix      = namedtuple("Matrix"                    , "right up at")
 HAnimHeader = namedtuple("HAnimHeader"               , "version id bone_count")
 Bone        = namedtuple("Bone"                      , "id index type")
 RGBA        = namedtuple("RGBA"                      , "r g b a")
-GeomSurfPro = namedtuple("GeometrySurfaceProperties" ,
-                         "ambient specular diffuse")
+GeomSurfPro = namedtuple("GeomSurfPro"               , "ambient specular diffuse")
 TexCoords   = namedtuple("TexCoords"                 , "u v")
 Sphere      = namedtuple("Sphere"                    , "x y z radius")
 Triangle    = namedtuple("Triangle"                  , "b a material c")
@@ -46,19 +45,19 @@ rpGEOMETRYNATIVE                = 0x01000000
 # Block types
 
 types = {
-    "Frame": 39056126,
-    "HAnim PLG": 286,
-    "Struct": 1,
-    "Material": 7,
-    "Texture": 6,
-    "Extension": 3,
-    "Geometry": 15,
-    "Material List": 8,
-    "Bin Mesh PLG": 0x50E,
-    "Frame List": 14,
-    "Geometry List": 26,
-    "Atomic": 20,
-    "Clump": 16
+    "Frame"         : 39056126,
+    "HAnim PLG"     : 286,
+    "Struct"        : 1,
+    "Material"      : 7,
+    "Texture"       : 6,
+    "Extension"     : 3,
+    "Geometry"      : 15,
+    "Material List" : 8,
+    "Bin Mesh PLG"  : 0x50E,
+    "Frame List"    : 14,
+    "Geometry List" : 26,
+    "Atomic"        : 20,
+    "Clump"         : 16
 }
 
 #######################################################
@@ -74,23 +73,24 @@ def strlen(bytes, offset):
 
         i += 1
         
-    return i-offset
+    return i-offset-1
 
+#######################################################
 class Sections:
 
     # Unpack/pack format for above data types
     unpackers =  {
-        Chunk: "<3I",
-        Clump: "<3I",
-        Vector: "<3f",
-        HAnimHeader: "<3I",
-        Bone: "<3I",
-        RGBA: "<4B",
-        GeomSurfPro: "<3f",
-        Sphere: "<4f",
-        Triangle: "<4H",
-        Atomic: "<4I",
-        TexCoords: "<2f"
+        Chunk       : "<3I",
+        Clump       : "<3I",
+        Vector      : "<3f",
+        HAnimHeader : "<3I",
+        Bone        : "<3I",
+        RGBA        : "<4B",
+        GeomSurfPro : "<3f",
+        Sphere      : "<4f",
+        Triangle    : "<4H",
+        Atomic      : "<4I",
+        TexCoords   : "<2f"
     }
     
     #######################################################
@@ -125,8 +125,8 @@ class Sections:
 class Texture:
     filters = None
     unknown = None
-    name = ""
-    mask = ""
+    name    = ""
+    mask    = ""
 
     #######################################################
     def __init__(self, data):
@@ -140,12 +140,12 @@ class Texture:
 #######################################################
 class Material:
 
-    flags = None
-    colour = None
-    is_textured = None
+    flags              = None
+    colour             = None
+    is_textured        = None
     surface_properties = None
-    textures = None
-    plugins = None
+    textures           = None
+    plugins            = None
 
     #######################################################
     def __init__(self, data):
@@ -167,11 +167,11 @@ class Material:
 class Frame:
 
     rotation_matrix = None
-    position = None
-    parent = None
-    creation_flags = None
-    name = None
-    bone_data = None
+    position        = None
+    parent          = None
+    creation_flags  = None
+    name            = None
+    bone_data       = None
 
     def __init__(self, data):
 
@@ -205,17 +205,17 @@ class HAnimPLG:
 #######################################################
 class Geometry:
 
-    flags = None
-    triangles = None
-    vertices = None
+    flags              = None
+    triangles          = None
+    vertices           = None
     surface_properties = None
-    prelit_colours = None
-    tex_coords = None
-    bounding_sphere = None
-    has_vertices = None
-    has_normals = None
-    normals = None
-    materials = []
+    prelit_colours     = None
+    tex_coords         = None
+    bounding_sphere    = None
+    has_vertices       = None
+    has_normals        = None
+    normals            = None
+    materials          = []
 
     #######################################################
     def __init__(self, data, parent_chunk):
@@ -226,12 +226,10 @@ class Geometry:
         #      convert an array to an array of namedtuples.
         #      I have not found a way yet to implement such a function.
 
-        self.flags = unpack_from("<I", data)[0]
-
+        self.flags    = unpack_from("<I", data)[0]
         num_triangles = unpack_from("<I", data,4)[0]
-        num_vertices = unpack_from("<I", data,8)[0]
-        
-        rw_version = Sections.get_rw_version(parent_chunk.version)
+        num_vertices  = unpack_from("<I", data,8)[0]
+        rw_version    = Sections.get_rw_version(parent_chunk.version)
         
         # read surface properties (only on rw below 0x34000)
         pos = 16
@@ -327,8 +325,8 @@ class dff:
     #######################################################
     def read_frame_list(self, parent_chunk):
 
-        parent_end = self.pos + parent_chunk.size
-        chunk = self.read_chunk()
+        parent_end       = self.pos + parent_chunk.size
+        chunk            = self.read_chunk()
         frame_list_start = self.pos
 
         # read frames count
@@ -346,7 +344,7 @@ class dff:
         i = 0
         while self.pos < parent_end:
 
-            chunk = self.read_chunk()
+            chunk     = self.read_chunk()
             chunk_end = self.pos + chunk.size
 
             if chunk.size == 0:
@@ -378,9 +376,9 @@ class dff:
         # TODO: Add support for Triangle Strips
         geometry.triangles = []
         
-        _Header = namedtuple("_Header","flags mesh_count total_indices")
+        _Header      = namedtuple("_Header","flags mesh_count total_indices")
         _SplitHeader = namedtuple("_SplitHeader","indices_count material")
-        _Triangle = namedtuple("_Triangle", "a b c")
+        _Triangle    = namedtuple("_Triangle", "a b c")
         
         header = _Header._make(unpack_from("<III", self.data, self._read(12)))
 
@@ -608,7 +606,7 @@ class dff:
             self.read_clump(root)
 
     #######################################################
-    def unload(self):
+    def clear(self):
             self.frame_list    = []
             self.geometry_list = []
             self.atomic_list   = []
@@ -626,14 +624,7 @@ class dff:
     #######################################################
     def __init__(self):
         
-        self.frame_list = []
-        self.geometry_list = []
-        self.atomic_list = []
-        self.light_list = []
-        
-        # read variables
-        self.pos = 0
-        self.data = ""
+        self.clear()
 
 #test = dff()
 #test.load_file("/home/parik/Downloads/androm.dff")
