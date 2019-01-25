@@ -24,6 +24,8 @@ from .dff import dff
 #######################################################
 class dff_importer:
 
+    image_ext = "png"
+    
     #######################################################
     def _init():
         self = dff_importer
@@ -48,9 +50,6 @@ class dff_importer:
             bm   = bmesh.new()
 
             uv_layers = []
-
-            # Materials
-            self.import_materials(geom)
             
             # Vertices
             for v in geom.vertices:
@@ -73,12 +72,14 @@ class dff_importer:
                             bm.verts[f.c]
                         ])
 
-                    # Setting faces
+                    face.material_index = f.material
+                    
+                    # Setting UV coordinates
                     for i, layer in enumerate(geom.uv_layers):
-                        
+                    
                         for loop in face.loops:
                             bl_layer = uv_layers[i]
-
+                            
                             uv_coords = layer[loop.vert.index]
 
                             loop[bl_layer].uv = (
@@ -103,6 +104,9 @@ class dff_importer:
                 mesh.use_auto_smooth = True
 
             mesh.update()
+
+            # Import materials and add the mesh to the meshes list
+            self.import_materials(geom, frame, mesh)
             self.meshes[atomic.frame] = mesh
 
     #######################################################
@@ -126,7 +130,7 @@ class dff_importer:
         pass
 
     ##################################################################
-    def import_materials(geometry):
+    def import_materials(geometry, frame, mesh):
 
         self = dff_importer
         
@@ -141,28 +145,33 @@ class dff_importer:
 
             for index, material in enumerate(geometry.materials):
 
-                mat = bpy.data.materials.new(name="Material")
+                # Generate a nice name with index and frame
+                name = "%s.%d" % (frame.name, index)
+                
+                mat = bpy.data.materials.new(name)
                 mat.use_nodes = True
                 
                 principled = PrincipledBSDFWrapper(mat, is_readonly=False)
                 
                 principled.base_color = (
-                    material.colour.r,
-                    material.colour.g,
-                    material.colour.b
+                    material.colour.r / 255,
+                    material.colour.g / 255,
+                    material.colour.b / 255
                 )
 
                 # Texture
-                print(material.is_textured)
-                if material.is_textured == 1:
+                if (material.is_textured == 1) and (self.image_ext is not "None"):
                     texture = material.textures[0]
-                    path = os.path.dirname(self.file_name) + '/' + texture.name + '.png'
+                    path = os.path.dirname(self.file_name)
 
-                    image = load_image(path)
+                    image = load_image("%s.%s" % (texture.name, self.image_ext),
+                                       path,
+                                       recursive=False,
+                                       place_holder=False )
                     if image is not None:
                         principled.base_color_texture.image = image
                     else:
-                        print("Image not found %s" % (path))
+                        print("Image not found %s" % (path + '/' + texture.name + self.image_ext))
                 
                 props = None
 
@@ -176,7 +185,10 @@ class dff_importer:
                 # TODO: Ambient property in an added panel
                 if props is not None:
                     principled.specular = props.specular
-                    principled.roughness = props.diffuse                    
+                    principled.roughness = props.diffuse
+
+                # Add imported material to the object
+                mesh.materials.append(principled.material)
                 
     
     #######################################################
@@ -240,7 +252,8 @@ class dff_importer:
         self.import_frames()
 
 #######################################################
-def import_dff(file_name):
+def import_dff(options):
 
     # Shadow function
-    dff_importer.import_dff(file_name)
+    dff_importer.image_ext = options['image_ext']
+    dff_importer.import_dff(options['file_name'])

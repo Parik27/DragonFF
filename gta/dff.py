@@ -67,13 +67,14 @@ def strlen(bytes, offset):
     
     i = offset
     while i < len(bytes):
-       
-        if bytes[i] == 0:
+
+        # 32  -> ' ' and 126 -> '~'
+        if bytes[i] < 32 or bytes[i] > 126:
             break
 
         i += 1
         
-    return i-offset-2
+    return i-offset
 
 #######################################################
 class Sections:

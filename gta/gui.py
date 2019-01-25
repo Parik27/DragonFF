@@ -46,14 +46,48 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
          name        = "File Path",
          description = "Filepath used for importing the DFF/COL file",
          maxlen      = 1024,
-         default     = ""
+         default     = "",
+         options     = {'HIDDEN'}
      )
 
+    
+    load_txd =  bpy.props.BoolProperty(
+        name        = "Load TXD file",
+        default     = True
+    )
+    
+    image_ext = bpy.props.EnumProperty(
+        items =
+        (
+            ("PNG", ".PNG", "Load a PNG image"),
+            ("JPG", ".JPG", "Load a JPG image"),
+            ("JPEG", ".JPEG", "Load a JPEG image"),
+            ("TGA", ".TGA", "Load a TGA image"),
+            ("BMP", ".BMP", "Load a BMP image"),
+            ("TIF", ".TIF", "Load a TIF image"),
+            ("TIFF", ".TIFF", "Load a TIFF image"),
+            ("NONE", "None", "Don't import textures from images" )
+        ),
+        name        = "Image extension",
+        description = "Image extension to search textures in"
+    )
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "load_txd")
+        layout.prop(self, "image_ext")
+        
     #######################################################
     def execute(self, context):
         
         for file in [os.path.join(self.directory,file.name) for file in self.files]:
-            dff_importer.import_dff(file)
+            dff_importer.import_dff(
+                {'file_name': file,
+                 'image_ext': self.image_ext
+                }
+            )
         return {'FINISHED'}
 
     #######################################################
