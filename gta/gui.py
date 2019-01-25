@@ -16,7 +16,7 @@
 
 import bpy
 import os
-import dff_importer
+from . import dff_importer
 
 from bpy_extras.io_utils import ImportHelper
 
@@ -42,7 +42,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     )
 
     # Stores a single file path
-    filepath  = bpy.props.StringProperty(
+    filepath = bpy.props.StringProperty(
          name        = "File Path",
          description = "Filepath used for importing the DFF/COL file",
          maxlen      = 1024,

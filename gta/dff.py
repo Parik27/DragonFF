@@ -73,7 +73,7 @@ def strlen(bytes, offset):
 
         i += 1
         
-    return i-offset-1
+    return i-offset-2
 
 #######################################################
 class Sections:
@@ -123,75 +123,104 @@ class Sections:
         
 #######################################################
 class Texture:
-    filters = None
-    unknown = None
-    name    = ""
-    mask    = ""
 
+    def __init__(self):
+        self.flags              = None
+        self.colour             = None
+        self.is_textured        = None
+        self.surface_properties = None
+        self.textures           = None
+        self.plugins            = None
+    
     #######################################################
-    def __init__(self, data):
+    def from_mem(data):
+
+        self = Texture()
+        
         _Texture = namedtuple("_Texture", "filters unk")
         _tex = _Texture._make(unpack_from("<2H", data))
  
         self.filters = _tex.filters
         self.unknown = _tex.unk
 
+        return self
 
 #######################################################
 class Material:
 
-    flags              = None
-    colour             = None
-    is_textured        = None
-    surface_properties = None
-    textures           = None
-    plugins            = None
-
     #######################################################
-    def __init__(self, data):
-        array_data = [unpack_from("<I", data),
+    def __init__(self):
+
+        self.flags              = None
+        self.colour             = None
+        self.is_textured        = None
+        self.surface_properties = None
+        self.textures           = None
+        self.plugins            = None
+
+    
+    #######################################################
+    def from_mem(data):
+
+        self = Material()
+        
+        array_data = [unpack_from("<I", data)[0],
                       Sections.read(RGBA, data, 4),
-                      unpack_from("<I", data, 8),
-                      unpack_from("<I", data, 12)]
+                      unpack_from("<I", data, 8)[0],
+                      unpack_from("<I", data, 12)[0]]
 
         if len(data) > 16:
             self.surface_properties = Sections.read(GeomSurfPro, data, 16)
 
         self.flags       = array_data[0]
         self.colour      = array_data[1]
-        self.is_textured = array_data[2]
+        self.is_textured = array_data[3]
         self.textures    = []
         self.plugins     = []
+
+        return self
                 
 #######################################################
 class Frame:
 
-    rotation_matrix = None
-    position        = None
-    parent          = None
-    creation_flags  = None
-    name            = None
-    bone_data       = None
+    ##################################################################
+    def __init__(self):
+        self.rotation_matrix = None
+        self.position        = None
+        self.parent          = None
+        self.creation_flags  = None
+        self.name            = None
+        self.bone_data       = None
 
-    def __init__(self, data):
+    ##################################################################
+    def from_mem(data):
 
+        self = Frame()
+        
         self.rotation_matrix = Sections.read(Matrix,data)
         self.position        = Sections.read(Vector,data,36)
         self.parent          = unpack_from("<i", data,48)[0]
         self.creation_flags  = unpack_from("<I", data,52)[0]
 
+        return self
+
+    ##################################################################
     def size():
         return 56
 
 #######################################################
 class HAnimPLG:
 
-    header = 0
-    bones = []
+    #######################################################
+    def __init__(self):
+        self.header = 0
+        self.bones = []
 
     #######################################################
-    def __init__(self, data):
+    def from_mem(data):
 
+        self = HAnimPLG()
+        
         self.header = Sections.read(HAnimHeader,data)
         if self.header.bone_count > 0:
             pos = 20  # offset to bone array
@@ -202,23 +231,27 @@ class HAnimPLG:
 
                 pos += 12
 
+        return self
+
 #######################################################
 class Geometry:
 
-    flags              = None
-    triangles          = None
-    vertices           = None
-    surface_properties = None
-    prelit_colours     = None
-    tex_coords         = None
-    bounding_sphere    = None
-    has_vertices       = None
-    has_normals        = None
-    normals            = None
-    materials          = []
+    ##################################################################
+    def __init__(self):
+        self.flags              = None
+        self.triangles          = None
+        self.vertices           = None
+        self.surface_properties = None
+        self.prelit_colours     = None
+        self.uv_layers          = None
+        self.bounding_sphere    = None
+        self.has_vertices       = None
+        self.has_normals        = None
+        self.normals            = None
+        self.materials          = []
 
     #######################################################
-    def __init__(self, data, parent_chunk):
+    def from_mem(data, parent_chunk):
 
         # Note: In the following function, I have used a loop
         #      to load the texture coordinates or prelit colours,
@@ -226,6 +259,8 @@ class Geometry:
         #      convert an array to an array of namedtuples.
         #      I have not found a way yet to implement such a function.
 
+        self = Geometry()
+        
         self.flags    = unpack_from("<I", data)[0]
         num_triangles = unpack_from("<I", data,4)[0]
         num_vertices  = unpack_from("<I", data,8)[0]
@@ -257,12 +292,16 @@ class Geometry:
                     texCount = 2 if (self.flags & rpGEOMETRYTEXTURED2) else \
                         1 if (self.flags & rpGEOMETRYTEXTURED) else 0
 
-                self.tex_coords = []
-                for i in range(num_vertices*texCount):
-                    tex_coord = Sections.read(TexCoords, data, pos)
-                    self.tex_coords.append(tex_coord)
+                self.uv_layers = []
+                for i in range(texCount):
 
-                    pos += 8
+                    self.uv_layers.append([]) #add empty new layer
+                    
+                    for j in range(num_vertices):
+                        
+                        tex_coord = Sections.read(TexCoords, data, pos)
+                        self.uv_layers[i].append(tex_coord)
+                        pos += 8
 
             # Read Triangles
             self.triangles = []
@@ -296,6 +335,8 @@ class Geometry:
                 normal = Sections.read(Vector, data, pos)
                 self.normals.append(normal)
                 pos += 12
+
+        return self
 
 #######################################################
 
@@ -333,7 +374,7 @@ class dff:
         frames_count = unpack_from("<I", self.data, self._read(4))[0]
 
         for i in range(frames_count):
-            frame = Frame(self.data[self.pos:])
+            frame = Frame.from_mem(self.data[self.pos:])
 
             self.frame_list.append(frame)
             self._read(Frame.size())
@@ -360,7 +401,7 @@ class dff:
                     name = self.raw(strlen(self.data,self.pos)).decode("utf-8")
                     
                 elif chunk.type == types["HAnim PLG"]:
-                    bone_data = HAnimPLG(self.raw(chunk.size))
+                    bone_data = HAnimPLG.from_mem(self.raw(chunk.size))
 
                 self._read(chunk.size)
                 if name is not None:
@@ -450,7 +491,9 @@ class dff:
 
                     # Read header
                     if chunk.type == types["Struct"]:
-                        material = Material(self.data[self.pos:self.pos+chunk.size])
+                        material = Material.from_mem(
+                            self.data[self.pos:self.pos+chunk.size]
+                        )
                         self.pos += chunk.size
 
                     # Read textures and extensions
@@ -462,7 +505,7 @@ class dff:
                             chunk = self.read_chunk() 
 
                             # Read a  texture
-                            texture = Texture(
+                            texture = Texture.from_mem(
                                 self.data[self.pos:self.pos+chunk.size]
                             )
                             
@@ -523,7 +566,7 @@ class dff:
                     chunk_end = self.pos + chunk.size
 
                     chunk = self.read_chunk()
-                    geometry = Geometry(self.data[self.pos:], parent_chunk)
+                    geometry = Geometry.from_mem(self.data[self.pos:], parent_chunk)
 
                     self._read(chunk.size)
 

@@ -15,9 +15,20 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
-import gui
+from . import gui
 
 from bpy.utils import register_class, unregister_class
+
+bl_info = {
+    "name": "Blender GTA Tools",
+    "author": "Parik",
+    "version": (0, 1),
+    "blender": (2, 80, 0),
+    "category": "Import-Export",
+    "location": "File > Import/Export",
+    "description": "Importer and Exporter for GTA Formats"
+}
+
 
 # Class list to register
 _classes = [
@@ -30,12 +41,21 @@ def register():
     for cls in _classes:
         register_class(cls)
 
-    bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
+        if (2, 80, 0) > bpy.app.version:        
+            bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
+            
+        else:
+            bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
+    
 
 #######################################################
 def unregister():
 
-    bpy.types.INFO_MT_file_import.remove(gui.import_dff_func)
+    if (2, 80, 0) > bpy.app.version:
+        bpy.types.INFO_MT_file_import.remove(gui.import_dff_func)
+
+    else:
+        bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
     
     # Unregister all the classes
     for cls in _classes:
