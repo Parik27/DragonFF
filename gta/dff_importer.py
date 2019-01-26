@@ -35,6 +35,8 @@ class dff_importer:
         self.meshes = {}
         self.objects = []
         self.file_name = ""
+        self.skin_data = {}
+        self.bones = {}
 
     #######################################################
     def import_atomics():
@@ -58,6 +60,10 @@ class dff_importer:
             bm.verts.ensure_lookup_table()
             bm.verts.index_update()
 
+            # Will use this later when creating frames to construct an armature
+            if 'skin' in geom.extensions:
+                self.skin_data[atomic.frame] = geom.extensions['skin']
+            
             # Add UV Layers
             for layer in geom.uv_layers:
                 uv_layers.append(bm.loops.layers.uv.new())
@@ -167,11 +173,9 @@ class dff_importer:
                     image = load_image("%s.%s" % (texture.name, self.image_ext),
                                        path,
                                        recursive=False,
-                                       place_holder=False )
-                    if image is not None:
-                        principled.base_color_texture.image = image
-                    else:
-                        print("Image not found %s" % (path + '/' + texture.name + self.image_ext))
+                                       place_holder=True )
+
+                    principled.base_color_texture.image = image
                 
                 props = None
 
@@ -190,11 +194,32 @@ class dff_importer:
                 # Add imported material to the object
                 mesh.materials.append(principled.material)
                 
+
+    #######################################################
+    def construct_bone_dict():
+        self = dff_importer
+        
+        for index, frame in enumerate(self.dff.frame_list):
+            if frame.bone_data:
+                bone_id = frame.bone_data.header.id
+                if bone_id != 4294967295: #-1
+                    self.bones[bone_id] = {'frame': frame,
+                                              'index': index}
+                    
+                
+    #######################################################
+    def set_object_mode(obj, mode):
+        
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode=mode, toggle=False)
     
     #######################################################
     def import_frames():
         self = dff_importer
 
+        # Initialise bone indices for use in armature construction
+        self.construct_bone_dict()
+        
         for index, frame in enumerate(self.dff.frame_list):
             
             if frame.name is None:
@@ -205,11 +230,9 @@ class dff_importer:
             if index in self.meshes:
                 mesh = self.meshes[index]
 
-            # Create and link the object to the scene
-            obj = bpy.data.objects.new(frame.name, mesh)
-            self.link_object(obj)
+            obj = None
 
-            # Load matrix
+            # Load rotation matrix
             matrix = mathutils.Matrix(
                 (
                     frame.rotation_matrix.right,
@@ -220,19 +243,80 @@ class dff_importer:
             
             matrix.transpose()
 
-            obj.rotation_mode       = 'QUATERNION'
-            obj.rotation_quaternion = matrix.to_quaternion()
-            obj.location            = frame.position
+            if True:
+                if frame.bone_data is not None:
 
-            # Set empty display properties to something decent
-            if mesh is None:
-                self.set_empty_draw_properties(obj)
+                    # Construct an armature
+                    if frame.bone_data.header.bone_count > 0:
+
+                        armature = bpy.data.armatures.new(frame.name)
+                        obj = bpy.data.objects.new(frame.name, armature)
+                        self.link_object(obj)
+
+                        skinned_obj_data = None
+                        if frame.parent in self.skin_data:
+                            skinned_obj_data = self.skin_data[frame.parent]
+                        else:
+                            skinned_obj_data = self.skin_data[index]
+                        
+                        # armature edit bones are only available in edit mode :/
+                        self.set_object_mode(obj, "EDIT")
+                        edit_bones = obj.data.edit_bones
+                        
+                        bone_list = {}
+                        
+                        for index, bone in enumerate(frame.bone_data.bones):
+
+                            bone_frame = self.bones[bone.id]['frame']
+
+                            e_bone = edit_bones.new(bone_frame.name)
+                            e_bone.tail = (0,0.05,0) # Stop bone from getting delete                            
+                            matrix = skinned_obj_data.bone_matrices[bone.index]
+                            matrix = mathutils.Matrix(matrix).transposed()
+                            matrix = matrix.inverted()
+
+                            e_bone.transform(matrix)
+                            
+                            bone_list[self.bones[bone.id]['index']] = e_bone
+                            print(bone_frame.name, self.bones[bone.id]['index'],
+                                  bone_frame.parent)
+                            
+                            # Setting parent. See "set parent" note below
+                            if bone_frame.parent is not -1:
+                                try:
+                                    e_bone.use_connect = True
+                                    e_bone.parent = bone_list[bone_frame.parent]
+                                except:
+                                    print("GTATools: Bone parent not found")
+                            pass
+
+                        mesh = armature
+
+                        self.set_object_mode(obj, "OBJECT")
+
+                    # Skip bones
+                    elif frame.bone_data.header.id in self.bones and mesh is None:
+                        continue
+                    
+            
+            # Create and link the object to the scene
+            if obj is None:
+                obj = bpy.data.objects.new(frame.name, mesh)
+                self.link_object(obj)
+
+                obj.rotation_mode       = 'QUATERNION'
+                obj.rotation_quaternion = matrix.to_quaternion()
+                obj.location            = frame.position
+
+                # Set empty display properties to something decent
+                if mesh is None:
+                    self.set_empty_draw_properties(obj)
             
             # set parent
             # Note: I have not considered if frames could have parents
             # that have not yet been defined. If I come across such
             # a model, the code will be modified to support that
-            
+          
             if  frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
 

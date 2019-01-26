@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
-from struct import unpack_from
+from struct import unpack_from, calcsize
 
 # Data types
 Chunk       = namedtuple("Chunk"                     , "type size version")
@@ -57,7 +57,8 @@ types = {
     "Frame List"    : 14,
     "Geometry List" : 26,
     "Atomic"        : 20,
-    "Clump"         : 16
+    "Clump"         : 16,
+    "Skin PLG"      : 278
 }
 
 #######################################################
@@ -85,7 +86,7 @@ class Sections:
         Clump       : "<3I",
         Vector      : "<3f",
         HAnimHeader : "<3I",
-        Bone        : "<3I",
+        Bone        : "<3i",
         RGBA        : "<4B",
         GeomSurfPro : "<3f",
         Sphere      : "<4f",
@@ -125,6 +126,18 @@ class Sections:
 #######################################################
 class Texture:
 
+    __slots__ = [
+        'flags',
+        'colour',
+        'is_textured',
+        'surface_properties',
+        'textures',
+        'plugins',
+        'filters',
+        'name',
+        'mask'
+    ]
+    
     def __init__(self):
         self.flags              = None
         self.colour             = None
@@ -132,6 +145,8 @@ class Texture:
         self.surface_properties = None
         self.textures           = None
         self.plugins            = None
+        self.name               = ""
+        self.mask               = ""
     
     #######################################################
     def from_mem(data):
@@ -142,13 +157,21 @@ class Texture:
         _tex = _Texture._make(unpack_from("<2H", data))
  
         self.filters = _tex.filters
-        self.unknown = _tex.unk
 
         return self
 
 #######################################################
 class Material:
 
+    __slots__ = [
+        'flags',
+        'colour',
+        'is_textured',
+        'surface_properties',
+        'textures',
+        'plugins'
+    ]
+    
     #######################################################
     def __init__(self):
 
@@ -184,6 +207,15 @@ class Material:
 #######################################################
 class Frame:
 
+    __slots__ = [
+        'rotation_matrix',
+        'position',
+        'parent',
+        'creation_flags',
+        'name',
+        'bone_data'
+    ]
+    
     ##################################################################
     def __init__(self):
         self.rotation_matrix = None
@@ -212,6 +244,11 @@ class Frame:
 #######################################################
 class HAnimPLG:
 
+    __slots__ = [
+        'header',
+        'bones'
+    ]
+    
     #######################################################
     def __init__(self):
         self.header = 0
@@ -235,8 +272,103 @@ class HAnimPLG:
         return self
 
 #######################################################
+class SkinPLG:
+
+    __slots__ = [
+        "num_bones",
+        "num_used_bones",
+        "max_weights_per_vertex",
+        "bones_used",
+        "vertex_bone_indices",
+        "vertex_bone_weights",
+        "bone_matrices"
+    ]
+
+    ##################################################################
+    def __init__(self):
+        
+        self.num_bones = None
+        self.num_used_bones = None
+        self.max_weights_per_vertex = None
+        self.bones_used = []
+        self.vertex_bone_indices = None
+        self.vertex_bone_weights = None
+        self.bone_matrices = []
+
+    ##################################################################
+    def from_mem(data, geometry):
+
+        self = SkinPLG()
+
+        _data = unpack_from("<3Bx", data)
+        self.num_bones, self.num_used_bones, self.max_weights_per_vertex = _data
+        
+        # Used bones array starts at offset 4
+        pos = 4
+        for i in range(self.num_used_bones):
+            self.bones_used.append(unpack_from("<B", data, pos))
+            pos += 1
+
+        vertices_count = len(geometry.vertices)
+
+        # Read vertex bone indices
+        _data = unpack_from("<%dB" % (vertices_count * 4), data, pos)
+        self.vertex_bone_indices = list(
+            _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
+        )
+        pos += vertices_count * 4
+        
+        # Read vertex bone weights        
+        _data = unpack_from("<%df" % (vertices_count * 4), data, pos)
+        self.vertex_bone_weights = list(
+            _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
+        )
+        pos += vertices_count * 4 * 4 #floats have size 4 bytes
+       
+        # According to gtamods, there is an extra unknown integer here
+        # if the weights per vertex is zero.
+        unpack_format = "<16f"
+        if self.num_used_bones is 0:
+            unpack_format = "<4x16f"
+
+        # Read bone matrices
+        
+        for i in range(self.num_bones):
+
+            _data = list(unpack_from(unpack_format, data, pos))
+            _data[ 3] = 0.0
+            _data[ 7] = 0.0
+            _data[11] = 0.0
+            _data[15] = 1.0
+            
+            self.bone_matrices.append(
+                [_data[0:4], _data[4:8], _data[8:12],
+                 _data[12:16]]
+            )
+
+            pos += calcsize(unpack_format)
+            
+        return self
+    
+#######################################################
 class Geometry:
 
+    __slots__ = [
+        
+        'flags',
+        'triangles',
+        'vertices',
+        'surface_properties',
+        'prelit_colours',
+        'uv_layers',
+        'bounding_sphere',
+        'has_vertices',
+        'has_normals',
+        'normals',
+        'materials',
+        'extensions'
+    ]
+    
     ##################################################################
     def __init__(self):
         self.flags              = None
@@ -250,6 +382,7 @@ class Geometry:
         self.has_normals        = None
         self.normals            = None
         self.materials          = []
+        self.extensions         = {}
 
     #######################################################
     def from_mem(data, parent_chunk):
@@ -314,7 +447,6 @@ class Geometry:
 
         # Read  morph targets (This should be only once)
         self.bounding_sphere = Sections.read(Sphere, data, pos)
-        print(self.bounding_sphere)
         
         pos += 16
         self.has_vertices = unpack_from("<I", data, pos)[0]
@@ -388,9 +520,6 @@ class dff:
 
             chunk     = self.read_chunk()
             chunk_end = self.pos + chunk.size
-
-            if chunk.size == 0:
-                continue
             
             while self.pos < chunk_end:
                 chunk = self.read_chunk()
@@ -409,7 +538,9 @@ class dff:
                     self.frame_list[i].name = name
                 if bone_data is not None:
                     self.frame_list[i].bone_data = bone_data
-                
+
+            if self.frame_list[i].name is None:
+                self.frame_list[i].name = "unnamed"
             i += 1
             
 
@@ -585,6 +716,13 @@ class dff:
                         elif chunk.type == types["Extension"]:  
                             pass # will fallthrough
 
+                        elif chunk.type == types["Skin PLG"]:
+                            
+                            skin = SkinPLG.from_mem(self.data[self.pos:], geometry)
+                            geometry.extensions["skin"] = skin
+                            
+                            self._read(chunk.size)
+                        
                         #BIN MESH PLG
                         #elif chunk.type == types["Bin Mesh PLG"]: 
                         #   self.read_mesh_plg(chunk,geometry)
@@ -669,7 +807,3 @@ class dff:
     def __init__(self):
         
         self.clear()
-
-#test = dff()
-#test.load_file("/home/parik/Downloads/androm.dff")
-#print(test.geometry_list[2].triangles)
