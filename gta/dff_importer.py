@@ -25,6 +25,16 @@ from .dff import dff
 class dff_importer:
 
     image_ext = "png"
+    use_bone_connect = False
+
+    __slots__ = [
+        'dff',
+        'meshes',
+        'objects',
+        'file_name',
+        'skin_data',
+        'bones'
+    ]
     
     #######################################################
     def _init():
@@ -210,8 +220,83 @@ class dff_importer:
     #######################################################
     def set_object_mode(obj, mode):
         
-        bpy.context.view_layer.objects.active = obj
+        # Blender 2.79 compatibility
+        if (2, 80, 0) > bpy.app.version:
+            bpy.context.scene.objects.active = obj
+        else:
+            bpy.context.view_layer.objects.active = obj
+            
         bpy.ops.object.mode_set(mode=mode, toggle=False)
+
+    #######################################################
+    def construct_armature(frame, frame_index):
+
+        self = dff_importer
+        
+        armature = bpy.data.armatures.new(frame.name)
+        obj = bpy.data.objects.new(frame.name, armature)
+        self.link_object(obj)
+        
+        skinned_obj_data = self.skin_data[frame.parent]
+        skinned_obj = self.objects[frame.parent]
+        
+        # armature edit bones are only available in edit mode :/
+        self.set_object_mode(obj, "EDIT")
+        edit_bones = obj.data.edit_bones
+        
+        bone_list = {}
+                        
+        for index, bone in enumerate(frame.bone_data.bones):
+            
+            bone_frame = self.bones[bone.id]['frame']
+
+            # Set vertex group name of the skinned object
+            skinned_obj.vertex_groups[index].name = bone_frame.name
+            
+            e_bone = edit_bones.new(bone_frame.name)
+            e_bone.tail = (0,0.05,0) # Stop bone from getting delete                            
+            matrix = skinned_obj_data.bone_matrices[bone.index]
+            matrix = mathutils.Matrix(matrix).transposed()
+            matrix = matrix.inverted()
+            
+            e_bone.transform(matrix)
+            
+            bone_list[self.bones[bone.id]['index']] = e_bone
+            print(bone_frame.name, self.bones[bone.id]['index'],
+                  bone_frame.parent)
+            
+            # Setting parent. See "set parent" note below
+            if bone_frame.parent is not -1:
+                try:
+                    e_bone.use_connect = self.use_bone_connect
+                    e_bone.parent = bone_list[bone_frame.parent]
+                except BaseException:
+                    print("GTATools: Bone parent not found")
+                    
+        self.set_object_mode(obj, "OBJECT")
+
+        # Add Armature modifier to skinned object
+        modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
+        modifier.object = obj
+        
+        return (armature, obj)
+
+    #######################################################
+    def set_vertex_groups(obj, skin_data):
+
+        # Allocate vertex groups
+        for i in range(skin_data.num_bones):
+            obj.vertex_groups.new()
+
+        # vertex_bone_indices stores what 4 bones influence this vertex
+        for i in range(len(skin_data.vertex_bone_indices)):
+
+            for j in range(len(skin_data.vertex_bone_indices[i])):
+
+                bone = skin_data.vertex_bone_indices[i][j]
+                weight = skin_data.vertex_bone_weights[i][j]
+
+                obj.vertex_groups[bone].add([i], weight, 'ADD')
     
     #######################################################
     def import_frames():
@@ -222,9 +307,6 @@ class dff_importer:
         
         for index, frame in enumerate(self.dff.frame_list):
             
-            if frame.name is None:
-                continue
-
             # Check if the mesh for the frame has been loaded
             mesh = None
             if index in self.meshes:
@@ -243,60 +325,15 @@ class dff_importer:
             
             matrix.transpose()
 
-            if True:
-                if frame.bone_data is not None:
-
-                    # Construct an armature
-                    if frame.bone_data.header.bone_count > 0:
-
-                        armature = bpy.data.armatures.new(frame.name)
-                        obj = bpy.data.objects.new(frame.name, armature)
-                        self.link_object(obj)
-
-                        skinned_obj_data = None
-                        if frame.parent in self.skin_data:
-                            skinned_obj_data = self.skin_data[frame.parent]
-                        else:
-                            skinned_obj_data = self.skin_data[index]
-                        
-                        # armature edit bones are only available in edit mode :/
-                        self.set_object_mode(obj, "EDIT")
-                        edit_bones = obj.data.edit_bones
-                        
-                        bone_list = {}
-                        
-                        for index, bone in enumerate(frame.bone_data.bones):
-
-                            bone_frame = self.bones[bone.id]['frame']
-
-                            e_bone = edit_bones.new(bone_frame.name)
-                            e_bone.tail = (0,0.05,0) # Stop bone from getting delete                            
-                            matrix = skinned_obj_data.bone_matrices[bone.index]
-                            matrix = mathutils.Matrix(matrix).transposed()
-                            matrix = matrix.inverted()
-
-                            e_bone.transform(matrix)
-                            
-                            bone_list[self.bones[bone.id]['index']] = e_bone
-                            print(bone_frame.name, self.bones[bone.id]['index'],
-                                  bone_frame.parent)
-                            
-                            # Setting parent. See "set parent" note below
-                            if bone_frame.parent is not -1:
-                                try:
-                                    e_bone.use_connect = True
-                                    e_bone.parent = bone_list[bone_frame.parent]
-                                except:
-                                    print("GTATools: Bone parent not found")
-                            pass
-
-                        mesh = armature
-
-                        self.set_object_mode(obj, "OBJECT")
-
-                    # Skip bones
-                    elif frame.bone_data.header.id in self.bones and mesh is None:
-                        continue
+            if frame.bone_data is not None:
+                
+                # Construct an armature
+                if frame.bone_data.header.bone_count > 0:
+                    mesh, obj = self.construct_armature(frame, index)
+                    
+                # Skip bones
+                elif frame.bone_data.header.id in self.bones and mesh is None:
+                    continue
                     
             
             # Create and link the object to the scene
@@ -311,6 +348,10 @@ class dff_importer:
                 # Set empty display properties to something decent
                 if mesh is None:
                     self.set_empty_draw_properties(obj)
+
+                # Set vertex groups
+                if index in self.skin_data:
+                    self.set_vertex_groups(obj, self.skin_data[index])
             
             # set parent
             # Note: I have not considered if frames could have parents
@@ -339,5 +380,7 @@ class dff_importer:
 def import_dff(options):
 
     # Shadow function
-    dff_importer.image_ext = options['image_ext']
+    dff_importer.image_ext        = options['image_ext']
+    dff_importer.use_bone_connect = options['connect_bones']
+    
     dff_importer.import_dff(options['file_name'])

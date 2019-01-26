@@ -55,6 +55,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         name        = "Load TXD file",
         default     = True
     )
+
+    connect_bones =  bpy.props.BoolProperty(
+        name        = "Connect Bones",
+        description = "Whether to connect bones (not recommended for anim editing)",
+        default     = False
+    )
     
     image_ext = bpy.props.EnumProperty(
         items =
@@ -77,6 +83,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         layout = self.layout
 
         layout.prop(self, "load_txd")
+        layout.prop(self, "connect_bones")
         layout.prop(self, "image_ext")
         
     #######################################################
@@ -84,8 +91,10 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         
         for file in [os.path.join(self.directory,file.name) for file in self.files]:
             dff_importer.import_dff(
-                {'file_name': file,
-                 'image_ext': self.image_ext
+                {
+                    'file_name'    : file,
+                    'image_ext'    : self.image_ext,
+                    'connect_bones': self.connect_bones
                 }
             )
         return {'FINISHED'}
