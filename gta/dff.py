@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
-from struct import unpack_from, calcsize
+from struct import unpack_from, calcsize, pack
 
 # Data types
 Chunk       = namedtuple("Chunk"                     , "type size version")
@@ -45,20 +45,22 @@ rpGEOMETRYNATIVE                = 0x01000000
 # Block types
 
 types = {
-    "Frame"         : 39056126,
-    "HAnim PLG"     : 286,
-    "Struct"        : 1,
-    "Material"      : 7,
-    "Texture"       : 6,
-    "Extension"     : 3,
-    "Geometry"      : 15,
-    "Material List" : 8,
-    "Bin Mesh PLG"  : 0x50E,
-    "Frame List"    : 14,
-    "Geometry List" : 26,
-    "Atomic"        : 20,
-    "Clump"         : 16,
-    "Skin PLG"      : 278
+    "Frame"           : 39056126,
+    "HAnim PLG"       : 286,
+    "Struct"          : 1,
+    "Material"        : 7,
+    "Texture"         : 6,
+    "Extension"       : 3,
+    "Geometry"        : 15,
+    "Material List"   : 8,
+    "Bin Mesh PLG"    : 0x50E,
+    "Frame List"      : 14,
+    "Geometry List"   : 26,
+    "Atomic"          : 20,
+    "Clump"           : 16,
+    "Skin PLG"        : 278,
+    "String"          : 2,
+    "Right to Render" : 31
 }
 
 #######################################################
@@ -81,7 +83,7 @@ def strlen(bytes, offset):
 class Sections:
 
     # Unpack/pack format for above data types
-    unpackers =  {
+    formats =  {
         Chunk       : "<3I",
         Clump       : "<3I",
         Vector      : "<3f",
@@ -94,14 +96,16 @@ class Sections:
         Atomic      : "<4I",
         TexCoords   : "<2f"
     }
+
+    library_id = 0 # used for writing
     
     #######################################################
     def read(type, data, offset=0):
 
         # These are simple non-nested data types that can be returned in a single
         # unpack calls, and thus do not need any special functions
-        if type in Sections.unpackers:
-            unpacker = Sections.unpackers[type]
+        if type in Sections.formats:
+            unpacker = Sections.formats[type]
             return type._make(unpack_from(unpacker,data,offset))
 
         elif type is Matrix:
@@ -114,14 +118,60 @@ class Sections:
             )
         else:
             raise NotImplementedError("unknown type", type)
+
+    #######################################################
+    def pad_string(str):
+
+        str_len = len(str)
+        return str.encode('utf8')
+        
+    #######################################################
+    def write(type, data, chunk_type=None):
+        _data = b''
+        
+        if type in Sections.formats:
+            packer = Sections.formats[type]
+            _data = pack(packer, *data)
+            
+        elif type is Matrix:
+            _data += Sections.write(Vector, data.right)
+            _data += Sections.write(Vector, data.up)
+            _data += Sections.write(Vector, data.at)
+            
+        if chunk_type is not None:
+            _data = Sections.write_chunk(_data, chunk_type)
+
+        return _data
+        
+
+    #######################################################
+    def write_chunk(data, type):
+        return pack("<III", type, len(data), Sections.library_id) + data
         
      ########################################################
-    def get_rw_version(library_id):
+    def get_rw_version(library_id=None):
         #see https://gtamods.com/wiki/RenderWare
+
+        if library_id is None:
+            library_id = Sections.library_id
         
         if library_id & 0xFFFF0000:
             return (library_id >> 14 & 0x3FF00) + 0x30000 | \
                 (library_id >> 16 & 0x3F)
+
+    #######################################################
+    def get_library_id(version, build):
+        #see https://gtamods.com/wiki/RenderWare
+        
+        if version <= 0x31000:
+            return version >> 8
+
+        return (version-0x30000 & 0x3FF00) << 14 | (version & 0x3F) << 16 | \
+               (build & 0xFFFF)
+
+    #######################################################
+    def set_library_id(version, build):
+        Sections.library_id = Sections.get_library_id(version,build)
         
 #######################################################
 class Texture:
@@ -159,6 +209,19 @@ class Texture:
         self.filters = _tex.filters
 
         return self
+
+    #######################################################
+    def to_mem(self):
+
+        data = b''
+        data += pack("<H2x", self.filters)
+
+        data  = Sections.write_chunk(data, types["Struct"])
+        data += Sections.write_chunk(Sections.pad_string(self.name), types["String"])
+        data += Sections.write_chunk(Sections.pad_string(self.mask), types["String"])
+        data += Sections.write_chunk(b'', types["Extension"])
+
+        return Sections.write_chunk(data, types["Texture"])
 
 #######################################################
 class Material:
@@ -203,6 +266,26 @@ class Material:
         self.plugins     = []
 
         return self
+
+    #######################################################
+    def to_mem(self):
+
+        data = b''
+        data += pack("<4x")
+        data += Sections.write(RGBA, self.colour)
+        data += pack("<II", len(self.textures) > 0, 1)
+
+        if Sections.get_rw_version() > 0x30400:
+            data += Sections.write(GeomSurfPro, self.surface_properties)
+
+        data = Sections.write_chunk(data, types["Struct"])
+
+        # Only 1 texture is supported (I think)
+        if len(self.textures) > 0:
+            data += self.textures[0].to_mem()
+
+        data += Sections.write_chunk(b"", types["Extension"])
+        return Sections.write_chunk(data, types["Material"])
                 
 #######################################################
 class Frame:
@@ -237,6 +320,29 @@ class Frame:
 
         return self
 
+    #######################################################
+    def header_to_mem(self):
+
+        data = b''
+        data += Sections.write(Matrix, self.rotation_matrix)
+        data += Sections.write(Vector, self.position)
+        data += pack("<iI", self.parent, self.creation_flags)
+
+        return data
+
+    #######################################################
+    def extensions_to_mem(self):
+
+        data = b''
+
+        if self.name is not None and self.name is not "unknown":
+            data += Sections.write_chunk(Sections.pad_string(self.name), types["Frame"])
+
+        if self.bone_data is not None:
+            data += self.bone_data.to_mem()
+        
+        return Sections.write_chunk(data, types["Extension"])
+
     ##################################################################
     def size():
         return 56
@@ -270,6 +376,19 @@ class HAnimPLG:
                 pos += 12
 
         return self
+    #######################################################
+    def to_mem(self):
+
+        data = b''
+
+        data += Sections.write(HAnimHeader, self.header)
+        if len(self.bones) > 0:
+            data += pack("<II", 0, 36)
+            
+        for bone in self.bones:
+            data += Sections.write(Bone, bone)
+
+        return Sections.write_chunk(data, types["HAnim PLG"])
 
 #######################################################
 class SkinPLG:
@@ -295,6 +414,28 @@ class SkinPLG:
         self.vertex_bone_weights = None
         self.bone_matrices = []
 
+    ##################################################################
+    def to_mem(self):
+
+        data = b''
+        data += pack("<B3x", self.num_bones)
+        
+        # 4x Indices
+        for indices in self.vertex_bone_indices:
+            data += pack("<4B", *indices)
+
+        # 4x Weight
+        for weight in self.vertex_bone_weights:
+            data += pack("<4f", *weight)
+
+        # 4x4 Matrix
+        for matrix in self.bone_matrices:
+            data += pack("<I", 0xDEADDEAD) # interesting value :eyes:
+            for i in matrix:
+                data += pack("<4f", *i)
+
+        return Sections.write_chunk(data, types["Skin PLG"])
+        
     ##################################################################
     def from_mem(data, geometry):
 
@@ -366,7 +507,8 @@ class Geometry:
         'has_normals',
         'normals',
         'materials',
-        'extensions'
+        'extensions',
+        'export_flags'
     ]
     
     ##################################################################
@@ -383,6 +525,12 @@ class Geometry:
         self.normals            = None
         self.materials          = []
         self.extensions         = {}
+
+        # used for export
+        self.export_flags = {
+            "light"              : True,
+            "modulate_colour"    : False
+            }
 
     #######################################################
     def from_mem(data, parent_chunk):
@@ -470,6 +618,92 @@ class Geometry:
                 pos += 12
 
         return self
+
+    #######################################################
+    def material_list_to_mem(self):
+        # TODO: Support instance materials
+
+        data = b''
+        
+        data += pack("<I", len(self.materials))
+        for i in range(len(self.materials)):
+            data += pack("<i", -1)
+
+        data = Sections.write_chunk(data, types["Struct"])
+
+        for material in self.materials:
+            data += material.to_mem()
+
+        return Sections.write_chunk(data, types["Material List"])
+
+    #######################################################
+    def extensions_to_mem(self):
+
+        data = b''
+        for extension in self.extensions:
+            data += self.extensions[extension].to_mem()
+
+        return Sections.write_chunk(data, types["Extension"])
+        
+    #######################################################
+    def to_mem(self):
+
+        # Set flags
+        flags = rpGEOMETRYPOSITIONS
+        if len(self.uv_layers) > 0:
+            flags |= rpGEOMETRYTEXTURED
+        if len(self.uv_layers) > 1:
+            flags |= rpGEOMETRYTEXTURED2
+        if self.prelit_colours is not None:
+            flags |= rpGEOMETRYPRELIT
+        if self.normals is not None:
+            flags |= rpGEOMETRYNORMALS
+        if self.export_flags["light"]:
+            flags |= rpGEOMETRYLIGHT
+        if self.export_flags["modulate_colour"]:
+            flags |= rpGEOMETRYMODULATEMATERIALCOLOR
+
+        data = b''
+        data += pack("<IIII", flags, len(self.triangles), len(self.vertices), 1)
+
+        # Only present in older RW
+        if Sections.get_rw_version() < 0x34000:
+            data += Sections.write(GeomSurfPro, self.surface_properties)
+
+        # Write pre-lit colours
+        if flags & rpGEOMETRYPRELIT:
+            for colour in self.prelit_colours:
+                data += Sections.write(RGBA, colour)
+
+        # Write UV Layers
+        for uv_layer in self.uv_layers:
+            for tex_coord in uv_layer:
+                data += Sections.write(TexCoords, tex_coord)
+
+        # Write Triangles
+        for triangle in self.triangles:
+            data += Sections.write(Triangle, triangle)
+
+        # Bounding sphere and has_vertices, has_normals
+        data += Sections.write(Sphere, self.bounding_sphere)
+        data += pack("<II",
+                     1 if len(self.vertices) > 0 else 0,
+                     1 if len(self.normals) > 0 else 0)
+
+        # Write Vertices
+        for vertex in self.vertices:
+            data += Sections.write(Vector, vertex)
+
+        # Write Normals
+        for normal in self.normals:
+            data += Sections.write(Vector, normal)
+
+        data = Sections.write_chunk(data, types["Struct"])
+        
+        # Write Material List and extensions
+        data += self.material_list_to_mem()
+        data += self.extensions_to_mem()
+        return Sections.write_chunk(data, types["Geometry"])
 
 #######################################################
 
@@ -789,12 +1023,12 @@ class dff:
 
     #######################################################
     def clear(self):
-            self.frame_list    = []
-            self.geometry_list = []
-            self.atomic_list   = []
-            self.light_list    = []
-            self.pos           = 0
-            self.data          = ""
+        self.frame_list    = []
+        self.geometry_list = []
+        self.atomic_list   = []
+        self.light_list    = []
+        self.pos           = 0
+        self.data          = ""
             
     #######################################################
     def load_file(self, filename: str):
@@ -802,8 +1036,80 @@ class dff:
         with open(filename, mode='rb') as file:
             content = file.read()
             self.load_memory(content)
+           
+    #######################################################
+    def write_frame_list(self):
 
+        data = b''
+
+        data += pack("<I", len(self.frame_list)) # length
+
+        for frame in self.frame_list:
+            data += frame.header_to_mem()
+
+        data = Sections.write_chunk(data, types["Struct"])
+        
+        for frame in self.frame_list:
+            data += frame.extensions_to_mem()
+
+        return Sections.write_chunk(data, types["Frame List"])
+
+    #######################################################
+    def write_geometry_list(self):
+
+        data = b''
+        data += pack("<I", len(self.geometry_list))
+
+        data = Sections.write_chunk(data, types["Struct"])
+        
+        for geometry in self.geometry_list:
+            data += geometry.to_mem()
+        
+        return Sections.write_chunk(data, types["Geometry List"])
+
+    #######################################################
+    def write_atomic(self, atomic):
+
+        data = Sections.write(Atomic, atomic, types["Struct"])
+
+        ext_data = b''
+        if "skin" in self.geometry_list[atomic.geometry].extensions:
+            ext_data += Sections.write_chunk(
+                pack("<II", 0x0116, 1),
+                types["Right to Render"]
+            )
+        data += Sections.write_chunk(ext_data, types["Extension"])
+        return Sections.write_chunk(data, types["Atomic"])
+    
+    #######################################################
+    def write_memory(self, version):
+
+        data = b''
+        Sections.set_library_id(version, 0xFFFF)
+
+        data += Sections.write(Clump, (len(self.atomic_list), 0,0), types["Struct"])
+        data += self.write_frame_list()
+        data += self.write_geometry_list()
+
+        for atomic in self.atomic_list:
+            data += self.write_atomic(atomic)
+
+        data += Sections.write_chunk(b"", types["Extension"])
+            
+        return Sections.write_chunk(data, types["Clump"])
+            
+    #######################################################
+    def write_file(self, filename: str, version):
+
+        with open(filename, mode='wb') as file:
+            content = self.write_memory(version)
+            file.write(content)
+            
     #######################################################
     def __init__(self):
         
         self.clear()
+
+test = dff()
+test.load_file("/home/parik/player.dff")
+test.write_file("test.dff", 0x33002 )
