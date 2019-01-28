@@ -177,24 +177,13 @@ class Sections:
 class Texture:
 
     __slots__ = [
-        'flags',
-        'colour',
-        'is_textured',
-        'surface_properties',
-        'textures',
-        'plugins',
         'filters',
         'name',
         'mask'
     ]
     
     def __init__(self):
-        self.flags              = None
-        self.colour             = None
-        self.is_textured        = None
-        self.surface_properties = None
-        self.textures           = None
-        self.plugins            = None
+        self.filters            = None
         self.name               = ""
         self.mask               = ""
     
@@ -242,7 +231,7 @@ class Material:
         self.colour             = None
         self.is_textured        = None
         self.surface_properties = None
-        self.textures           = None
+        self.textures           = []
         self.plugins            = None
 
     
@@ -335,7 +324,7 @@ class Frame:
 
         data = b''
 
-        if self.name is not None and self.name is not "unknown":
+        if self.name is not None and self.name != "unknown":
             data += Sections.write_chunk(Sections.pad_string(self.name), types["Frame"])
 
         if self.bone_data is not None:
@@ -469,7 +458,7 @@ class SkinPLG:
         # According to gtamods, there is an extra unknown integer here
         # if the weights per vertex is zero.
         unpack_format = "<16f"
-        if self.num_used_bones is 0:
+        if self.num_used_bones == 0:
             unpack_format = "<4x16f"
 
         # Read bone matrices
@@ -514,15 +503,15 @@ class Geometry:
     ##################################################################
     def __init__(self):
         self.flags              = None
-        self.triangles          = None
-        self.vertices           = None
+        self.triangles          = []
+        self.vertices           = []
         self.surface_properties = None
-        self.prelit_colours     = None
-        self.uv_layers          = None
+        self.prelit_colours     = []
+        self.uv_layers          = []
         self.bounding_sphere    = None
         self.has_vertices       = None
         self.has_normals        = None
-        self.normals            = None
+        self.normals            = []
         self.materials          = []
         self.extensions         = {}
 
@@ -586,7 +575,6 @@ class Geometry:
                         pos += 8
 
             # Read Triangles
-            self.triangles = []
             for i in range(num_triangles):
                 triangle = Sections.read(Triangle, data, pos)
                 self.triangles.append(triangle)
@@ -603,7 +591,6 @@ class Geometry:
 
         # read vertices
         if self.has_vertices:
-            self.vertices = []
             for i in range(num_vertices):
                 vertice = Sections.read(Vector, data, pos)
                 self.vertices.append(vertice)
@@ -611,7 +598,6 @@ class Geometry:
             
         # read normals
         if self.has_normals:
-            self.normals = []
             for i in range(num_vertices):
                 normal = Sections.read(Vector, data, pos)
                 self.normals.append(normal)
@@ -654,7 +640,7 @@ class Geometry:
             flags |= rpGEOMETRYTEXTURED
         if len(self.uv_layers) > 1:
             flags |= rpGEOMETRYTEXTURED2
-        if self.prelit_colours is not None:
+        if len(self.prelit_colours) > 0:
             flags |= rpGEOMETRYPRELIT
         if self.normals is not None:
             flags |= rpGEOMETRYNORMALS
@@ -1109,7 +1095,3 @@ class dff:
     def __init__(self):
         
         self.clear()
-
-test = dff()
-test.load_file("/home/parik/player.dff")
-test.write_file("test.dff", 0x33002 )

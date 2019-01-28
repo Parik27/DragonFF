@@ -32,7 +32,8 @@ bl_info = {
 
 # Class list to register
 _classes = [
-    gui.IMPORT_OT_dff
+    gui.IMPORT_OT_dff,
+    gui.EXPORT_OT_dff
 ]
 #######################################################
 def register():
@@ -41,11 +42,14 @@ def register():
     for cls in _classes:
         register_class(cls)
 
-        if (2, 80, 0) > bpy.app.version:        
-            bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
-            
-        else:
-            bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
+    if (2, 80, 0) > bpy.app.version:        
+        bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
+        bpy.types.INFO_MT_file_export.append(gui.export_dff_func)
+        
+    else:
+        bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
+        bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
+        
     
 
 #######################################################
@@ -53,9 +57,11 @@ def unregister():
 
     if (2, 80, 0) > bpy.app.version:
         bpy.types.INFO_MT_file_import.remove(gui.import_dff_func)
+        bpy.types.INFO_MT_file_export.remove(gui.export_dff_func)
 
     else:
         bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
+        bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
     
     # Unregister all the classes
     for cls in _classes:
