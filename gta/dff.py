@@ -123,7 +123,11 @@ class Sections:
     def pad_string(str):
 
         str_len = len(str)
-        return str.encode('utf8')
+        str_len += 1
+
+        # pad to next power of 4 if current number is not divisible by 4
+        str_len = (str_len // 4 + (0 if str_len % 4 == 0 else 1)) * 4
+        return pack("%ds" % str_len, str.encode('utf8'))
         
     #######################################################
     def write(type, data, chunk_type=None):
@@ -518,7 +522,7 @@ class Geometry:
         # used for export
         self.export_flags = {
             "light"              : True,
-            "modulate_colour"    : False
+            "modulate_colour"    : True
             }
 
     #######################################################
@@ -556,7 +560,6 @@ class Geometry:
                     pos += 4
 
             # Read Texture Mapping coordinates
-            # TODO: Fix multiple UV maps
             if self.flags & (rpGEOMETRYTEXTURED | rpGEOMETRYTEXTURED2):
                 texCount = self.flags & 0x00FF0000 % 65536
                 if texCount == 0:
@@ -637,18 +640,16 @@ class Geometry:
 
         # Set flags
         flags = rpGEOMETRYPOSITIONS
-        if len(self.uv_layers) > 0:
-            flags |= rpGEOMETRYTEXTURED
         if len(self.uv_layers) > 1:
             flags |= rpGEOMETRYTEXTURED2
+        elif len(self.uv_layers) > 0:
+            flags |= rpGEOMETRYTEXTURED
         if len(self.prelit_colours) > 0:
             flags |= rpGEOMETRYPRELIT
         if self.normals is not None:
             flags |= rpGEOMETRYNORMALS
-        if self.export_flags["light"]:
-            flags |= rpGEOMETRYLIGHT
-        if self.export_flags["modulate_colour"]:
-            flags |= rpGEOMETRYMODULATEMATERIALCOLOR
+        flags |= rpGEOMETRYLIGHT * self.export_flags["light"]
+        flags |= rpGEOMETRYMODULATEMATERIALCOLOR * self.export_flags["modulate_colour"]
 
         data = b''
         data += pack("<IIII", flags, len(self.triangles), len(self.vertices), 1)
@@ -666,6 +667,7 @@ class Geometry:
         for uv_layer in self.uv_layers:
             for tex_coord in uv_layer:
                 data += Sections.write(TexCoords, tex_coord)
+
 
         # Write Triangles
         for triangle in self.triangles:

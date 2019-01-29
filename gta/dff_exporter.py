@@ -17,6 +17,7 @@
 import bpy
 import bmesh
 import mathutils
+import cProfile
 
 from . import dff
 
@@ -30,6 +31,7 @@ class dff_exporter:
     version = None
     frames = {}
     bones = {}
+    parent_queue = {}
 
     #######################################################
     def multiply_matrix(a, b):
@@ -48,13 +50,20 @@ class dff_exporter:
     def create_frame(obj, append=True):
         self = dff_exporter
         
-        frame = dff.Frame()
+        frame       = dff.Frame()
+        frame_index = len(self.dff.frame_list)
         
         # Get rid of everything before the last period
         frame.name = self.clear_extension(obj.name)
 
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
+
+        # Scan parent queue
+        for name in self.parent_queue:
+            if name == obj.name:
+                index = self.parent_queue[name]
+                self.dff.frame_list[index].parent = frame_index
         
         matrix                = obj.matrix_local
         frame.creation_flags  =  0
@@ -69,7 +78,7 @@ class dff_exporter:
         if obj.parent is not None:
             frame.parent = id_array[obj.parent.name]
 
-        id_array[obj.name] = len(self.dff.frame_list)
+        id_array[obj.name] = frame_index
 
         if append:
             self.dff.frame_list.append(frame)
@@ -130,8 +139,16 @@ class dff_exporter:
                     #TODO: Texture Extensions
                     
                     texture = dff.Texture()
+
+                    # Use node label if it is a substring of image name, else
+                    # use image name
+                    node_label = principled.base_color_texture.node_image.label
+                    image_name = principled.base_color_texture.image.name
+
                     texture.name = self.clear_extension(
-                        principled.base_color_texture.image.name
+                        node_label
+                        if node_label in image_name and node_label is not ""
+                        else image_name
                     )
                     texture.filters = 0 # <-- find a way to store this in Blender
 
@@ -242,7 +259,6 @@ class dff_exporter:
                                 vert.index for vert in face.verts
                             ]
 
-                        print(face.index, loop.index)
                         override_faces[face.index][loop.index] = len(bm.verts)
 
                         # Update the SkinPLG to include the duplicated vertex
@@ -260,7 +276,8 @@ class dff_exporter:
 
         # Allocate uv layers array
         uv_layers_count = len(bm.loops.layers.uv)
-        geometry.uv_layers = [[dff.TexCoords(0,0)] * len(bm.verts)] * uv_layers_count
+        geometry.uv_layers = [[dff.TexCoords(0,0)] * len(bm.verts)
+                              for i in range(uv_layers_count)]
         
         # Faces
         for face in bm.faces:
@@ -283,10 +300,10 @@ class dff_exporter:
             for loop in face.loops:
                 for index, layer in enumerate(bm.loops.layers.uv.values()):
                     uv = loop[layer].uv
-                    geometry.uv_layers[index][verts[loop.index]] = dff.TexCoords._make(
-                        (uv.x, 1 - uv.y) #UV Coordinates are flipped in the Y Axis
+                    geometry.uv_layers[index][verts[loop.index]] = dff.TexCoords(
+                        uv.x, 1 - uv.y #UV Coordinates are flipped in the Y Axis
                     )
-
+                
         self.create_frame(obj)
 
         # Bounding sphere
@@ -321,6 +338,17 @@ class dff_exporter:
         self.dff.atomic_list.append(atomic)
         bm.free()
 
+    #######################################################
+    def calculate_parent_depth(obj):
+        parent = obj.parent
+        depth = 0
+        
+        while parent is not None:
+            parent = parent.parent
+            depth += 1
+
+        return depth        
+        
     #######################################################
     def export_armature(obj):
         self = dff_exporter
@@ -402,29 +430,29 @@ class dff_exporter:
 
         self.file_name = filename
         
-        objects = []
+        objects = {}
 
         # Export collections
         if self.mass_export:
             for collection in bpy.data.collections:
-                if not self.selected:
-                    self.export_objects(collection.objects,
-                                        collection.name)
-                else:
-                    # Only add selected objects to the array
-                    for obj in collection.objects:
-                        if obj.select_get():
-                            objects.append(obj)
+                for obj in collection.objects:
+                    
+                    if not self.selected or obj.select_get():
+                        objects[obj] = self.calculate_parent_depth(obj)
 
-                    self.export_objects(objects,
-                                        collection.name)
-                    objects = []
+                objects = sorted(objects, key=objects.get)
+                self.export_objects(objects,
+                                    collection.name)
+                objects = {}
+                self.frames = {}
+                self.bones = {}
         else:
             for obj in bpy.data.objects:
                 
                 if not self.selected or obj.select_get():
-                    objects.append(obj)
+                    objects[obj] = self.calculate_parent_depth(obj)
 
+            objects = sorted(objects, key=objects.get)
             self.export_objects(objects)
                 
 #######################################################
@@ -435,5 +463,5 @@ def export_dff(options):
     dff_exporter.mass_export = options['mass_export']
     dff_exporter.path        = options['directory']
     dff_exporter.version     = options['version']
-    
+
     dff_exporter.export_dff(options['file_name'])

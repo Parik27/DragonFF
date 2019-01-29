@@ -197,7 +197,8 @@ class dff_importer:
                     image = load_image("%s.%s" % (texture.name, self.image_ext),
                                        path,
                                        recursive=False,
-                                       place_holder=True )
+                                       place_holder=True,
+                                       check_existing=True)
 
                     slot.texture.image = image
                     mesh.materials.append(mat)
@@ -230,8 +231,10 @@ class dff_importer:
                     image = load_image("%s.%s" % (texture.name, self.image_ext),
                                        path,
                                        recursive=False,
-                                       place_holder=True )
-
+                                       place_holder=True,
+                                       check_existing=True
+                    )
+                    principled.base_color_texture.node_image.label = texture.name
                     principled.base_color_texture.image = image
                 
                 props = None
