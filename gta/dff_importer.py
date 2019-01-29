@@ -1,4 +1,4 @@
-# GTA Blender Tools - Tools to edit basic GTA formats
+# GTA DragonFF - Blender scripts to edit basic GTA formats
 # Copyright (C) 2019  Parik
 
 # This program is free software: you can redistribute it and/or modify
@@ -291,7 +291,7 @@ class dff_importer:
                     e_bone.use_connect = self.use_bone_connect
                     e_bone.parent = bone_list[bone_frame.parent]
                 except BaseException:
-                    print("GTATools: Bone parent not found")
+                    print("DragonFF: Bone parent not found")
                     
         self.set_object_mode(obj, "OBJECT")
 

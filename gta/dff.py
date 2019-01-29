@@ -1,4 +1,4 @@
-# GTA Blender Tools - Tools to edit basic GTA formats
+# GTA DragonFF - Blender scripts to edit basic GTA formats
 # Copyright (C) 2019  Parik
 
 # This program is free software: you can redistribute it and/or modify

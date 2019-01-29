@@ -1,4 +1,4 @@
-# GTA Blender Tools - Tools to edit basic GTA formats
+# GTA DragonFF - Blender scripts to edit basic GTA formats
 # Copyright (C) 2019  Parik
 
 # This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@ from . import gui
 from bpy.utils import register_class, unregister_class
 
 bl_info = {
-    "name": "Blender GTA Tools",
+    "name": "GTA DragonFF",
     "author": "Parik",
     "version": (0, 1),
     "blender": (2, 80, 0),
