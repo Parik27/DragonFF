@@ -262,7 +262,7 @@ class Material:
         data = b''
         data += pack("<4x")
         data += Sections.write(RGBA, self.colour)
-        data += pack("<II", len(self.textures) > 0, 1)
+        data += pack("<II", 1, len(self.textures) > 0)
 
         if Sections.get_rw_version() > 0x30400:
             data += Sections.write(GeomSurfPro, self.surface_properties)
@@ -399,8 +399,8 @@ class SkinPLG:
         self.num_used_bones = None
         self.max_weights_per_vertex = None
         self.bones_used = []
-        self.vertex_bone_indices = None
-        self.vertex_bone_weights = None
+        self.vertex_bone_indices = []
+        self.vertex_bone_weights = []
         self.bone_matrices = []
 
     ##################################################################
@@ -627,7 +627,8 @@ class Geometry:
 
         data = b''
         for extension in self.extensions:
-            data += self.extensions[extension].to_mem()
+            if self.extensions[extension] is not None:
+                data += self.extensions[extension].to_mem()
 
         return Sections.write_chunk(data, types["Extension"])
         

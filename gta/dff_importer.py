@@ -1,36 +1,33 @@
 # GTA Blender Tools - Tools to edit basic GTA formats
 # Copyright (C) 2019  Parik
 
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import os
 import bpy
 import bmesh
+import math
 import mathutils
-import os
 
-from .dff import dff
+from . import dff
 
 #######################################################
 class dff_importer:
 
     image_ext = "png"
     use_bone_connect = False
+    current_collection = None
 
     __slots__ = [
         'dff',
@@ -132,13 +129,7 @@ class dff_importer:
 
     #######################################################
     def link_object(obj):
-        # Blender 2.79 used scene instead of collections
-        scene = bpy.context.scene
-        
-        if (2, 80, 0) > bpy.app.version:
-            scene.objects.link(obj)
-        else:
-            scene.collection.objects.link(obj)
+        dff_importer.current_collection.objects.link(obj)
             
     #######################################################
     def set_empty_draw_properties(empty):
@@ -234,6 +225,23 @@ class dff_importer:
         bpy.ops.object.mode_set(mode=mode, toggle=False)
 
     #######################################################
+    def align_roll( vec, vecz, tarz ):
+
+        sine_roll = vec.normalized().dot(vecz.normalized().cross( tarz.normalized() ) )
+
+        if 1 < abs(sine_roll):
+            sine_roll /= abs(sine_roll)
+            
+        if 0 < vecz.dot( tarz ):
+            return math.asin( sine_roll )
+        
+        elif 0 < sine_roll:
+            return -math.asin( sine_roll ) + math.pi
+        
+        else:
+            return -math.asin( sine_roll ) - math.pi
+        
+    #######################################################
     def construct_armature(frame, frame_index):
 
         self = dff_importer
@@ -259,12 +267,19 @@ class dff_importer:
             skinned_obj.vertex_groups[index].name = bone_frame.name
             
             e_bone = edit_bones.new(bone_frame.name)
-            e_bone.tail = (0,0.05,0) # Stop bone from getting delete                            
+            e_bone.tail = (0,0.05,0) # Stop bone from getting delete
+
+            e_bone['bone_id'] = bone.id
+            e_bone['type'] = bone.type
+            
             matrix = skinned_obj_data.bone_matrices[bone.index]
             matrix = mathutils.Matrix(matrix).transposed()
             matrix = matrix.inverted()
-            
-            e_bone.transform(matrix)
+
+            e_bone.transform(matrix, False, False)
+            e_bone.roll = self.align_roll(e_bone.vector,
+                                          e_bone.z_axis,
+                                          matrix.to_3x3() @ mathutils.Vector((0,0,1)))
             
             bone_list[self.bones[bone.id]['index']] = e_bone
             print(bone_frame.name, self.bones[bone.id]['index'],
@@ -365,19 +380,34 @@ class dff_importer:
           
             if  frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
+                
+            self.objects.append(obj)            
 
-            self.objects.append(obj)
-    
+    #######################################################
+    def create_collection(name):
+        if (2, 80, 0) > bpy.app.version:
+            return bpy.data.groups.new(name)
+        else:
+            collection = bpy.data.collections.new(name)
+            bpy.context.scene.collection.children.link(collection)
+
+            return collection
+            
     #######################################################
     def import_dff(file_name):
         self = dff_importer
         self._init()
 
         # Load the DFF
-        self.dff = dff()
+        self.dff = dff.dff()
         self.dff.load_file(file_name)
         self.file_name = file_name
 
+        # Create a new group/collection
+        self.current_collection = self.create_collection(
+            os.path.basename(file_name)
+        )
+        
         self.import_atomics()
         self.import_frames()
 
