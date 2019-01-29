@@ -32,6 +32,13 @@ class dff_exporter:
     bones = {}
 
     #######################################################
+    def multiply_matrix(a, b):
+        # For compatibility with 2.79
+        if bpy.app.version < (2, 80, 0):
+            return a * b
+        return a @ b
+    
+    #######################################################
     def clear_extension(string):
         
         k = string.rfind('.')
@@ -79,8 +86,32 @@ class dff_exporter:
 
             # Blender 2.7x compatibility
             if (2, 80, 0) > bpy.app.version:
-                pass
+                material = dff.Material()
+                material.colour = dff.RGBA(
+                    list(int(255 * x) for x in b_material.diffuse_color) + [255]
+                )
 
+                # Texture
+                try:
+                    texture = dff.Texture()
+                    texture.filters = 0
+                    texture.name = self.clear_extension(
+                        b_material.texture_slots[0].texture.image.name
+                    )
+                    material.textures.append(texture)
+                except:
+                    pass
+
+                # Surface properties
+                specular = b_material.specular_intensity
+                diffuse  = b_material.diffuse_intensity
+                ambient  = b_material.ambient
+                
+                material.surface_properties = dff.GeomSurfPro(
+                    ambient, specular, diffuse
+                )
+                
+                materials.append(material)
             else:
                 from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
             
@@ -91,9 +122,8 @@ class dff_exporter:
 
                 material.colour = dff.RGBA._make(
                     # Blender uses float for RGB Values, and has no Alpha
-                    list(int(255 * x) for x in principled.base_color)
-                    + [255])
-
+                    list(int(255 * x) for x in principled.base_color) + [255])
+                
                 # Texture
                 if principled.base_color_texture.image is not None:
                     #TODO: Texture Filters
@@ -264,7 +294,7 @@ class dff_exporter:
             (mathutils.Vector(b) for b in obj.bound_box),
             mathutils.Vector()
         )
-        sphere_center = obj.matrix_world @ sphere_center
+        sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
         sphere_radius = 1.414 * max(*obj.dimensions) # sqrt(2) * side = diagonal
 
         geometry.bounding_sphere = dff.Sphere._make(

@@ -37,6 +37,13 @@ class dff_importer:
         'skin_data',
         'bones'
     ]
+
+    #######################################################
+    def multiply_matrix(a, b):
+        # For compatibility with 2.79
+        if bpy.app.version < (2, 80, 0):
+            return a * b
+        return a @ b
     
     #######################################################
     def _init():
@@ -130,6 +137,8 @@ class dff_importer:
     #######################################################
     def link_object(obj):
         dff_importer.current_collection.objects.link(obj)
+        if (2, 80, 0) > bpy.app.version:
+            bpy.context.scene.objects.link(obj)
             
     #######################################################
     def set_empty_draw_properties(empty):
@@ -149,9 +158,50 @@ class dff_importer:
         from bpy_extras.image_utils import load_image
         
         # Blender 2.79 loading
+        # TODO: This function can probably be refactored to be shorter
+        # and support both 2.80 and 2.79
+        
         if (2,80, 0) > bpy.app.version:
-            pass
 
+            for index, material in enumerate(geometry.materials):
+
+                name = "%s.%d" % (frame.name, index)
+                mat = bpy.data.materials.new(name)
+
+                mat.diffuse_color = (
+                    material.colour.r / 255,
+                    material.colour.g / 255,
+                    material.colour.b / 255,
+                )
+                if material.surface_properties is not None:
+                    props = material.surface_properties
+                    
+                elif geometry.surface_properties is not None:
+                    props = geometry.surface_properties
+
+                # TODO: Ambient property in an added panel
+                if props is not None:
+                    mat.diffuse_intensity = props.diffuse
+                    mat.specular_intensity = props.specular
+                    mat.ambient = props.ambient
+
+                if (material.is_textured == 1):
+                    texture = material.textures[0]
+                    
+                    slot = mat.texture_slots.add()
+                    slot.texture = bpy.data.textures.new(
+                        name=texture.name,
+                        type="IMAGE"
+                    )
+                    path = os.path.dirname(self.file_name)
+                    image = load_image("%s.%s" % (texture.name, self.image_ext),
+                                       path,
+                                       recursive=False,
+                                       place_holder=True )
+
+                    slot.texture.image = image
+                    mesh.materials.append(mat)
+                    
         else:
             from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
 
@@ -172,10 +222,11 @@ class dff_importer:
                 )
 
                 # Texture
-                if (material.is_textured == 1) and (self.image_ext is not "None"):
+                if (material.is_textured == 1):
                     texture = material.textures[0]
                     path = os.path.dirname(self.file_name)
 
+                    # name.None shouldn't exist, lol
                     image = load_image("%s.%s" % (texture.name, self.image_ext),
                                        path,
                                        recursive=False,
@@ -275,11 +326,14 @@ class dff_importer:
             matrix = skinned_obj_data.bone_matrices[bone.index]
             matrix = mathutils.Matrix(matrix).transposed()
             matrix = matrix.inverted()
-
             e_bone.transform(matrix, False, False)
             e_bone.roll = self.align_roll(e_bone.vector,
                                           e_bone.z_axis,
-                                          matrix.to_3x3() @ mathutils.Vector((0,0,1)))
+                                          self.multiply_matrix(
+                                              matrix,
+                                              mathutils.Vector((0,0,1))
+                                          )
+            )
             
             bone_list[self.bones[bone.id]['index']] = e_bone
             print(bone_frame.name, self.bones[bone.id]['index'],

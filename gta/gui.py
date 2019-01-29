@@ -156,22 +156,22 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     bl_description = 'Import a Renderware DFF or COL File'
     bl_label       = "GTA Renderware (.dff, .col)"
 
-    filter_glob   : bpy.props.StringProperty(default="*.dff;*.col",
+    filter_glob   = bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
     
-    directory     : bpy.props.StringProperty(maxlen=1024,
+    directory     = bpy.props.StringProperty(maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH',
                                               options={'HIDDEN'})
     
     # Stores all the file names to read (not just the firsst)
-    files : bpy.props.CollectionProperty(
+    files = bpy.props.CollectionProperty(
         type    = bpy.types.OperatorFileListElement,
         options = {'HIDDEN'}
     )
 
     # Stores a single file path
-    filepath : bpy.props.StringProperty(
+    filepath = bpy.props.StringProperty(
          name        = "File Path",
          description = "Filepath used for importing the DFF/COL file",
          maxlen      = 1024,
@@ -180,18 +180,18 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
      )
 
     
-    load_txd :  bpy.props.BoolProperty(
+    load_txd =  bpy.props.BoolProperty(
         name        = "Load TXD file",
         default     = True
     )
 
-    connect_bones :  bpy.props.BoolProperty(
+    connect_bones =  bpy.props.BoolProperty(
         name        = "Connect Bones",
         description = "Whether to connect bones (not recommended for anim editing)",
         default     = False
     )
     
-    image_ext : bpy.props.EnumProperty(
+    image_ext = bpy.props.EnumProperty(
         items =
         (
             ("PNG", ".PNG", "Load a PNG image"),
