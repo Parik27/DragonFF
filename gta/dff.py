@@ -210,10 +210,12 @@ class Texture:
         data += pack("<H2x", self.filters)
 
         data  = Sections.write_chunk(data, types["Struct"])
-        data += Sections.write_chunk(Sections.pad_string(self.name), types["String"])
-        data += Sections.write_chunk(Sections.pad_string(self.mask), types["String"])
+        data += Sections.write_chunk(Sections.pad_string(self.name),
+                                     types["String"])
+        data += Sections.write_chunk(Sections.pad_string(self.mask),
+                                     types["String"])
         data += Sections.write_chunk(b'', types["Extension"])
-
+        
         return Sections.write_chunk(data, types["Texture"])
 
 #######################################################
@@ -320,7 +322,6 @@ class Frame:
         data += Sections.write(Matrix, self.rotation_matrix)
         data += Sections.write(Vector, self.position)
         data += pack("<iI", self.parent, self.creation_flags)
-
         return data
 
     #######################################################
@@ -329,7 +330,8 @@ class Frame:
         data = b''
 
         if self.name is not None and self.name != "unknown":
-            data += Sections.write_chunk(Sections.pad_string(self.name), types["Frame"])
+            data += Sections.write_chunk(Sections.pad_string(self.name),
+                                         types["Frame"])
 
         if self.bone_data is not None:
             data += self.bone_data.to_mem()
@@ -649,7 +651,8 @@ class Geometry:
         if self.normals is not None:
             flags |= rpGEOMETRYNORMALS
         flags |= rpGEOMETRYLIGHT * self.export_flags["light"]
-        flags |= rpGEOMETRYMODULATEMATERIALCOLOR * self.export_flags["modulate_colour"]
+        flags |= rpGEOMETRYMODULATEMATERIALCOLOR * \
+            self.export_flags["modulate_colour"]
 
         data = b''
         data += pack("<IIII", flags, len(self.triangles), len(self.vertices), 1)
@@ -980,7 +983,7 @@ class dff:
         if chunk.type == types["Struct"]:  
 
             # read clump data
-            root_clump = Sections.read(Clump, self.data, self._read(12))
+            Sections.read(Clump, self.data, self._read(12))
 
             while self.pos < root_end-12:
                 chunk = self.read_chunk()
@@ -1060,7 +1063,7 @@ class dff:
     def write_atomic(self, atomic):
 
         data = Sections.write(Atomic, atomic, types["Struct"])
-
+        
         ext_data = b''
         if "skin" in self.geometry_list[atomic.geometry].extensions:
             ext_data += Sections.write_chunk(

@@ -17,7 +17,6 @@
 import bpy
 import bmesh
 import mathutils
-import cProfile
 
 from . import dff
 
@@ -108,7 +107,7 @@ class dff_exporter:
                         b_material.texture_slots[0].texture.image.name
                     )
                     material.textures.append(texture)
-                except:
+                except BaseException:
                     pass
 
                 # Surface properties
@@ -202,8 +201,31 @@ class dff_exporter:
                     break
                 skin.vertex_bone_indices[-1][index] = group.group
                 skin.vertex_bone_weights[-1][index] = group.weight
-
         return skin
+
+    #######################################################
+    def get_vertex_shared_loops(vertex, layers_list):
+        temp = [[None] * len(layers) for layers in layers_list]
+        shared_loops = []
+        
+        for loop in vertex.link_loops:
+
+            shared = False
+            for i, layers in enumerate(layers_list):
+                for j, layer in enumerate(layers):
+
+                    if temp[i][j] is None:
+                        temp[i][j] = loop[layer]
+
+                    if temp[i][j] != loop[layer]:
+                        shared = True
+                        break
+
+                if shared:
+                    shared_loops.append(loop)
+                    break
+                
+        return shared_loops
     
     #######################################################
     def populate_atomic(obj):
@@ -223,6 +245,7 @@ class dff_exporter:
         # Set SkinPLG
         skin = self.init_skin_plg(obj)
 
+        has_prelit_colours = len(obj.data.vertex_colors) > 0
 
         # These are used to set the vertex indices for new vertices
         # created in the next loop to get rid of shared vertices.
@@ -237,48 +260,47 @@ class dff_exporter:
             geometry.vertices.append(dff.Vector._make(vertex.co))
             geometry.normals.append(dff.Vector._make(vertex.normal))
 
-            # Look for shared vertices with different
-            # UV Coordinates (Done) / Vertex Color (TODO)
-            uv_layers = bm.loops.layers.uv.values()
-            vertex_coord = [None] * len(uv_layers)
+            shared_loops = self.get_vertex_shared_loops(
+                vertex,
+                [
+                    bm.loops.layers.uv.values(),
+                    bm.loops.layers.color.values()
+                ]
+            )
             
-            for loop in vertex.link_loops:
-                for index, layer in enumerate(uv_layers):
-
-                    if vertex_coord[index] is None:
-                        vertex_coord[index] = loop[layer].uv
-                        continue
-
-                    # create a fork
-                    if vertex_coord[index] != loop[layer].uv:
-                        face = loop.face
-                        face.loops.index_update()
+            # create a fork
+            for loop in shared_loops:
+                face = loop.face
+                face.loops.index_update()
+                
+                if face.index not in override_faces:
+                    override_faces[face.index] = [
+                        vert.index for vert in face.verts
+                    ]
+                else:
+                    continue
                         
-                        if face.index not in override_faces:
-                            override_faces[face.index] = [
-                                vert.index for vert in face.verts
-                            ]
-
-                        override_faces[face.index][loop.index] = len(bm.verts)
-
-                        # Update the SkinPLG to include the duplicated vertex
-                        if skin is not None:
-                            bone_indices = skin.vertex_bone_indices
-                            bone_weights = skin.vertex_bone_weights
-
-                            bone_indices.append(bone_indices[vertex.index])
-                            bone_weights.append(bone_weights[vertex.index])
-                        
-                        bm.verts.new(vertex.co, vertex)
-                        bm.verts.ensure_lookup_table()
+                override_faces[face.index][loop.index] = len(bm.verts)
+                
+                # Update the SkinPLG to include the duplicated vertex
+                if skin is not None:
+                    bone_indices = skin.vertex_bone_indices
+                    bone_weights = skin.vertex_bone_weights
+                    
+                    bone_indices.append(bone_indices[vertex.index])
+                    bone_weights.append(bone_weights[vertex.index])
+                    
+                bm.verts.new(vertex.co, vertex)
+                bm.verts.ensure_lookup_table()
             
             i += 1
 
-        # Allocate uv layers array
+        # Allocate uv layers/vertex colours array
         uv_layers_count = len(bm.loops.layers.uv)
         geometry.uv_layers = [[dff.TexCoords(0,0)] * len(bm.verts)
                               for i in range(uv_layers_count)]
-        
+        if has_prelit_colours:
+            geometry.prelit_colours = [dff.RGBA(255,255,255,255)] * len(bm.verts)
         # Faces
         for face in bm.faces:
 
@@ -295,14 +317,24 @@ class dff_exporter:
                 ))
             )
 
-            # Set UV Coordinates for this face
             face.loops.index_update()
             for loop in face.loops:
+                
+                # Set UV Coordinates for this face
                 for index, layer in enumerate(bm.loops.layers.uv.values()):
                     uv = loop[layer].uv
                     geometry.uv_layers[index][verts[loop.index]] = dff.TexCoords(
                         uv.x, 1 - uv.y #UV Coordinates are flipped in the Y Axis
                     )
+
+                # Set prelit faces for this face
+                if has_prelit_colours:
+                    for index, layer in enumerate(bm.loops.layers.color.values()):
+                        color = loop[layer]
+                        geometry.prelit_colours[verts[loop.index]] = dff.RGBA._make(
+                            int(c * 255) for c in color
+                        )
+                        break #only once
                 
         self.create_frame(obj)
 
@@ -369,6 +401,7 @@ class dff_exporter:
                     bone["bone_id"],
                     len(obj.data.bones)
                 )
+                
                 # Make bone array in the root bone
                 for _index, _bone in enumerate(obj.data.bones):
                     bone_data.bones.append(

@@ -86,6 +86,10 @@ class dff_importer:
             # Add UV Layers
             for layer in geom.uv_layers:
                 uv_layers.append(bm.loops.layers.uv.new())
+                
+            # Add Vertex Colours
+            if geom.flags & dff.rpGEOMETRYPRELIT:
+                vertex_color = bm.loops.layers.color.new()
             
             # Faces (TODO: Materials)
             for f in geom.triangles:
@@ -100,9 +104,9 @@ class dff_importer:
                     face.material_index = f.material
                     
                     # Setting UV coordinates
-                    for i, layer in enumerate(geom.uv_layers):
-                    
-                        for loop in face.loops:
+                    for loop in face.loops:
+                        for i, layer in enumerate(geom.uv_layers):
+
                             bl_layer = uv_layers[i]
                             
                             uv_coords = layer[loop.vert.index]
@@ -111,6 +115,12 @@ class dff_importer:
                                 uv_coords.u,
                                 1 - uv_coords.v # Y coords are flipped in Blender
                             )
+                        # Vertex colours
+                        if geom.flags & dff.rpGEOMETRYPRELIT:
+                            loop[vertex_color] = [
+                                c / 255.0 for c in
+                                geom.prelit_colours[loop.vert.index]
+                            ]
                     
                     face.smooth = True
                 except BaseException as e:
@@ -149,7 +159,7 @@ class dff_importer:
             empty.empty_display_type = 'CUBE'
             empty.empty_display_size = 0.05
         pass
-
+    
     ##################################################################
     def import_materials(geometry, frame, mesh):
 
@@ -281,7 +291,7 @@ class dff_importer:
     #######################################################
     def align_roll( vec, vecz, tarz ):
 
-        sine_roll = vec.normalized().dot(vecz.normalized().cross( tarz.normalized() ) )
+        sine_roll = vec.normalized().dot(vecz.normalized().cross(tarz.normalized()))
 
         if 1 < abs(sine_roll):
             sine_roll /= abs(sine_roll)
