@@ -16,20 +16,25 @@
 
 from collections import namedtuple
 from struct import unpack_from, calcsize, pack
+from enum import Enum
 
 # Data types
-Chunk       = namedtuple("Chunk"                     , "type size version")
-Clump       = namedtuple("Clump"                     , "atomics lights cameras")
-Vector      = namedtuple("Vector"                    , "x y z")
-Matrix      = namedtuple("Matrix"                    , "right up at")
-HAnimHeader = namedtuple("HAnimHeader"               , "version id bone_count")
-Bone        = namedtuple("Bone"                      , "id index type")
-RGBA        = namedtuple("RGBA"                      , "r g b a")
-GeomSurfPro = namedtuple("GeomSurfPro"               , "ambient specular diffuse")
-TexCoords   = namedtuple("TexCoords"                 , "u v")
-Sphere      = namedtuple("Sphere"                    , "x y z radius")
-Triangle    = namedtuple("Triangle"                  , "b a material c")
-Atomic      = namedtuple("Atomic"                    , "frame geometry flags unk")
+Chunk       = namedtuple("Chunk"       , "type size version")
+Clump       = namedtuple("Clump"       , "atomics lights cameras")
+Vector      = namedtuple("Vector"      , "x y z")
+Matrix      = namedtuple("Matrix"      , "right up at")
+HAnimHeader = namedtuple("HAnimHeader" , "version id bone_count")
+Bone        = namedtuple("Bone"        , "id index type")
+RGBA        = namedtuple("RGBA"        , "r g b a")
+GeomSurfPro = namedtuple("GeomSurfPro" , "ambient specular diffuse")
+TexCoords   = namedtuple("TexCoords"   , "u v")
+Sphere      = namedtuple("Sphere"      , "x y z radius")
+Triangle    = namedtuple("Triangle"    , "b a material c")
+Atomic      = namedtuple("Atomic"      , "frame geometry flags unk")
+UVFrame     = namedtuple("UVFrame"     , "time uv prev")
+BumpMapFX   = namedtuple("BumpMapFX"   , "intensity bump_map height_map")
+EnvMapFX    = namedtuple("EnvMapFX"    , "coefficient use_fb_alpha env_map")
+DualFX      = namedtuple("DualFX"      , "src_blend dst_blend texture")
 
 # geometry flags
 rpGEOMETRYTRISTRIP              = 0x00000001
@@ -42,25 +47,44 @@ rpGEOMETRYMODULATEMATERIALCOLOR = 0x00000040
 rpGEOMETRYTEXTURED2             = 0x00000080
 rpGEOMETRYNATIVE                = 0x01000000
 
-# Block types
+# MatFX Dual Texture Blend Mode
+class BlendMode(Enum):
 
+    NOBLEND      = 0x00
+    ZERO         = 0x01
+    ONE          = 0x02
+    SRCCOLOR     = 0x03
+    INVSRCCOLOR  = 0x04
+    SRCALPHA     = 0x05
+    INVSRCALPHA  = 0x06
+    DESTALPHA    = 0x07
+    INVDESTALPHA = 0x08
+    DESTCOLOR    = 0x09
+    INVDESTCOLOR = 0x0A
+    SRCALPHASAT  = 0x0B
+
+# Block types291
 types = {
-    "Frame"           : 39056126,
-    "HAnim PLG"       : 286,
-    "Struct"          : 1,
-    "Material"        : 7,
-    "Texture"         : 6,
-    "Extension"       : 3,
-    "Geometry"        : 15,
-    "Material List"   : 8,
-    "Bin Mesh PLG"    : 0x50E,
-    "Frame List"      : 14,
-    "Geometry List"   : 26,
-    "Atomic"          : 20,
-    "Clump"           : 16,
-    "Skin PLG"        : 278,
-    "String"          : 2,
-    "Right to Render" : 31
+    "Struct"                  : 1,
+    "String"                  : 2,
+    "Extension"               : 3,
+    "Texture"                 : 6,
+    "Material"                : 7,
+    "Material List"           : 8,
+    "Frame List"              : 14,
+    "Geometry"                : 15,
+    "Clump"                   : 16,
+    "Atomic"                  : 20,
+    "Geometry List"           : 26,
+    "Animation Anim"          : 27,
+    "Right to Render"         : 31,
+    "UV Animation Dictionary" : 43,
+    "Skin PLG"                : 278,
+    "HAnim PLG"               : 286,
+    "Material Effects PLG"    : 291,
+    "UV Animation PLG"        : 309,
+    "Bin Mesh PLG"            : 1294,
+    "Frame"                   : 39056126
 }
 
 #######################################################
@@ -115,6 +139,13 @@ class Sections:
                     Sections.read(Vector, data, offset+12),
                     Sections.read(Vector, data, offset+24)
                 )
+            )
+
+        elif type is UVFrame:
+            return UVFrame(
+                unpack_from("<f", data, offset)[0], #Time
+                list(unpack_from("<6f", data, offset + 4)), #UV
+                unpack_from("<i", data, offset + 28)[0] #Prev
             )
         else:
             raise NotImplementedError("unknown type", type)
@@ -238,7 +269,7 @@ class Material:
         self.is_textured        = None
         self.surface_properties = None
         self.textures           = []
-        self.plugins            = None
+        self.plugins            = {}
 
     
     #######################################################
@@ -258,10 +289,23 @@ class Material:
         self.colour      = array_data[1]
         self.is_textured = array_data[3]
         self.textures    = []
-        self.plugins     = []
+        self.plugins     = {}
 
         return self
 
+    #######################################################
+    def add_plugin(self, key, plugin):
+        if key not in material.plugins:
+            self.plugins[key] = []
+
+        try:
+            self.plugins[key].append(plugin)
+
+        # This shouldn't happen
+        except AttributeError:
+            self.plugins[key] = []
+            self.plugins[key].append(plugin)
+        
     #######################################################
     def to_mem(self):
 
@@ -386,6 +430,44 @@ class HAnimPLG:
         return Sections.write_chunk(data, types["HAnim PLG"])
 
 #######################################################
+class UVAnim:
+    __slots__ = [
+        "type_id",
+        "flags",
+        "duration",
+        "name",
+        "node_to_uv",
+        "frames"
+    ]
+
+    #######################################################
+    def __init__(self):
+        self.type_id = None
+        self.flags = None
+        self.duration = None
+        self.name = ""
+        self.node_to_uv = []
+        self.frames = []
+
+    #######################################################
+    def from_mem(data):
+        self = UVAnim()
+
+        _data = unpack_from("<4xiiif4x32s", data)
+        self.type_id, num_frames, self.flags, self.duration, self.name = _data
+
+        _data = unpack_from("8f", data, 56)
+        self.node_to_uv = list(_data)
+
+        for pos in range(88, 88 + num_frames * 32, 32):
+            self.frames.append(
+                Sections.read(UVFrame, data, pos)
+            )
+            print(self.frames[-1])
+
+        return self
+    
+#######################################################
 class SkinPLG:
 
     __slots__ = [
@@ -440,11 +522,10 @@ class SkinPLG:
         self.num_bones, self.num_used_bones, self.max_weights_per_vertex = _data
         
         # Used bones array starts at offset 4
-        pos = 4
-        for i in range(self.num_used_bones):
+        for pos in range(4, self.num_used_bones + 4):
             self.bones_used.append(unpack_from("<B", data, pos))
-            pos += 1
 
+        pos = 4 + self.num_used_bones
         vertices_count = len(geometry.vertices)
 
         # Read vertex bone indices
@@ -817,7 +898,138 @@ class dff:
                     
                 geometry.triangles.append(triangle)
                 pass
+
+    #######################################################
+    def read_matfx_bumpmap(self):
+        bump_map   = None
+        intensity  = 0.0
+        height_map = None
+        
+        intensity, contains_bump_map = unpack_from("<fI",
+                                                   self.data,
+                                                   self._read(8))
+        # Read Bump Map
+        if contains_bump_map:
+            bump_chunk = self.read_chunk()
+            chunk_end = self.pos + bump_chunk.size
             
+            if bump_chunk.type != types["Texture"]:
+                raise RuntimeError("Invalid format")
+
+            bump_map = self.read_texture()
+            self.pos = chunk_end
+
+        contains_height_map = unpack_from("<I", self.data, self._read(4))[0]
+
+        # Read height map
+        if contains_height_map:
+            height_chunk = self.read_chunk()
+            chunk_end = self.pos + height_chunk.size
+            
+            if height_chunk.type != types["Texture"]:
+                raise RuntimeError("Invalid format")
+            
+            height_map = self.read_texture()
+            self.pos = chunk_end
+
+        return BumpMapFX(intensity, bump_map, height_map)        
+
+    #######################################################
+    def read_matfx_envmap(self):
+        env_map      = None
+        coefficient  = 1.0
+        use_fb_alpha = False #fb = frame buffer
+    
+        coefficient, use_fb_alpha, contains_envmap = unpack_from("<III",
+                                                                 self.data,
+                                                                 self._read(12))
+
+        # Read environment map texture
+        if contains_envmap:
+            env_chunk = self.read_chunk()
+            chunk_end = self.pos + env_chunk.size
+            
+            if env_chunk.type != types["Texture"]:
+                raise RuntimeError("Invalid format")
+            
+            env_map = self.read_texture()
+            self.pos = chunk_end
+
+        return EnvMapFX(coefficient, use_fb_alpha, env_map)
+
+    #######################################################
+    def read_matfx_dual(self):
+        src_blend = 0
+        dst_blend = 0
+        texture   = None
+
+        src_blend, dst_blend, has_texture = unpack_from("<III",
+                                                        self.data,
+                                                        self._read(12))
+
+        # Read Texture
+        if has_texture:
+            tex_chunk = self.read_chunk()
+            chunk_end = self.pos + tex_chunk.size
+            
+            if tex_chunk.type != types["Texture"]:
+                raise RuntimeError("Invalid format")
+            
+            texture = self.read_texture()
+            self.pos = chunk_end
+
+        return DualFX(src_blend, dst_blend, texture)
+    
+    #######################################################
+    def read_matfx(self, material, chunk):
+        
+        for i in range(2):
+            effect_type = unpack_from("<I", self.data, self._read(4))
+
+            # Bump Map
+            if effect_type == 1:
+                material.add_plugin('bump_map', self.read_matfx_bumpmap())
+
+            # Environment Mapping
+            if effect_type == 2:
+                material.add_plugin('enc_map', self.read_matfx_envmap())
+
+            # Dual Texturing
+            if effect_type == 4:
+                material.add_plugin('dual', self.read_matfx_dual())
+
+            # UV Animation
+            if effect_type == 5:
+                material.add_plugin('uv_anim', [])
+
+    #######################################################
+    def read_texture(self):
+        chunk = self.read_chunk() 
+
+        # Read a  texture
+        texture = Texture.from_mem(
+            self.data[self.pos:self.pos+chunk.size]
+        )
+        
+        self._read(chunk.size)
+        
+        # Texture Name
+        chunk = self.read_chunk()
+        texture.name = self.raw(
+            strlen(self.data,self.pos)
+        ).decode("utf-8")
+        
+        self._read(chunk.size)
+        
+        # Mask Name
+        chunk = self.read_chunk()  
+        texture.mask = self.raw(
+            strlen(self.data,self.pos)
+        ).decode("utf-8")
+        
+        self._read(chunk.size)
+        return texture
+        
     #######################################################
     def read_material_list(self, parent_chunk):
         list_end = parent_chunk.size + self.pos
@@ -860,31 +1072,11 @@ class dff:
 
                         if chunk.type == types["Texture"]:
 
-                            chunk = self.read_chunk() 
+                            chunk_end = self.pos + chunk.size
+                            texture = self.read_texture()
 
-                            # Read a  texture
-                            texture = Texture.from_mem(
-                                self.data[self.pos:self.pos+chunk.size]
-                            )
-                            
-                            self._read(chunk.size)
-
-                            # Texture Name
-                            chunk = self.read_chunk()
-                            texture.name = self.raw(
-                                strlen(self.data,self.pos)
-                            ).decode("utf-8")
-                            
-                            self._read(chunk.size)
-
-                            # Mask Name
-                            chunk = self.read_chunk()  
-                            texture.mask = self.raw(
-                                strlen(self.data,self.pos)
-                            ).decode("utf-8")
-
-                            self._read(chunk.size)
                             material.textures.append(texture)
+                            self.pos = chunk_end
 
                         elif chunk.type == types["Extension"]: 
                             if chunk.size > 0:
@@ -894,9 +1086,30 @@ class dff:
                                 # Read extensions
                                 while self.pos < chunk_end:
                                     chunk = self.read_chunk()
+                                    chunk_end = self.pos + chunk.size
+                                    
+                                    if chunk.type == types["Material Effects PLG"]:
+                                        self.read_matfx(material, chunk)
 
-                                    #TODO: Extensions
-                                    self.pos += chunk.size
+                                    if chunk.type == types["UV Animation PLG"]:
+
+                                        anim_count = unpack_from("<I",
+                                                                 self.data,
+                                                                 self._read(4))
+
+                                        # Read n animations
+                                        for i in range(anim_count):
+                                            material.add_plugin('uv_anim',
+                                                                self.raw(
+                                                                    strlen(
+                                                                        self.data,
+                                                                        self.pos
+                                                                    )
+                                                                ), self._read(32)
+                                            )
+                                            
+                                    self.pos = chunk.end
+                                    
                                     
                             self._read(chunk.size)
                             
@@ -1005,19 +1218,44 @@ class dff:
                     self.pos += chunk.size
 
     #######################################################
+    def read_uv_anim_dict(self, root_chunk):
+        chunk = self.read_chunk()
+        
+        if chunk.type == types["Struct"]:
+            num_anims = unpack_from("<I", self.data, self._read(4))[0]
+
+        for i in range(num_anims):
+            
+            chunk = self.read_chunk()
+
+            if chunk.type == types["Animation Anim"]:
+                self.uvanim_dict.append(
+                    UVAnim.from_mem(self.data[self.pos:])
+                )
+
+            self._read(chunk.size)
+        pass
+                    
+    #######################################################
     def load_memory(self, data: str):
 
         self.data = data
-        root = self.read_chunk()
+        while self.pos < len(data):
+            chunk = self.read_chunk()
 
-        if root.type == types["Clump"]:
-            self.read_clump(root)
+            if chunk.type == types["Clump"]:
+                self.read_clump(chunk)
+
+            elif chunk.type == types["UV Animation Dictionary"]:
+                self.read_uv_anim_dict(chunk)
+                
 
     #######################################################
     def clear(self):
         self.frame_list    = []
         self.geometry_list = []
         self.atomic_list   = []
+        self.uvanim_dict   = []
         self.light_list    = []
         self.pos           = 0
         self.data          = ""
