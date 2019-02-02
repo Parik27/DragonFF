@@ -23,6 +23,92 @@ import mathutils
 from . import dff
 
 #######################################################
+class material_helper:
+
+    """ Material Helper for Blender 2.7x and Blender 2.8 compatibility"""
+
+    #######################################################
+    def set_base_color(self, color):
+
+        if self.principled:
+            self.principled.base_color = color
+        else:
+            self.material.diffuse_color = color
+
+    #######################################################
+    def set_texture(self, image, label=""):
+        
+        if self.principled:
+            self.principled.base_color_texture.node_image.label = label
+            self.principled.base_color_texture.image            = image
+            
+        else:
+            slot               = self.material.texture_slots.add()
+            slot.texture       = bpy.data.textures.new(
+                name           = label,
+                type           = "IMAGE"
+            )
+            slot.texture.image = image
+
+    #######################################################
+    def set_surface_properties(self, props):
+
+        if self.principled:
+            self.principled.specular  = props.specular
+            self.principled.roughness = props.diffuse
+            self.material["ambient"]  = props.ambient
+            
+        else:
+            self.material.diffuse_intensity  = props.diffuse
+            self.material.specular_intensity = props.specular
+            self.material.ambient            = props.ambient
+
+    #######################################################
+    def set_normal_map(self, image, label, intensity):
+
+        if self.principled:
+            self.principled.node_normalmap_get()
+            
+            self.principled.normalmap_texture.image = image
+            self.principled.node_normalmap.label    = label
+            self.principled.normalmap_strength      = intensity
+
+        else:
+            slot = self.material.texture_slots.add()
+            slot.texture = bpy.data.textures.new(
+                name = label,
+                type = "IMAGE"
+            )
+            
+            slot.texture.image = image
+            slot.texture.use_normal_map = True
+            slot.use_map_color_diffuse  = False
+            slot.use_map_normal         = True
+            slot.normal_factor          = intensity
+        pass
+
+    #######################################################
+    def set_environment_map(self, plugin):
+
+        if plugin.env_map:
+            self.material["env_map_tex"]      = plugin.env_map.name
+            
+        self.material["env_map_coef"]         = plugin.coefficient
+        self.material["env_map_fb_alpha"]     = plugin.use_fb_alpha        
+    
+    #######################################################
+    def __init__(self, material):
+        self.material   = material
+        self.principled = None
+
+        # Init Principled Wrapper for Blender 2.8
+        if bpy.app.version >= (2, 80, 0):
+            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+            
+            self.principled = PrincipledBSDFWrapper(self.material,
+                                                    is_readonly=False)
+
+#######################################################
 class dff_importer:
 
     image_ext = "png"
@@ -160,110 +246,54 @@ class dff_importer:
         pass
     
     ##################################################################
-    # TODO: Refactor this function
     # TODO: MatFX: Dual Textures
     def import_materials(geometry, frame, mesh):
 
-        self = dff_importer
-        
+        self = dff_importer        
         from bpy_extras.image_utils import load_image
-        
-        # Blender 2.79 loading
-        
-        if (2,80, 0) > bpy.app.version:
 
-            for index, material in enumerate(geometry.materials):
+        # Refactored
+        for index, material in enumerate(geometry.materials):
 
-                name = "%s.%d" % (frame.name, index)
-                mat = bpy.data.materials.new(name)
+            # Generate a nice name with index and frame
+            name = "%s.%d" % (frame.name, index)
 
-                mat.diffuse_color = (
-                    material.colour.r / 255,
-                    material.colour.g / 255,
-                    material.colour.b / 255,
+            mat = bpy.data.materials.new(name)
+            helper = material_helper(mat)
+            
+            helper.set_base_color(material.colour[:3])
+
+            # Loading Texture
+            if material.is_textured == 1:
+                texture = material.textures[0]
+                path    = os.path.dirname(self.file_name)
+
+                # name.None shouldn't exist, lol
+                image = load_image("%s.%s" % (texture.name, self.image_ext),
+                                   path,
+                                   recursive=False,
+                                   place_holder=True,
+                                   check_existing=True
                 )
-                if material.surface_properties is not None:
-                    props = material.surface_properties
-                    
-                elif geometry.surface_properties is not None:
-                    props = geometry.surface_properties
-
-                if props is not None:
-                    mat.diffuse_intensity = props.diffuse
-                    mat.specular_intensity = props.specular
-                    mat.ambient = props.ambient
-
-                if (material.is_textured == 1):
-                    texture = material.textures[0]
-                    
-                    slot = mat.texture_slots.add()
-                    slot.texture = bpy.data.textures.new(
-                        name=texture.name,
-                        type="IMAGE"
-                    )
-                    path = os.path.dirname(self.file_name)
-                    image = load_image("%s.%s" % (texture.name, self.image_ext),
-                                       path,
-                                       recursive=False,
-                                       place_holder=True,
-                                       check_existing=True)
-
-                    slot.texture.image = image
-                    mesh.materials.append(mat)
-                    
-        else:
-            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-
-            for index, material in enumerate(geometry.materials):
-
-                # Generate a nice name with index and frame
-                name = "%s.%d" % (frame.name, index)
+                helper.set_texture(image, texture.name)
                 
-                mat = bpy.data.materials.new(name)
-                mat.use_nodes = True
-                
-                principled = PrincipledBSDFWrapper(mat, is_readonly=False)
-                
-                principled.base_color = (
-                    material.colour.r / 255,
-                    material.colour.g / 255,
-                    material.colour.b / 255
-                )
+            # Normal Map
+            if 'bump_map' in material.plugins:
+                for bump_fx in material.plugins['bump_map']:
 
-                # Texture
-                if (material.is_textured == 1):
-                    texture = material.textures[0]
-                    path = os.path.dirname(self.file_name)
-
-                    # name.None shouldn't exist, lol
-                    image = load_image("%s.%s" % (texture.name, self.image_ext),
-                                       path,
-                                       recursive=False,
-                                       place_holder=True,
-                                       check_existing=True
-                    )
-                    principled.base_color_texture.node_image.label = texture.name
-                    principled.base_color_texture.image = image
-
-                # Normal Map
-                if 'bump_map' in material.plugins:
-                    bump_fx = material.plugins['bump_map'][0]
-
-                    # Set bump map to either bump map or height map
                     texture = None
-                    
-                    if bump_fx.bump_map is not None:
-                        texture = bump_fx.bump_map
-                        if bump_fx.height_map is not None:
-                            mat["height_map_tex"] = bump_fx.height_map.name
-
-                    elif bump_fx.height_map is not None:
+                    if bump_fx.height_map is not None:
                         texture = bump_fx.height_map
-                  
+                        if bump_fx.bump_map is not None:
+                            mat["height_map_tex"] = bump_fx.bump_map.name
+
+                    elif bump_fx.bump_map is not None:
+                        texture = bump_fx.bump_map
+
                     if texture:
                         path = os.path.dirname(self.file_name)
 
-                        # name.None shouldn't exist, lol
+                        # see name.None note above
                         image = load_image("%s.%s" % (texture.name,
                                                       self.image_ext),
                                            path,
@@ -271,38 +301,29 @@ class dff_importer:
                                            place_holder=True,
                                            check_existing=True
                         )
-                        principled.node_normalmap_get()
-                        principled.normalmap_texture.image = image
-                        principled.node_normalmap.label = texture.name
-                    
-                props = None
 
-                # Give precedence to the material surface properties
-                if material.surface_properties is not None:
-                    props = material.surface_properties
-                    
-                elif geometry.surface_properties is not None:
-                    props = geometry.surface_properties
+                        helper.set_normal_map(image,
+                                              texture.name,
+                                              bump_fx.intensity
+                        )
 
-                if props is not None:
-                    principled.specular = props.specular
-                    principled.roughness = props.diffuse
-                    principled.material["ambient"] = props.ambient
+            # Surface Properties
+            if material.surface_properties is not None:
+                props = material.surface_properties
 
-                # Set custom property for environment map
-                if 'env_map' in material.plugins and material.plugins[
-                        "env_map"][0].env_map:
-                    
-                    principled.material["env_map_tex"] = material.plugins[
-                        "env_map"][0].env_map.name
-                    principled.material["env_map_coef"] = material.plugins[
-                        "env_map"][0].coefficient
-                    principled.material["env_map_fb_alpha"] = material.plugins[
-                        "env_map"][0].use_fb_alpha
-                
-                    
-                # Add imported material to the object
-                mesh.materials.append(principled.material)
+            elif geometry.surface_properties is not None:
+                props = geometry.surface_properties
+
+            if props is not None:
+                helper.set_surface_properties(props)
+
+            # Environment Map
+            if 'env_map' in material.plugins:
+                plugin = material.plugins['env_map'][0]
+                helper.set_environment_map(plugin)
+                                    
+            # Add imported material to the object
+            mesh.materials.append(helper.material)
                 
 
     #######################################################

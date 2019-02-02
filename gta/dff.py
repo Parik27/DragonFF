@@ -194,6 +194,8 @@ class Sections:
             return (library_id >> 14 & 0x3FF00) + 0x30000 | \
                 (library_id >> 16 & 0x3F)
 
+        return (library_id << 8)
+
     #######################################################
     def get_library_id(version, build):
         #see https://gtamods.com/wiki/RenderWare
@@ -1197,8 +1199,10 @@ class dff:
         if chunk.type == types["Struct"]:  
 
             # read clump data
-            Sections.read(Clump, self.data, self._read(12))
-
+            self._read(12)
+            if Sections.get_rw_version(chunk.version) < 0x33000:
+                self._read(-8)
+                        
             while self.pos < root_end-12:
                 chunk = self.read_chunk()
 
@@ -1318,7 +1322,15 @@ class dff:
         data = b''
         Sections.set_library_id(version, 0xFFFF)
 
-        data += Sections.write(Clump, (len(self.atomic_list), 0,0), types["Struct"])
+        data = Sections.write(Clump, (len(self.atomic_list), 0,0), types["Struct"])
+
+        # Old RW versions didn't have cameras and lights in their clump structure
+        if Sections.get_rw_version() < 0x33000:
+            data = Sections.write_chunk(Clump,
+                                        pack("<I",
+                                             len(self.atomic_list)),
+                                        types["Clump"])
+            
         data += self.write_frame_list()
         data += self.write_geometry_list()
 
