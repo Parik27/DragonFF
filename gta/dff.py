@@ -81,7 +81,7 @@ types = {
     "UV Animation Dictionary" : 43,
     "Skin PLG"                : 278,
     "HAnim PLG"               : 286,
-    "Material Effects PLG"    : 291,
+    "Material Effects PLG"    : 288,
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
     "Frame"                   : 39056126
@@ -295,7 +295,7 @@ class Material:
 
     #######################################################
     def add_plugin(self, key, plugin):
-        if key not in material.plugins:
+        if key not in self.plugins:
             self.plugins[key] = []
 
         try:
@@ -905,13 +905,15 @@ class dff:
         intensity  = 0.0
         height_map = None
         
-        intensity, contains_bump_map = unpack_from("<fI",
+        intensity, contains_bump_map = unpack_from("<4xfI",
                                                    self.data,
-                                                   self._read(8))
+                                                   self._read(12))
         # Read Bump Map
         if contains_bump_map:
             bump_chunk = self.read_chunk()
             chunk_end = self.pos + bump_chunk.size
+
+            print(bump_chunk)
             
             if bump_chunk.type != types["Texture"]:
                 raise RuntimeError("Invalid format")
@@ -940,9 +942,9 @@ class dff:
         coefficient  = 1.0
         use_fb_alpha = False #fb = frame buffer
     
-        coefficient, use_fb_alpha, contains_envmap = unpack_from("<III",
+        coefficient, use_fb_alpha, contains_envmap = unpack_from("<4xfII",
                                                                  self.data,
-                                                                 self._read(12))
+                                                                 self._read(16))
 
         # Read environment map texture
         if contains_envmap:
@@ -984,15 +986,15 @@ class dff:
     def read_matfx(self, material, chunk):
         
         for i in range(2):
-            effect_type = unpack_from("<I", self.data, self._read(4))
-
+            effect_type = unpack_from("<I", self.data, self._read(4))[0]
+            
             # Bump Map
             if effect_type == 1:
                 material.add_plugin('bump_map', self.read_matfx_bumpmap())
 
             # Environment Mapping
             if effect_type == 2:
-                material.add_plugin('enc_map', self.read_matfx_envmap())
+                material.add_plugin('env_map', self.read_matfx_envmap())
 
             # Dual Texturing
             if effect_type == 4:
@@ -1069,24 +1071,23 @@ class dff:
                     # Read textures and extensions
                     while self.pos < chunk_end:
                         chunk = self.read_chunk()
-
+                        
                         if chunk.type == types["Texture"]:
 
-                            chunk_end = self.pos + chunk.size
+                            _chunk_end = self.pos + chunk.size
                             texture = self.read_texture()
 
                             material.textures.append(texture)
-                            self.pos = chunk_end
+                            self.pos = _chunk_end
 
-                        elif chunk.type == types["Extension"]: 
+                        elif chunk.type == types["Extension"]:
                             if chunk.size > 0:
-                                
-                                chunk_end = chunk.size + self.pos
+                                _chunk_end = chunk.size + self.pos
 
                                 # Read extensions
-                                while self.pos < chunk_end:
+                                while self.pos < _chunk_end:
                                     chunk = self.read_chunk()
-                                    chunk_end = self.pos + chunk.size
+                                    __chunk_end = self.pos + chunk.size
                                     
                                     if chunk.type == types["Material Effects PLG"]:
                                         self.read_matfx(material, chunk)
@@ -1108,7 +1109,7 @@ class dff:
                                                                 ), self._read(32)
                                             )
                                             
-                                    self.pos = chunk.end
+                                    self.pos = __chunk_end
                                     
                                     
                             self._read(chunk.size)
@@ -1240,7 +1241,7 @@ class dff:
     def load_memory(self, data: str):
 
         self.data = data
-        while self.pos < len(data):
+        while self.pos < len(data) - 12:
             chunk = self.read_chunk()
 
             if chunk.type == types["Clump"]:

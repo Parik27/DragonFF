@@ -91,7 +91,6 @@ class dff_importer:
             if geom.flags & dff.rpGEOMETRYPRELIT:
                 vertex_color = bm.loops.layers.color.new()
             
-            # Faces (TODO: Materials)
             for f in geom.triangles:
                 try:
                     face = bm.faces.new(
@@ -161,6 +160,8 @@ class dff_importer:
         pass
     
     ##################################################################
+    # TODO: Refactor this function
+    # TODO: MatFX: Dual Textures
     def import_materials(geometry, frame, mesh):
 
         self = dff_importer
@@ -168,8 +169,6 @@ class dff_importer:
         from bpy_extras.image_utils import load_image
         
         # Blender 2.79 loading
-        # TODO: This function can probably be refactored to be shorter
-        # and support both 2.80 and 2.79
         
         if (2,80, 0) > bpy.app.version:
 
@@ -189,7 +188,6 @@ class dff_importer:
                 elif geometry.surface_properties is not None:
                     props = geometry.surface_properties
 
-                # TODO: Ambient property in an added panel
                 if props is not None:
                     mat.diffuse_intensity = props.diffuse
                     mat.specular_intensity = props.specular
@@ -246,7 +244,37 @@ class dff_importer:
                     )
                     principled.base_color_texture.node_image.label = texture.name
                     principled.base_color_texture.image = image
-                
+
+                # Normal Map
+                if 'bump_map' in material.plugins:
+                    bump_fx = material.plugins['bump_map'][0]
+
+                    # Set bump map to either bump map or height map
+                    texture = None
+                    
+                    if bump_fx.bump_map is not None:
+                        texture = bump_fx.bump_map
+                        if bump_fx.height_map is not None:
+                            mat["height_map_tex"] = bump_fx.height_map.name
+
+                    elif bump_fx.height_map is not None:
+                        texture = bump_fx.height_map
+                  
+                    if texture:
+                        path = os.path.dirname(self.file_name)
+
+                        # name.None shouldn't exist, lol
+                        image = load_image("%s.%s" % (texture.name,
+                                                      self.image_ext),
+                                           path,
+                                           recursive=False,
+                                           place_holder=True,
+                                           check_existing=True
+                        )
+                        principled.node_normalmap_get()
+                        principled.normalmap_texture.image = image
+                        principled.node_normalmap.label = texture.name
+                    
                 props = None
 
                 # Give precedence to the material surface properties
@@ -256,11 +284,23 @@ class dff_importer:
                 elif geometry.surface_properties is not None:
                     props = geometry.surface_properties
 
-                # TODO: Ambient property in an added panel
                 if props is not None:
                     principled.specular = props.specular
                     principled.roughness = props.diffuse
+                    principled.material["ambient"] = props.ambient
 
+                # Set custom property for environment map
+                if 'env_map' in material.plugins and material.plugins[
+                        "env_map"][0].env_map:
+                    
+                    principled.material["env_map_tex"] = material.plugins[
+                        "env_map"][0].env_map.name
+                    principled.material["env_map_coef"] = material.plugins[
+                        "env_map"][0].coefficient
+                    principled.material["env_map_fb_alpha"] = material.plugins[
+                        "env_map"][0].use_fb_alpha
+                
+                    
                 # Add imported material to the object
                 mesh.materials.append(principled.material)
                 

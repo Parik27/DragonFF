@@ -154,10 +154,11 @@ class dff_exporter:
                     material.textures.append(texture)
 
                 # Surface Properties
-                # TODO: Ambient property from custom properties
                 specular = principled.specular
                 diffuse  = principled.roughness
-                ambient  = principled.roughness
+                ambient  = principled.roughness if "ambient" not in material \
+                    else material["ambient"]
+                
                 material.surface_properties = dff.GeomSurfPro(
                     ambient, specular, diffuse
                 )
