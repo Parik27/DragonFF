@@ -88,7 +88,7 @@ types = {
 }
 
 #######################################################
-def strlen(bytes, offset):
+def strlen(bytes, offset=0):
 
     # A helper function to find length of byte null terminated strings
     

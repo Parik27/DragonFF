@@ -1,0 +1,326 @@
+# GTA DragonFF - Blender scripts to edit basic GTA formats
+# Copyright (C) 2019  Parik
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+from struct import unpack_from, calcsize, pack
+from collections import namedtuple
+from dff import strlen
+
+class ColModel:
+    def __init__(self):
+
+        # initialise
+        self.version       = None
+        self.model_name    = None
+        self.model_id      = None
+        self.bounds        = None
+        self.spheres       = []
+        self.cubes         = []
+        self.mesh_verts    = []
+        self.mesh_faces    = []
+        self.lines         = []
+        self.flags         = None
+        self.shadow_verts  = []
+        self.shadow_faces  = []
+        self.col_mesh      = None
+
+#######################################################
+TBounds    = None
+TSurface   = None
+TSphere    = None
+TBox       = None
+TFaceGroup = None
+TVertex    = None
+TFace      = None
+TVector    = namedtuple("TVector", "x y z")
+        
+#######################################################
+class Sections:
+
+    version = 1
+
+    #######################################################
+    def init_sections(version):
+
+        global TSurface, TVertex, TBox, TBounds, TSphere, TFace, TFaceGroup
+        
+        TSurface = namedtuple("TSurface" , "material flag brightness light")
+        TVertex  = namedtuple("TVertex"  , "x y z")
+        TBox     = namedtuple("TBox"     , "min max surface")
+        
+        if version == 1:
+            
+            TBounds = namedtuple("TBounds", "radius center min max")
+            TSphere = namedtuple("TSphere", "radius center surface")
+            TFace   = namedtuple("TFace"  , "a b c surface")
+
+        else:
+
+            TFaceGroup = namedtuple("TFaceGroup" , "min max start end")
+            TFace      = namedtuple("TFace"      , "a b c material light")
+            TBounds    = namedtuple("TBounds"    , "min max center radius")
+            TSphere    = namedtuple("TSphere"    , "center radius surface")
+
+        Sections.version = version
+
+        Sections.__formats = {
+            # V = Vector, S = Surface
+            TBounds    : [  "fVVV" , "VVVf"  ],
+            TSurface   : [  "BBBB" , "BBBB"  ],
+            TSphere    : [  "fVS"  , "VfS"   ],
+            TBox       : [  "VVS"  , "VVS"   ],
+            TFaceGroup : [  "VVHH" , "VVHH"  ],
+            TVertex    : [  "fff"  , "hhh"   ],
+            TFace      : [  "IIIS" , "HHHBB" ]
+        }
+
+    #######################################################
+    def __read_format(format, data, offset):
+
+        output = []
+
+        for char in format:
+            if char == 'V':
+                output.append(unpack_from("<fff", data, offset))
+                offset += 12
+
+            elif char == 'S':
+                output.append(
+                    Sections.read_section(TSurface, data, offset)
+                )
+                offset += Sections.size(TSurface)
+
+            else:
+                output.append(unpack_from(char, data, offset)[0])
+                offset += calcsize(char)
+                
+        return output
+    
+    #######################################################
+    def read_section(type, data, offset):
+
+        version = 0 if Sections.version == 1 else 1
+        
+        return type._make(Sections.__read_format(
+            Sections.__formats[type][version], data, offset)
+        )
+
+    #######################################################
+    def size(type):
+
+        version = 0 if Sections.version == 1 else 1
+
+        format = Sections.__formats[type][version]
+
+        # Convert vectors and surface to their properties
+        format = format.replace("V", "fff")
+        format = format.replace("S", "BBBB")
+
+        return calcsize(format)
+        
+#######################################################
+class coll:
+
+    __slots__ = [
+        "models",
+        "_data",
+        "_pos"
+    ]
+
+    #######################################################
+    def __read_struct(self, format):
+
+        unpacked = unpack_from(format, self._data, self._pos)
+        self._pos += calcsize(format)
+
+        return unpacked
+
+    #######################################################
+    def __incr(self, incr):
+        pos = self._pos
+        self._pos += incr
+        return pos
+
+    #######################################################
+    def __read_block(self, block_type, count=-1):
+        block_size = Sections.size(block_type)
+        object_array = []
+
+        if count == -1:
+            count = unpack_from("<I", self._data, self.__incr(4))[0]
+
+        for i in range(count):
+            object_array.append(
+                Sections.read_section(
+                    block_type,
+                    self._data,
+                    self.__incr(block_size)
+                )
+            )
+            
+        return object_array
+    
+    #######################################################
+    def __read_legacy_col(self, model):
+
+        # Spheres
+        model.spheres += self.__read_block(TSphere)
+        self.__incr(4) # number of unk. data (from GTAModding)
+
+        model.cubes      += self.__read_block(TBox)
+        model.mesh_verts += self.__read_block(TVertex)
+        model.mesh_faces += self.__read_block(TFace)
+            
+        pass
+
+    #######################################################
+    def __read_new_col(self, model):
+        sphere_count, box_count, face_count, line_count, flags, \
+            spheres_offset, box_offset, lines_offset, verts_offset, \
+            faces_offset, triangles_offset = \
+            unpack_from("<HHHBxIIIIIII", self._data, self.__incr(36))
+
+        model.flags = flags
+        
+        if model.version >= 3:
+            shadow_mesh_face_count, shadow_verts_offset, shadow_faces_offset = \
+                unpack_from("<III", self._data, self.__incr(12))
+
+        if model.version == 4:
+            self.__incr(4)
+
+        # Spheres
+        self._pos = spheres_offset + 4
+        model.spheres += self.__read_block(TSphere, sphere_count)
+
+        # Boxes
+        self._pos = box_offset + 4
+        model.cubes += self.__read_block(TBox, box_count)
+        
+        # Faces
+        self._pos = faces_offset + 4
+        model.mesh_faces += self.__read_block(TFace, face_count)
+
+        # Vertices
+        # Calculate the count first
+        self._pos = faces_offset + 4
+
+        if flags & 8: #has face groups
+            self._pos -= 4
+            face_group_count = unpack_from("<I", self._data, self._pos)
+
+            self._pos -= 28 * face_group_count
+
+        verts_count = (self._pos - verts_offset) // 6
+        self._pos = verts_offset + 4
+        model.mesh_verts += self.__read_block(TVertex, verts_count)
+
+        # Calculate the actual vertices
+        for i, vertex in enumerate(model.mesh_verts):
+            model.mesh_verts[i] = (
+                vertex.x / 128,
+                vertex.y / 128,
+                vertex.z / 128
+            )
+
+        # Read shadow mesh
+        if model.version >= 3 and flags & 16:
+
+            # Vertices
+            self._pos = shadow_verts_offset + 4
+            verts_count = (shadow_faces_offset - shadow_verts_offset) // 6
+            model.shadow_verts += self.__read_block(TVertex, verts_count)
+
+            # Faces
+            self._pos = shadow_faces_offset + 4
+            model.shadow_faces += self.__read_block(TFace, shadow_mesh_face_count)
+        
+    #######################################################
+    def __read_col(self):
+        model = ColModel()
+        pos = self._pos
+        header_format = namedtuple("header_format",
+                                   [
+                                       "magic_number",
+                                       "file_size",
+                                       "model_name",
+                                       "model_id"
+                                   ]
+        )
+        header = header_format._make(self.__read_struct("4sI22sH"))
+
+        magic_number = header.magic_number.decode("ascii")
+
+        model.model_name = header.model_name[:strlen(header.model_name)].decode(
+            "ascii"
+        )
+        model.model_id = header.model_id
+
+        version_headers = {
+            "COLL": 1,
+            "COL2": 2,
+            "COL3": 3,
+            "COL4": 4 # what version is this?
+        }
+        
+        try:
+            model.version = version_headers[magic_number]
+        except KeyError:
+            raise RuntimeError("Invalid COL header")
+
+        Sections.init_sections(model.version)
+        
+        # Read 40 TBound objects
+        model.bounds = Sections.read_section(
+            TBounds,
+            self._data,
+            self._pos
+        )
+        self._pos += Sections.size(TBounds)
+
+        if model.version == 1:
+            self.__read_legacy_col(model)
+        else:
+            self.__read_new_col(model)
+
+        self._pos = pos + header.file_size + 8 # set to next model
+        return model
+            
+    #######################################################
+    def load_memory(self, memory):
+        self._data = memory
+        self._pos = 0
+
+        while self._pos < len(self._data):
+            self.models.append(self.__read_col())
+
+        for model in self.models:
+            print(model.model_name)
+    
+    #######################################################
+    def load_file(self, filename):
+
+        with open(filename, mode='rb') as file:
+            content = file.read()
+            self.load_memory(content)
+
+    #######################################################
+    def __init__(self):
+        self.models = []
+        self._data = ""
+        self._pos = 0
+
+test = coll()
+test.load_file("/home/parik/Games/GTA 3/GTA 3 Clean/models/Coll/vehicles.col")
