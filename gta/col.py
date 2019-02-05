@@ -87,15 +87,25 @@ class Sections:
         }
 
     #######################################################
+    def compress_vertices(vertices):
+        compressed_vertices = []
+        for vertex in vertices:
+            compressed_vertices.append(TVertex._make(int(i*128) for i in vertex))
+
+        return compressed_vertices
+            
+    #######################################################
     def __read_format(format, data, offset):
 
         output = []
 
         for char in format:
+            # Custom format: Vector
             if char == 'V':
                 output.append(unpack_from("<fff", data, offset))
                 offset += 12
 
+            # Custom format: Surface
             elif char == 'S':
                 output.append(
                     Sections.read_section(TSurface, data, offset)
@@ -107,6 +117,34 @@ class Sections:
                 offset += calcsize(char)
                 
         return output
+
+    #######################################################
+    def __write_format(format, data):
+
+        _data = b''
+        
+        for index, char in enumerate(format):
+            # Custom format: Vector
+            if char == 'V':
+                _data += pack("<fff", *data[index])
+
+            # Custom format: Surface
+            elif char == 'S':
+                _data += Sections.write_section(TSurface, data[index])
+
+            else:
+                _data += pack(char, data[index])
+            
+        return _data
+
+    #######################################################
+    def write_section(type, data):
+
+        version = 0 if Sections.version == 1 else 1
+
+        return Sections.__write_format(
+            Sections.__formats[type][version], data
+        )
     
     #######################################################
     def read_section(type, data, offset):
@@ -182,8 +220,6 @@ class coll:
         model.cubes      += self.__read_block(TBox)
         model.mesh_verts += self.__read_block(TVertex)
         model.mesh_faces += self.__read_block(TFace)
-            
-        pass
 
     #######################################################
     def __read_new_col(self, model):
@@ -282,7 +318,7 @@ class coll:
 
         Sections.init_sections(model.version)
         
-        # Read 40 TBound objects
+        # Read TBounds
         model.bounds = Sections.read_section(
             TBounds,
             self._data,
@@ -305,9 +341,6 @@ class coll:
 
         while self._pos < len(self._data):
             self.models.append(self.__read_col())
-
-        for model in self.models:
-            print(model.model_name)
     
     #######################################################
     def load_file(self, filename):
@@ -317,10 +350,140 @@ class coll:
             self.load_memory(content)
 
     #######################################################
+    def __write_block(self, block_type, blocks, write_count = True):
+
+        data = b''
+        
+        if write_count:
+            data += pack("<I", len(blocks))
+
+        for block in blocks:
+            data += Sections.write_section(block_type, block)
+
+        return data
+            
+    #######################################################
+    def __write_col_legacy(self, model: ColModel):
+        data = b''
+
+        data += self.__write_block(TSphere, model.spheres)
+        data += pack('<I', 0)
+        data += self.__write_block(TBox, model.cubes)
+        data += self.__write_block(TVertex, model.mesh_verts)
+        data += self.__write_block(TFace, model.mesh_faces)
+
+        return data
+
+    #######################################################
+    def __write_col_new(self, model: ColModel):
+        data = b''
+
+        flags = 0
+        flags &= 2 if model.spheres or model.cubes or model.mesh_faces else 0
+        flags &= 16 if model.shadow_faces and model.version >= 3 else 0
+
+        header_len = 104
+        header_len += 12 if model.version >= 3 else 0
+        header_len += 4 if model.version >= 4 else 0
+
+        offsets = []
+        
+        # Spheres
+        offsets.append(len(data) + header_len)
+        data += self.__write_block(TSphere, model.spheres, False)
+
+        # Boxes
+        offsets.append(len(data) + header_len)
+        data += self.__write_block(TBox, model.cubes, False)
+
+        offsets.append(0) # TODO: Cones
+        
+        # Vertices
+        offsets.append(len(data) + header_len)
+        data += self.__write_block(TVertex,
+                                   Sections.compress_vertices(model.mesh_verts),
+                                   False)
+        
+        # Faces
+        offsets.append(len(data) + header_len)
+        data += self.__write_block(TFace, model.mesh_faces, False)
+
+        offsets.append(0) # Triangle Planes (what are these?)
+        
+        # Shadow Mesh
+
+        if model.version >= 3:
+
+            # Shadow Vertices
+            offsets.append(len(data) + header_len)
+            data += self.__write_block(TVertex, model.shadow_verts, False)
+            
+            # Shadow Vertices
+            offsets.append(len(data) + header_len)
+            data += self.__write_block(TFace, model.shadow_faces, False)
+
+        # Write Header
+        header_data = pack("<HHHBxIIIIIII",
+                            len(model.spheres),
+                            len(model.cubes),
+                            len(model.mesh_faces),
+                            len(model.lines),
+                            flags,
+                            *offsets[:6])
+
+        # Shadow Mesh (only after version 3)
+        if model.version >= 3:
+            header_data += pack("<III", len(model.shadow_faces), *offsets[6:])
+
+        return header_data + data
+    
+    #######################################################
+    def __write_col(self, model: ColModel):
+
+        Sections.init_sections(model.version)
+        
+        if model.version == 1:
+            data = self.__write_col_legacy(model)
+        else:
+            data = self.__write_col_new(model)
+            
+        data = Sections.write_section(TBounds, model.bounds) + data
+
+        header_size = 24
+        header = [
+            ("COL" + ('L' if model.version == 1 else str(model.version))).encode(
+                "ascii"
+            ),
+            len(data) + header_size,
+            model.model_name.encode("ascii"),
+            model.model_id
+        ]
+
+        return pack("4sI22sH", *header) + data
+            
+    #######################################################
+    def write_memory(self):
+
+        data = b''
+        
+        for model in self.models:
+            data += self.__write_col(model)
+
+        return data
+            
+    #######################################################
+    def write_file(self, filename):
+
+        with open(filename, mode='wb') as file:
+            content = self.write_memory()
+            file.write(content)
+            
+    #######################################################
     def __init__(self):
         self.models = []
         self._data = ""
         self._pos = 0
 
 test = coll()
-test.load_file("/home/parik/Games/GTA 3/GTA 3 Clean/models/Coll/vehicles.col")
+test.load_file("/home/parik/vehicles3.col")
+test.write_file("generated.col")
