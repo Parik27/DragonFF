@@ -1220,7 +1220,6 @@ class dff:
                     self.read_atomic(chunk)
 
                 elif chunk.type == types["Collision Model"]:
-                    print("here")
                     self.collisions.append(
                         self.data[self.pos:self.pos + chunk.size]
                     )

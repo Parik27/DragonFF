@@ -21,21 +21,28 @@ from . import col
 
 #######################################################
 def link_object(obj, collection):
-        collection.objects.link(obj)
-        if (2, 80, 0) > bpy.app.version:
-            bpy.context.scene.objects.link(obj)
-
+    collection.objects.link(obj)
+    if (2, 80, 0) > bpy.app.version:
+        bpy.context.scene.objects.link(obj)
+        
 #######################################################        
 def create_collection(name, link=True):
-        if (2, 80, 0) > bpy.app.version:
-            return bpy.data.groups.new(name)
-        else:
-            collection = bpy.data.collections.new(name)
-            if link:
-                bpy.context.scene.collection.children.link(collection)
-                
-            return collection        
-
+    if (2, 80, 0) > bpy.app.version:
+        return bpy.data.groups.new(name)
+    else:
+        collection = bpy.data.collections.new(name)
+        if link:
+            bpy.context.scene.collection.children.link(collection)
+            
+        return collection        
+        
+#######################################################
+def hide_object(object, hide=True):
+    if (2, 80, 0) > bpy.app.version:
+        object.hide = hide
+    else:
+        object.hide_viewport = hide
+        
 #######################################################        
 class col_importer:
 
@@ -128,18 +135,21 @@ class col_importer:
 
             if len(model.mesh_verts) > 0:
                 self.__add_mesh(collection,
-                                "ColMesh",
+                                collection.name + ".ColMesh",
                                 model.mesh_verts,
                                 model.mesh_faces)
 
             if len(model.shadow_verts) > 0:
                 self.__add_mesh(collection,
-                                "ShadowMesh",
+                                collection.name + ".ShadowMesh",
                                 model.shadow_verts,
                                 model.shadow_faces)
                         
             collection_list.append(collection)
-            collection.hide_viewport = True
+
+            # Hide objects
+            for obj in collection.objects:
+                hide_object(obj)
 
         return collection_list
     

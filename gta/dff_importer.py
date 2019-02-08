@@ -528,9 +528,11 @@ class dff_importer:
 
         # Add collisions
         for collision in self.dff.collisions:
-                col = import_col_mem(collision, os.path.basename(file_name), False)
+            col = import_col_mem(collision, os.path.basename(file_name), False)
+            
+            if (2, 80, 0) <= bpy.app.version:
                 for collection in col:
-                        self.current_collection.children.link(collection)
+                    self.current_collection.children.link(collection)
 
 #######################################################
 def import_dff(options):
