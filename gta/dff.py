@@ -84,7 +84,8 @@ types = {
     "Material Effects PLG"    : 288,
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
-    "Frame"                   : 39056126
+    "Collision Model"         : 39056122,
+    "Frame"                   : 39056126,
 }
 
 #######################################################
@@ -1218,8 +1219,19 @@ class dff:
                 elif chunk.type == types["Atomic"]:  
                     self.read_atomic(chunk)
 
-                #TODO: Extensions (Collision models)
-                else: 
+                elif chunk.type == types["Collision Model"]:
+                    print("here")
+                    self.collisions.append(
+                        self.data[self.pos:self.pos + chunk.size]
+                    )
+                    self.pos += chunk.size
+                    
+                #Not incrementing the position here to read the next extensions
+                #in the same loop
+                elif chunk.type == types["Extension"]: 
+                    pass
+
+                else:
                     self.pos += chunk.size
 
     #######################################################
@@ -1259,6 +1271,7 @@ class dff:
     def clear(self):
         self.frame_list    = []
         self.geometry_list = []
+        self.collisions    = []
         self.atomic_list   = []
         self.uvanim_dict   = []
         self.light_list    = []

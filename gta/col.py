@@ -16,7 +16,7 @@
 
 from struct import unpack_from, calcsize, pack
 from collections import namedtuple
-from dff import strlen
+from .dff import strlen
 
 class ColModel:
     def __init__(self):
@@ -480,10 +480,6 @@ class coll:
             
     #######################################################
     def __init__(self):
-        self.models = []
+        self.models = [ColModel()] * 0
         self._data = ""
         self._pos = 0
-
-test = coll()
-test.load_file("/home/parik/vehicles3.col")
-test.write_file("generated.col")

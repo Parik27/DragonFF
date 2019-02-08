@@ -21,7 +21,19 @@ import math
 import mathutils
 
 from . import dff
+from .col_importer import import_col_mem, link_object, create_collection
 
+#######################################################            
+def set_object_mode(obj, mode):
+        
+        # Blender 2.79 compatibility
+        if (2, 80, 0) > bpy.app.version:
+            bpy.context.scene.objects.active = obj
+        else:
+            bpy.context.view_layer.objects.active = obj
+            
+        bpy.ops.object.mode_set(mode=mode, toggle=False)
+        
 #######################################################
 class material_helper:
 
@@ -31,9 +43,9 @@ class material_helper:
     def set_base_color(self, color):
 
         if self.principled:
-            self.principled.base_color = color
+            self.principled.base_color = [i / 255 for i in color]
         else:
-            self.material.diffuse_color = color
+            self.material.diffuse_color = [i / 255 for i in color]
 
     #######################################################
     def set_texture(self, image, label=""):
@@ -229,12 +241,7 @@ class dff_importer:
             self.import_materials(geom, frame, mesh)
             self.meshes[atomic.frame] = mesh
 
-    #######################################################
-    def link_object(obj):
-        dff_importer.current_collection.objects.link(obj)
-        if (2, 80, 0) > bpy.app.version:
-            bpy.context.scene.objects.link(obj)
-            
+               
     #######################################################
     def set_empty_draw_properties(empty):
         if (2, 80, 0) > bpy.app.version:
@@ -339,17 +346,6 @@ class dff_importer:
                     
                 
     #######################################################
-    def set_object_mode(obj, mode):
-        
-        # Blender 2.79 compatibility
-        if (2, 80, 0) > bpy.app.version:
-            bpy.context.scene.objects.active = obj
-        else:
-            bpy.context.view_layer.objects.active = obj
-            
-        bpy.ops.object.mode_set(mode=mode, toggle=False)
-
-    #######################################################
     def align_roll( vec, vecz, tarz ):
 
         sine_roll = vec.normalized().dot(vecz.normalized().cross(tarz.normalized()))
@@ -373,7 +369,7 @@ class dff_importer:
         
         armature = bpy.data.armatures.new(frame.name)
         obj = bpy.data.objects.new(frame.name, armature)
-        self.link_object(obj)
+        link_object(obj, dff_importer.current_collection)
         
         skinned_obj_data = self.skin_data[frame.parent]
         skinned_obj = self.objects[frame.parent]
@@ -487,7 +483,7 @@ class dff_importer:
             # Create and link the object to the scene
             if obj is None:
                 obj = bpy.data.objects.new(frame.name, mesh)
-                self.link_object(obj)
+                link_object(obj, dff_importer.current_collection)
 
                 obj.rotation_mode       = 'QUATERNION'
                 obj.rotation_quaternion = matrix.to_quaternion()
@@ -511,16 +507,7 @@ class dff_importer:
                 
             self.objects.append(obj)            
 
-    #######################################################
-    def create_collection(name):
-        if (2, 80, 0) > bpy.app.version:
-            return bpy.data.groups.new(name)
-        else:
-            collection = bpy.data.collections.new(name)
-            bpy.context.scene.collection.children.link(collection)
-
-            return collection
-            
+                
     #######################################################
     def import_dff(file_name):
         self = dff_importer
@@ -532,12 +519,18 @@ class dff_importer:
         self.file_name = file_name
 
         # Create a new group/collection
-        self.current_collection = self.create_collection(
+        self.current_collection = create_collection(
             os.path.basename(file_name)
         )
         
         self.import_atomics()
         self.import_frames()
+
+        # Add collisions
+        for collision in self.dff.collisions:
+                col = import_col_mem(collision, os.path.basename(file_name), False)
+                for collection in col:
+                        self.current_collection.children.link(collection)
 
 #######################################################
 def import_dff(options):

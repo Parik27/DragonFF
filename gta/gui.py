@@ -16,7 +16,7 @@
 
 import bpy
 import os
-from . import dff_importer, dff_exporter
+from . import dff_importer, dff_exporter, col_importer
 
 from bpy_extras.io_utils import ImportHelper
 
@@ -219,13 +219,17 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         
         for file in [os.path.join(self.directory,file.name) for file in self.files]:
-            dff_importer.import_dff(
-                {
-                    'file_name'    : file,
-                    'image_ext'    : self.image_ext,
-                    'connect_bones': self.connect_bones
-                }
-            )
+            if file.endswith(".col"):
+                col_importer.import_col_file(file, os.path.basename(file))
+                            
+            else:
+                dff_importer.import_dff(
+                    {
+                        'file_name'    : file,
+                        'image_ext'    : self.image_ext,
+                        'connect_bones': self.connect_bones
+                    }
+                )
         return {'FINISHED'}
 
     #######################################################
