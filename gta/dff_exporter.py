@@ -260,7 +260,7 @@ class dff_exporter:
             material = dff.Material()
             helper = material_helper(b_material)
 
-            material.colour             = helper.get_base_color()
+            material.color             = helper.get_base_color()
             material.surface_properties = helper.get_surface_properties()
             
             texture = helper.get_texture()
@@ -356,7 +356,7 @@ class dff_exporter:
         # Set SkinPLG
         skin = self.init_skin_plg(obj)
 
-        has_prelit_colours = len(obj.data.vertex_colors) > 0
+        has_prelit_colors = len(obj.data.vertex_colors) > 0
 
         # These are used to set the vertex indices for new vertices
         # created in the next loop to get rid of shared vertices.
@@ -406,12 +406,12 @@ class dff_exporter:
             
             i += 1
 
-        # Allocate uv layers/vertex colours array
+        # Allocate uv layers/vertex colors array
         uv_layers_count = len(bm.loops.layers.uv)
         geometry.uv_layers = [[dff.TexCoords(0,0)] * len(bm.verts)
                               for i in range(uv_layers_count)]
-        if has_prelit_colours:
-            geometry.prelit_colours = [dff.RGBA(255,255,255,255)] * len(bm.verts)
+        if has_prelit_colors:
+            geometry.prelit_colors = [dff.RGBA(255,255,255,255)] * len(bm.verts)
         # Faces
         for face in bm.faces:
 
@@ -439,10 +439,10 @@ class dff_exporter:
                     )
 
                 # Set prelit faces for this face
-                if has_prelit_colours:
+                if has_prelit_colors:
                     for index, layer in enumerate(bm.loops.layers.color.values()):
                         color = loop[layer]
-                        geometry.prelit_colours[verts[loop.index]] = dff.RGBA._make(
+                        geometry.prelit_colors[verts[loop.index]] = dff.RGBA._make(
                             int(c * 255) for c in color
                         )
                         break #only once

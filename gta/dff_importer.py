@@ -212,7 +212,7 @@ class dff_importer:
             for layer in geom.uv_layers:
                 uv_layers.append(bm.loops.layers.uv.new())
                 
-            # Add Vertex Colours
+            # Add Vertex Colors
             if geom.flags & dff.rpGEOMETRYPRELIT:
                 vertex_color = bm.loops.layers.color.new()
             
@@ -239,11 +239,11 @@ class dff_importer:
                                 uv_coords.u,
                                 1 - uv_coords.v # Y coords are flipped in Blender
                             )
-                        # Vertex colours
+                        # Vertex colors
                         if geom.flags & dff.rpGEOMETRYPRELIT:
                             loop[vertex_color] = [
                                 c / 255.0 for c in
-                                geom.prelit_colours[loop.vert.index]
+                                geom.prelit_colors[loop.vert.index]
                             ]
                     
                     face.smooth = True
@@ -295,7 +295,7 @@ class dff_importer:
             mat = bpy.data.materials.new(name)
             helper = material_helper(mat)
             
-            helper.set_base_color(material.colour)
+            helper.set_base_color(material.color)
 
             # Loading Texture
             if material.is_textured == 1:

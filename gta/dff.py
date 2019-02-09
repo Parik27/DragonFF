@@ -263,7 +263,7 @@ class Material:
 
     __slots__ = [
         'flags',
-        'colour',
+        'color',
         'is_textured',
         'surface_properties',
         'textures',
@@ -274,7 +274,7 @@ class Material:
     def __init__(self):
 
         self.flags              = None
-        self.colour             = None
+        self.color             = None
         self.is_textured        = None
         self.surface_properties = None
         self.textures           = []
@@ -295,7 +295,7 @@ class Material:
             self.surface_properties = Sections.read(GeomSurfPro, data, 16)
 
         self.flags       = array_data[0]
-        self.colour      = array_data[1]
+        self.color      = array_data[1]
         self.is_textured = array_data[3]
         self.textures    = []
         self.plugins     = {}
@@ -420,7 +420,7 @@ class Material:
     def to_mem(self):
 
         data = pack("<4x")
-        data += Sections.write(RGBA, self.colour)
+        data += Sections.write(RGBA, self.color)
         data += pack("<II", 1, len(self.textures) > 0)
 
         if Sections.get_rw_version() > 0x30400:
@@ -685,7 +685,7 @@ class Geometry:
         'triangles',
         'vertices',
         'surface_properties',
-        'prelit_colours',
+        'prelit_colors',
         'uv_layers',
         'bounding_sphere',
         'has_vertices',
@@ -702,7 +702,7 @@ class Geometry:
         self.triangles          = []
         self.vertices           = []
         self.surface_properties = None
-        self.prelit_colours     = []
+        self.prelit_colors     = []
         self.uv_layers          = []
         self.bounding_sphere    = None
         self.has_vertices       = None
@@ -714,14 +714,14 @@ class Geometry:
         # used for export
         self.export_flags = {
             "light"              : True,
-            "modulate_colour"    : True
+            "modulate_color"    : True
             }
 
     #######################################################
     def from_mem(data, parent_chunk):
 
         # Note: In the following function, I have used a loop
-        #      to load the texture coordinates or prelit colours,
+        #      to load the texture coordinates or prelit colors,
         #      although I feel that it might be more efficient to
         #      convert an array to an array of namedtuples.
         #      I have not found a way yet to implement such a function.
@@ -741,13 +741,13 @@ class Geometry:
 
         if self.flags & rpGEOMETRYNATIVE == 0:
 
-            # Read prelighting colours
+            # Read prelighting colors
             if self.flags & rpGEOMETRYPRELIT:
-                self.prelit_colours = []
+                self.prelit_colors = []
                 
                 for i in range(num_vertices):
-                    prelit_colour = Sections.read(RGBA, data, pos)
-                    self.prelit_colours.append(prelit_colour)
+                    prelit_color = Sections.read(RGBA, data, pos)
+                    self.prelit_colors.append(prelit_color)
 
                     pos += 4
 
@@ -836,13 +836,13 @@ class Geometry:
             flags |= rpGEOMETRYTEXTURED2
         elif len(self.uv_layers) > 0:
             flags |= rpGEOMETRYTEXTURED
-        if len(self.prelit_colours) > 0:
+        if len(self.prelit_colors) > 0:
             flags |= rpGEOMETRYPRELIT
         if self.normals is not None:
             flags |= rpGEOMETRYNORMALS
         flags |= rpGEOMETRYLIGHT * self.export_flags["light"]
         flags |= rpGEOMETRYMODULATEMATERIALCOLOR * \
-            self.export_flags["modulate_colour"]
+            self.export_flags["modulate_color"]
 
         data = b''
         data += pack("<IIII", flags, len(self.triangles), len(self.vertices), 1)
@@ -851,10 +851,10 @@ class Geometry:
         if Sections.get_rw_version() < 0x34000:
             data += Sections.write(GeomSurfPro, self.surface_properties)
 
-        # Write pre-lit colours
+        # Write pre-lit colors
         if flags & rpGEOMETRYPRELIT:
-            for colour in self.prelit_colours:
-                data += Sections.write(RGBA, colour)
+            for color in self.prelit_colors:
+                data += Sections.write(RGBA, color)
 
         # Write UV Layers
         for uv_layer in self.uv_layers:
@@ -1491,4 +1491,4 @@ test = dff()
 test.load_file("/home/parik/monster.dff")
 for geometry in test.geometry_list:
     for material in geometry.materials:
-        print(material.colour)
+        print(material.color)
