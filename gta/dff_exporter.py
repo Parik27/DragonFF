@@ -35,11 +35,13 @@ class material_helper:
     def get_base_color(self):
 
         if self.principled:
+            node = self.principled.node_principled_bsdf.inputs["Base Color"]
             return dff.RGBA._make(
-                list(int(255 * x) for x in self.principled.base_color) + [255]
+                list(int(255 * x) for x in node.default_value)
             )
+        alpha = self.material.alpha
         return dff.RGBA(
-                    list(int(255*x) for x in self.material.diffuse_color) + [255]
+                    list(int(255*x) for x in self.material.diffuse_color) + [alpha]
                 )
 
     #######################################################
@@ -95,8 +97,10 @@ class material_helper:
     #######################################################
     def get_normal_map(self):
 
-        texture = dff.Texture()
-        texture.filters = 0
+        bump_texture = None
+        diffuse_texture = dff.Texture()
+        
+        diffuse_texture.filters = 0
 
         if not self.material.dff.export_bump_map:
             return None
@@ -106,23 +110,34 @@ class material_helper:
             
             if self.principled.normalmap_texture.image is not None:
 
+                bump_texture = dff.Texture()
+                
                 node_label = self.principled.node_normalmap.label
                 image_name = self.principled.normalmap_texture.image.name
 
-                texture.name = clear_extension(
+                bump_texture.name = clear_extension(
                     node_label
                     if node_label in image_name and node_label is not ""
                     else image_name
                 )
-                return (texture, self.principled.normalmap_strength)
-            return None
+                intensity = self.principled.normalmap_strength
 
         # 2.79
         for slot in self.material.texture_slots:
 
+            bump_texture = dff.Texture()
+            
             if slot.texture.use_normal_map:
-                texture.name = clear_extension(slot.texture.image.name)
-                return (texture, slot.normal_factor)
+                bump_texture.name = clear_extension(slot.texture.image.name)
+                intensity = slot.normal_factor
+                return (bump_texture, slot.normal_factor)
+
+        diffuse_texture.name = self.material["bump_map_tex"]
+        if diffuse_texture.name == "":
+            diffuse_texture = None
+
+        if bump_texture is not None:
+            return dff.BumpMapFX(intensity, diffuse_texture, bump_texture)
 
         return None
 
@@ -136,7 +151,11 @@ class material_helper:
         coef         = self.material.dff.env_map_coef
         use_fb_alpha  = self.material.dff.env_map_fb_alpha
 
-        return dff.EnvMapFX(coef, use_fb_alpha, texture_name)
+        texture = dff.Texture()
+        texture.name = texture_name
+        texture.filters = 0
+        
+        return dff.EnvMapFX(coef, use_fb_alpha, texture)
 
     #######################################################
     def get_specular_material(self):
@@ -146,7 +165,8 @@ class material_helper:
         if not props.export_specular:
             return None
 
-        return dff.SpecularMat(props.specular_level, props.specular_texture)
+        return dff.SpecularMat(props.specular_level,
+                               props.specular_texture.encode('ascii'))
 
     #######################################################
     def get_reflection_material(self):
@@ -547,10 +567,6 @@ class dff_exporter:
             self.dff.write_file(self.file_name, self.version )
         else:
             self.dff.write_file("%s/%s" % (self.path, name), self.version)
-
-    #######################################################
-    def is_collision_object(obj):
-        pass
             
     #######################################################
     def export_dff(filename):

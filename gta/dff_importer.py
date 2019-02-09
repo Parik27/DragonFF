@@ -43,9 +43,15 @@ class material_helper:
     def set_base_color(self, color):
 
         if self.principled:
-            self.principled.base_color = [i / 255 for i in color]
+            self.principled.base_color = [i / 255 for i in color[:3]]
+
+            # Set Alpha
+            node = self.principled.node_principled_bsdf.inputs["Base Color"]
+            node.default_value[3] = color[3] / 255
+            
         else:
-            self.material.diffuse_color = [i / 255 for i in color]
+            self.material.diffuse_color = [i / 255 for i in color[:3]]
+            self.material.alpha = color[3] / 255
 
     #######################################################
     def set_texture(self, image, label=""):
@@ -289,7 +295,7 @@ class dff_importer:
             mat = bpy.data.materials.new(name)
             helper = material_helper(mat)
             
-            helper.set_base_color(material.colour[:3])
+            helper.set_base_color(material.colour)
 
             # Loading Texture
             if material.is_textured == 1:

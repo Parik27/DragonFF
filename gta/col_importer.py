@@ -69,20 +69,16 @@ class col_importer:
     #######################################################
     def __add_spheres(self, collection, array):
 
-        name = collection.name + ".Sphere"
+        for index, entity in enumerate(array):
+            name = collection.name + ".Sphere.%d" % (index)
         
-        mesh = bpy.data.metaballs.new(name)
-        obj  = bpy.data.objects.new(name, mesh)
-
-        mesh.threshold = 0.00001
-        mesh.resolution = 0.05
+            obj  = bpy.data.objects.new(name, None)
+            
+            obj.location = entity.center
+            obj.scale = [entity.radius] * 3
+            obj.empty_display_type = 'SPHERE'
         
-        link_object(obj, collection)
-        
-        for entity in array:
-            element = mesh.elements.new(type='BALL')
-            element.co = entity.center
-            element.radius = entity.radius
+            link_object(obj, collection)
 
     #######################################################
     def __add_mesh(self, collection, name, verts, faces):
@@ -138,8 +134,11 @@ class col_importer:
             collection_list.append(collection)
 
             # Hide objects
-            for obj in collection.objects:
-                hide_object(obj)
+            if (2, 80, 0) > bpy.app.version:
+                for obj in collection.objects:
+                    hide_object(obj)
+            else:
+               collection.hide_viewport = True     
 
         return collection_list
     

@@ -320,9 +320,102 @@ class Material:
             self.plugins[key].append(plugin)
 
     #######################################################
+    def bumpfx_to_mem(self):
+
+        data = b''
+        bump_map = self.plugins['bump_map'][0]
+        
+        data += pack("<IfI", 1, bump_map.intensity, bump_map.bump_map is not None)
+        if bump_map.bump_map is not None:
+            data += bump_map.bump_map.to_mem()
+
+        data += pack("<I", bump_map.height_map is not None)
+        if bump_map.height_map is not None:
+            data += bump_map.height_map.to_mem()
+
+        return data
+
+    #######################################################
+    def envfx_to_mem(self):
+        env_map: BumpMapFX = self.plugins['env_map'][0]
+        
+        data = pack("<IfII",
+                    2,
+                    env_map.coefficient,
+                    env_map.use_fb_alpha,
+                    env_map.env_map is not None
+        )
+        if env_map.env_map is not None:
+            data += env_map.env_map.to_mem()
+
+        return data
+
+    #######################################################
     def plugins_to_mem(self):
-        pass
+        data = self.matfx_to_mem()
+
+        # Specular Material
+        if 'spec' in self.plugins:
+            data += Sections.write(
+                SpecularMat,
+                self.plugins['spec'][0],
+                types["Specular Material"]
+            )
+
+        # Reflection Material
+        if 'refl' in self.plugins:
+            data += Sections.write(
+                ReflMat,
+                self.plugins['refl'][0],
+                types["Reflection Material"]
+            )
+
+        # UV Animation PLG
+        if 'uv_anim' in self.plugins:
+            _data = len(self.plugins['uv_anim'])
+            for frame_name in self.plugins['uv_anim']:
+                _data = pack("<32s", frame_name.encode('ascii'))
+
+            data += Sections.write_chunk(_data, types["UV Animation PLG"])
+
+        return data
+    
+    #######################################################
+    def matfx_to_mem(self):
+        data = b''
+
+        effectType = 0
+        if 'bump_map' in self.plugins:
+            data += self.bumpfx_to_mem()
+            effectType = 1
             
+            if 'env_map' in self.plugins: #rwMATFXEFFECTBUMPENVMAP
+                data += self.envfx_to_mem()
+                effectType = 3
+                
+            
+        elif 'env_map' in self.plugins:
+            data += self.envfx_to_mem()
+            effectType = 2
+            
+        elif 'dual' in self.plugins:
+            effectType = 4
+            
+            if 'uv_anim' in self.plugins: #rwMATFXEFFECTDUALUVTTRANSFORM
+                effectType = 6
+
+        elif 'uv_anim' in self.plugins:
+            effectType = 5
+
+        if effectType == 0:
+            return b''
+            
+        if effectType != 3 or effectType != 6: #Both effects are set
+            data += pack("<I", 0)
+    
+        data = pack("<I", effectType) + data
+        return Sections.write_chunk(data, types["Material Effects PLG"])
+        
     #######################################################
     def to_mem(self):
 
@@ -339,7 +432,7 @@ class Material:
         if len(self.textures) > 0:
             data += self.textures[0].to_mem()
 
-        data += Sections.write_chunk(b"", types["Extension"])
+        data += Sections.write_chunk(self.plugins_to_mem(), types["Extension"])
         return Sections.write_chunk(data, types["Material"])
                 
 #######################################################
@@ -913,7 +1006,6 @@ class dff:
                 )
                     
                 geometry.triangles.append(triangle)
-                pass
 
     #######################################################
     def read_matfx_bumpmap(self):
@@ -921,9 +1013,9 @@ class dff:
         intensity  = 0.0
         height_map = None
         
-        intensity, contains_bump_map = unpack_from("<4xfI",
+        intensity, contains_bump_map = unpack_from("<fI",
                                                    self.data,
-                                                   self._read(12))
+                                                   self._read(8))
         # Read Bump Map
         if contains_bump_map:
             bump_chunk = self.read_chunk()
@@ -958,9 +1050,9 @@ class dff:
         coefficient  = 1.0
         use_fb_alpha = False #fb = frame buffer
     
-        coefficient, use_fb_alpha, contains_envmap = unpack_from("<4xfII",
+        coefficient, use_fb_alpha, contains_envmap = unpack_from("<fII",
                                                                  self.data,
-                                                                 self._read(16))
+                                                                 self._read(12))
 
         # Read environment map texture
         if contains_envmap:
@@ -1000,7 +1092,8 @@ class dff:
     
     #######################################################
     def read_matfx(self, material, chunk):
-        
+
+        self._read(4) #header - effect type (not really required to be read)
         for i in range(2):
             effect_type = unpack_from("<I", self.data, self._read(4))[0]
             
@@ -1020,14 +1113,6 @@ class dff:
             if effect_type == 5:
                 material.add_plugin('uv_anim', [])
 
-    #######################################################
-    def read_specular_mat(self, material, chunk):
-        pass
-
-    #######################################################
-    def read_reflection_mat(self, material, chunk):
-        pass
-    
     #######################################################
     def read_texture(self):
         chunk = self.read_chunk() 
@@ -1288,7 +1373,6 @@ class dff:
                 )
 
             self._read(chunk.size)
-        pass
                     
     #######################################################
     def load_memory(self, data: str):
@@ -1402,3 +1486,9 @@ class dff:
     def __init__(self):
         
         self.clear()
+
+test = dff()
+test.load_file("/home/parik/monster.dff")
+for geometry in test.geometry_list:
+    for material in geometry.materials:
+        print(material.colour)
