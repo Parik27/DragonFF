@@ -66,9 +66,9 @@ class material_helper:
     def set_surface_properties(self, props):
 
         if self.principled:
-            self.principled.specular  = props.specular
-            self.principled.roughness = props.diffuse
-            self.material["ambient"]  = props.ambient
+            self.principled.specular       = props.specular
+            self.principled.roughness      = props.diffuse
+            self.material.dff.ambient = props.ambient
             
         else:
             self.material.diffuse_intensity  = props.diffuse
@@ -103,10 +103,31 @@ class material_helper:
     def set_environment_map(self, plugin):
 
         if plugin.env_map:
-            self.material["env_map_tex"]      = plugin.env_map.name
-            
-        self.material["env_map_coef"]         = plugin.coefficient
-        self.material["env_map_fb_alpha"]     = plugin.use_fb_alpha        
+            self.material.dff.env_map_tex      = plugin.env_map.name
+
+        self.material.dff.export_env_map       = True
+        self.material.dff.env_map_coef         = plugin.coefficient
+        self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha        
+
+    #######################################################
+    def set_specular_material(self, plugin):
+        
+        self.material.dff.export_specular = True
+        self.material.dff.specular_level = plugin.level
+        self.material.dff.specular_texture = plugin.texture.decode('ascii')
+
+    #######################################################
+    def set_reflection_material(self, plugin):
+
+        self.material.dff.export_reflection = True
+
+        self.material.dff.reflection_scale_x = plugin.s_x
+        self.material.dff.reflection_scale_y = plugin.s_y
+
+        self.material.dff.reflection_offset_y = plugin.o_y
+        self.material.dff.reflection_offset_x = plugin.o_x
+
+        self.material.dff.reflection_intensity = plugin.intensity
     
     #######################################################
     def __init__(self, material):
@@ -286,13 +307,15 @@ class dff_importer:
                 
             # Normal Map
             if 'bump_map' in material.plugins:
+                mat.dff.export_bump_map = True
+                
                 for bump_fx in material.plugins['bump_map']:
 
                     texture = None
                     if bump_fx.height_map is not None:
                         texture = bump_fx.height_map
                         if bump_fx.bump_map is not None:
-                            mat["height_map_tex"] = bump_fx.bump_map.name
+                            mat.dff.bump_map_tex = bump_fx.bump_map.name
 
                     elif bump_fx.bump_map is not None:
                         texture = bump_fx.bump_map
@@ -328,7 +351,17 @@ class dff_importer:
             if 'env_map' in material.plugins:
                 plugin = material.plugins['env_map'][0]
                 helper.set_environment_map(plugin)
-                                    
+
+            # Specular Material
+            if 'spec' in material.plugins:
+                plugin = material.plugins['spec'][0]
+                helper.set_specular_material(plugin)
+
+            # Reflection Material
+            if 'refl' in material.plugins:
+                plugin = material.plugins['refl'][0]
+                helper.set_reflection_material(plugin)
+
             # Add imported material to the object
             mesh.materials.append(helper.material)
                 
@@ -375,7 +408,7 @@ class dff_importer:
         skinned_obj = self.objects[frame.parent]
         
         # armature edit bones are only available in edit mode :/
-        self.set_object_mode(obj, "EDIT")
+        set_object_mode(obj, "EDIT")
         edit_bones = obj.data.edit_bones
         
         bone_list = {}
@@ -417,7 +450,7 @@ class dff_importer:
                 except BaseException:
                     print("DragonFF: Bone parent not found")
                     
-        self.set_object_mode(obj, "OBJECT")
+        set_object_mode(obj, "OBJECT")
 
         # Add Armature modifier to skinned object
         modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')

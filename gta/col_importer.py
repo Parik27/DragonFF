@@ -45,16 +45,6 @@ def hide_object(object, hide=True):
         
 #######################################################        
 class col_importer:
-
-    #######################################################
-    def create_collection(name):
-        if (2, 80, 0) > bpy.app.version:
-            return bpy.data.groups.new(name)
-        else:
-            collection = bpy.data.collections.new(name)
-            bpy.context.scene.collection.children.link(collection)
-
-            return collection
     
     #######################################################
     def __init__(self, col):

@@ -33,7 +33,9 @@ bl_info = {
 # Class list to register
 _classes = [
     gui.IMPORT_OT_dff,
-    gui.EXPORT_OT_dff
+    gui.EXPORT_OT_dff,
+    gui.MATERIAL_PT_dffMaterials,
+    gui.DFFMaterialProps
 ]
 #######################################################
 def register():

@@ -35,6 +35,8 @@ UVFrame     = namedtuple("UVFrame"     , "time uv prev")
 BumpMapFX   = namedtuple("BumpMapFX"   , "intensity bump_map height_map")
 EnvMapFX    = namedtuple("EnvMapFX"    , "coefficient use_fb_alpha env_map")
 DualFX      = namedtuple("DualFX"      , "src_blend dst_blend texture")
+ReflMat     = namedtuple("ReflMat"     , "s_x s_y o_x o_y intensity")
+SpecularMat = namedtuple("SpecularMap" , "level texture")
 
 # geometry flags
 rpGEOMETRYTRISTRIP              = 0x00000001
@@ -63,7 +65,7 @@ class BlendMode(Enum):
     INVDESTCOLOR = 0x0A
     SRCALPHASAT  = 0x0B
 
-# Block types291
+# Block types
 types = {
     "Struct"                  : 1,
     "String"                  : 2,
@@ -84,7 +86,9 @@ types = {
     "Material Effects PLG"    : 288,
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
+    "Specular Material"       : 39056118,
     "Collision Model"         : 39056122,
+    "Reflection Material"     : 39056124,
     "Frame"                   : 39056126,
 }
 
@@ -119,7 +123,9 @@ class Sections:
         Sphere      : "<4f",
         Triangle    : "<4H",
         Atomic      : "<4I",
-        TexCoords   : "<2f"
+        TexCoords   : "<2f",
+        ReflMat     : "<5f4x",
+        SpecularMat : "<f24s"
     }
 
     library_id = 0 # used for writing
@@ -298,6 +304,10 @@ class Material:
 
     #######################################################
     def add_plugin(self, key, plugin):
+
+        if plugin is None:
+            return
+
         if key not in self.plugins:
             self.plugins[key] = []
 
@@ -308,12 +318,15 @@ class Material:
         except AttributeError:
             self.plugins[key] = []
             self.plugins[key].append(plugin)
-        
+
+    #######################################################
+    def plugins_to_mem(self):
+        pass
+            
     #######################################################
     def to_mem(self):
 
-        data = b''
-        data += pack("<4x")
+        data = pack("<4x")
         data += Sections.write(RGBA, self.colour)
         data += pack("<II", 1, len(self.textures) > 0)
 
@@ -1008,6 +1021,14 @@ class dff:
                 material.add_plugin('uv_anim', [])
 
     #######################################################
+    def read_specular_mat(self, material, chunk):
+        pass
+
+    #######################################################
+    def read_reflection_mat(self, material, chunk):
+        pass
+    
+    #######################################################
     def read_texture(self):
         chunk = self.read_chunk() 
 
@@ -1095,6 +1116,23 @@ class dff:
                                     if chunk.type == types["Material Effects PLG"]:
                                         self.read_matfx(material, chunk)
 
+                                    if chunk.type == types["Specular Material"]:
+
+                                        material.add_plugin(
+                                            "spec",
+                                            Sections.read(SpecularMat,
+                                                          self.data,
+                                                          self.pos)
+                                        )
+
+                                    if chunk.type == types["Reflection Material"]:
+                                        material.add_plugin(
+                                            "refl",
+                                            Sections.read(ReflMat,
+                                                          self.data,
+                                                          self.pos)
+                                        )
+                                        
                                     if chunk.type == types["UV Animation PLG"]:
 
                                         anim_count = unpack_from("<I",

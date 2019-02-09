@@ -21,6 +21,160 @@ import mathutils
 from . import dff
 
 #######################################################
+def clear_extension(string):
+    
+    k = string.rfind('.')
+    return string if k < 0 else string[:k]
+    
+#######################################################
+class material_helper:
+
+    """ Material Helper for Blender 2.7x and 2.8 compatibility"""
+
+    #######################################################
+    def get_base_color(self):
+
+        if self.principled:
+            return dff.RGBA._make(
+                list(int(255 * x) for x in self.principled.base_color) + [255]
+            )
+        return dff.RGBA(
+                    list(int(255*x) for x in self.material.diffuse_color) + [255]
+                )
+
+    #######################################################
+    def get_texture(self):
+
+        texture = dff.Texture()
+        texture.filters = 0 # <-- find a way to store this in Blender
+        
+        # 2.8         
+        if self.principled:
+            if self.principled.base_color_texture.image is not None:
+
+                node_label = self.principled.base_color_texture.node_image.label
+                image_name = self.principled.base_color_texture.image.name
+
+                # Use node label if it is a substring of image name, else
+                # use image name
+                
+                texture.name = clear_extension(
+                    node_label
+                    if node_label in image_name and node_label is not ""
+                    else image_name
+                )
+                return texture
+            return None
+
+        # Blender Internal
+        try:
+            texture.name = clear_extension(
+                self.material.texture_slots[0].texture.image.name
+            )
+            return texture
+
+        except BaseException:
+            return None
+
+    #######################################################
+    def get_surface_properties(self):
+
+        if self.principled:
+            specular = self.principled.specular
+            diffuse = self.principled.roughness
+            ambient = self.material.dff.ambient
+            
+        else:
+
+            specular = self.material.specular_intensity
+            diffuse  = self.material.diffuse_intensity
+            ambient  = self.material.ambient
+            
+        return dff.GeomSurfPro(ambient, specular, diffuse)
+
+    #######################################################
+    def get_normal_map(self):
+
+        texture = dff.Texture()
+        texture.filters = 0
+
+        if not self.material.dff.export_bump_map:
+            return None
+        
+        # 2.8
+        if self.principled:
+            
+            if self.principled.normalmap_texture.image is not None:
+
+                node_label = self.principled.node_normalmap.label
+                image_name = self.principled.normalmap_texture.image.name
+
+                texture.name = clear_extension(
+                    node_label
+                    if node_label in image_name and node_label is not ""
+                    else image_name
+                )
+                return (texture, self.principled.normalmap_strength)
+            return None
+
+        # 2.79
+        for slot in self.material.texture_slots:
+
+            if slot.texture.use_normal_map:
+                texture.name = clear_extension(slot.texture.image.name)
+                return (texture, slot.normal_factor)
+
+        return None
+
+    #######################################################
+    def get_environment_map(self):
+
+        if not self.material.dff.export_env_map:
+            return None
+
+        texture_name = self.material.dff.env_map_tex
+        coef         = self.material.dff.env_map_coef
+        use_fb_alpha  = self.material.dff.env_map_fb_alpha
+
+        return dff.EnvMapFX(coef, use_fb_alpha, texture_name)
+
+    #######################################################
+    def get_specular_material(self):
+
+        props = self.material.dff
+        
+        if not props.export_specular:
+            return None
+
+        return dff.SpecularMat(props.specular_level, props.specular_texture)
+
+    #######################################################
+    def get_reflection_material(self):
+
+        props = self.material.dff
+
+        if not props.export_reflection:
+            return None
+
+        return dff.ReflMat(
+            props.reflection_scale_x, props.reflection_scale_y,
+            props.reflection_offset_x, props.reflection_offset_y,
+            props.reflection_intensity
+        )
+
+    #######################################################
+    def __init__(self, material):
+        self.material = material
+        self.principled = None
+
+        if bpy.app.version >= (2, 80, 0):
+            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+            
+            self.principled = PrincipledBSDFWrapper(self.material,
+                                                    is_readonly=False)
+        
+        
+#######################################################
 class dff_exporter:
 
     selected = False
@@ -40,12 +194,6 @@ class dff_exporter:
         return a @ b
     
     #######################################################
-    def clear_extension(string):
-        
-        k = string.rfind('.')
-        return string if k < 0 else string[:k]
-    
-    #######################################################
     def create_frame(obj, append=True):
         self = dff_exporter
         
@@ -53,7 +201,7 @@ class dff_exporter:
         frame_index = len(self.dff.frame_list)
         
         # Get rid of everything before the last period
-        frame.name = self.clear_extension(obj.name)
+        frame.name = clear_extension(obj.name)
 
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
@@ -86,84 +234,26 @@ class dff_exporter:
 
     #######################################################
     def generate_material_list(obj):
-        self = dff_exporter
-
         materials = []
 
         for b_material in obj.data.materials:
+            material = dff.Material()
+            helper = material_helper(b_material)
 
-            # Blender 2.7x compatibility
-            if (2, 80, 0) > bpy.app.version:
-                material = dff.Material()
-                material.colour = dff.RGBA(
-                    list(int(255 * x) for x in b_material.diffuse_color) + [255]
-                )
-
-                # Texture
-                try:
-                    texture = dff.Texture()
-                    texture.filters = 0
-                    texture.name = self.clear_extension(
-                        b_material.texture_slots[0].texture.image.name
-                    )
-                    material.textures.append(texture)
-                except BaseException:
-                    pass
-
-                # Surface properties
-                specular = b_material.specular_intensity
-                diffuse  = b_material.diffuse_intensity
-                ambient  = b_material.ambient
-                
-                material.surface_properties = dff.GeomSurfPro(
-                    ambient, specular, diffuse
-                )
-                
-                materials.append(material)
-            else:
-                from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+            material.colour             = helper.get_base_color()
+            material.surface_properties = helper.get_surface_properties()
             
-                material = dff.Material()
+            texture = helper.get_texture()
+            if texture:
+                material.textures.append(texture)
 
-                principled = PrincipledBSDFWrapper(b_material,
-                                                   is_readonly=True)
-
-                material.colour = dff.RGBA._make(
-                    # Blender uses float for RGB Values, and has no Alpha
-                    list(int(255 * x) for x in principled.base_color) + [255])
-                
-                # Texture
-                if principled.base_color_texture.image is not None:
-                    #TODO: Texture Filters
-                    #TODO: Texture Extensions
-                    
-                    texture = dff.Texture()
-
-                    # Use node label if it is a substring of image name, else
-                    # use image name
-                    node_label = principled.base_color_texture.node_image.label
-                    image_name = principled.base_color_texture.image.name
-
-                    texture.name = self.clear_extension(
-                        node_label
-                        if node_label in image_name and node_label is not ""
-                        else image_name
-                    )
-                    texture.filters = 0 # <-- find a way to store this in Blender
-
-                    material.textures.append(texture)
-
-                # Surface Properties
-                specular = principled.specular
-                diffuse  = principled.roughness
-                ambient  = principled.roughness if "ambient" not in material \
-                    else material["ambient"]
-                
-                material.surface_properties = dff.GeomSurfPro(
-                    ambient, specular, diffuse
-                )
-                
-                materials.append(material)
+            # Materials
+            material.add_plugin('bump_map', helper.get_normal_map())
+            material.add_plugin('env_map', helper.get_environment_map())
+            material.add_plugin('spec', helper.get_specular_material())
+            material.add_plugin('refl', helper.get_reflection_material())
+            
+            materials.append(material)
                 
         return materials
 
@@ -457,7 +547,11 @@ class dff_exporter:
             self.dff.write_file(self.file_name, self.version )
         else:
             self.dff.write_file("%s/%s" % (self.path, name), self.version)
-    
+
+    #######################################################
+    def is_collision_object(obj):
+        pass
+            
     #######################################################
     def export_dff(filename):
         self = dff_exporter
@@ -466,26 +560,28 @@ class dff_exporter:
         
         objects = {}
 
+        # TODO: Blender 2.7x compatibility
+        
         # Export collections
-        if self.mass_export:
-            for collection in bpy.data.collections:
-                for obj in collection.objects:
+        root_collection = bpy.context.scene.collection
+        collections = root_collection.children.values() + [root_collection]
+            
+        for collection in collections:
+            for obj in collection.objects:
                     
-                    if not self.selected or obj.select_get():
-                        objects[obj] = self.calculate_parent_depth(obj)
-
-                objects = sorted(objects, key=objects.get)
-                self.export_objects(objects,
-                                    collection.name)
-                objects = {}
-                self.frames = {}
-                self.bones = {}
-        else:
-            for obj in bpy.data.objects:
-                
                 if not self.selected or obj.select_get():
                     objects[obj] = self.calculate_parent_depth(obj)
 
+            if self.mass_export:
+                objects = sorted(objects, key=objects.get)
+                self.export_objects(objects,
+                                    collection.name)
+                objects     = {}
+                self.frames = {}
+                self.bones  = {}
+
+        if not self.mass_export:
+                
             objects = sorted(objects, key=objects.get)
             self.export_objects(objects)
                 

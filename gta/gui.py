@@ -25,7 +25,7 @@ class EXPORT_OT_dff(bpy.types.Operator):
     
     bl_idname      = "export_dff.scene"
     bl_description = "Export a Renderware DFF or COL File"
-    bl_label       = "GTA Renderware (.dff, .col)"
+    bl_label       = "DragonFF DFF (.dff)"
     filename_ext   = ".dff"
 
     filepath       = bpy.props.StringProperty(name="File path",
@@ -154,7 +154,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     
     bl_idname      = "import_scene.dff"
     bl_description = 'Import a Renderware DFF or COL File'
-    bl_label       = "GTA Renderware (.dff, .col)"
+    bl_label       = "DragonFF DFF (.dff)"
 
     filter_glob   = bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
@@ -239,11 +239,126 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
 #######################################################
+class MATERIAL_PT_dffMaterials(bpy.types.Panel):
+
+    bl_idname      = "MATERIAL_PT_dffMaterials"
+    bl_label       = "DragonFF - Export Material"
+    bl_space_type  = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context     = "material"
+
+    ambient     =  bpy.props.BoolProperty(
+        name        = "Export Material",
+        default     = False
+    )
+
+    def draw(self, context):
+
+        if not context.material.dff:
+            return
+        
+        layout = self.layout
+        layout.prop(context.material.dff, "ambient")
+
+        # Environment Map Panel
+        box = layout.box()
+        row = box.row()
+        row.prop(context.material.dff, "export_env_map")
+
+        if context.material.dff.export_env_map:
+            row = box.row()
+            row.prop(context.material.dff, "env_map_tex", text="Texture")
+
+            row = box.row()
+            row.label(text="Coefficient")
+            row.prop(context.material.dff, "env_map_coef", text="")
+
+            row = box.row()
+            row.label(text="Use FB Alpha")
+            row.prop(context.material.dff, "env_map_fb_alpha", text="")
+
+        # Bump Map Panel
+        box = layout.box()
+        row = box.row()
+        row.prop(context.material.dff, "export_bump_map")
+
+        if context.material.dff.export_bump_map:
+            row = box.row()
+            row.prop(context.material.dff, "bump_map_tex",
+                     text="Diffuse Texture")
+            row = box.row()
+
+        # Reflection Panel
+        box = layout.box()
+        row = box.row()
+        row.prop(context.material.dff, "export_reflection")
+
+        if context.material.dff.export_reflection:
+            row = box.row()
+            row.label(text="Scale")
+            row.prop(context.material.dff, "reflection_scale_x", text="")
+            row.prop(context.material.dff, "reflection_scale_y", text="")
+
+            row = box.row()
+            row.label(text="Offset")
+            row.prop(context.material.dff, "reflection_offset_x", text="")
+            row.prop(context.material.dff, "reflection_offset_y", text="")
+
+            row = box.row()
+            row.label(text="Intensity")
+            row.prop(context.material.dff, "reflection_intensity", text="")
+            
+        # Specular Panel
+        box = layout.box()
+        row = box.row()
+        row.prop(context.material.dff, "export_specular")
+
+        if context.material.dff.export_specular:
+            row = box.row()
+            row.label(text="Level")
+            row.prop(context.material.dff, "specular_level", text="")
+            
+            row = box.row()
+            row.prop(context.material.dff, "specular_texture", text="Texture")
+
+    pass
+    
+#######################################################
 def import_dff_func(self, context):
     
-    self.layout.operator(IMPORT_OT_dff.bl_idname, text="GTA Renderware (.dff, .col)")
+    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff)")
 
 #######################################################
 def export_dff_func(self, context):
 
-    self.layout.operator(EXPORT_OT_dff.bl_idname, text="GTA Renderware (.dff, .col)")
+    self.layout.operator(EXPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff)")
+
+# Custom properties
+class DFFMaterialProps(bpy.types.PropertyGroup):
+    ambient           = bpy.props.FloatProperty  (name="Ambient Shading")
+
+    # Environment Map
+    export_env_map    = bpy.props.BoolProperty   (name="Environment Map")
+    env_map_tex       = bpy.props.StringProperty ()
+    env_map_coef      = bpy.props.FloatProperty  ()
+    env_map_fb_alpha  = bpy.props.BoolProperty   ()
+
+    # Bump Map
+    export_bump_map   = bpy.props.BoolProperty   (name="Bump Map")
+    bump_map_tex      = bpy.props.StringProperty ()
+
+    # Reflection
+    export_reflection    = bpy.props.BoolProperty  (name="Reflection Material")
+    reflection_scale_x   = bpy.props.FloatProperty ()
+    reflection_scale_y   = bpy.props.FloatProperty ()
+    reflection_offset_x  = bpy.props.FloatProperty ()
+    reflection_offset_y  = bpy.props.FloatProperty ()
+    reflection_intensity = bpy.props.FloatProperty ()
+    
+    # Specularity
+    export_specular  = bpy.props.BoolProperty(name="Specular Material")
+    specular_level   = bpy.props.FloatProperty  ()
+    specular_texture = bpy.props.StringProperty ()
+    
+    def register():
+        bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
