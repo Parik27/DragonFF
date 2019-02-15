@@ -13,6 +13,8 @@ The following is a list of supported features by the addon
 - [X] Model files
 - [ ] Texture Files
 - [ ] Collision files (including the ones packed in dff)
+  - [X] Import
+  - [ ] Export
 - [ ] Map files (.ipl, .ide)
 - [ ] Animation files
 
@@ -21,9 +23,11 @@ The following is a list of supported features by the addon
 - [X] Skinned mesh support
 - [X] Multiple UV Maps
 - [X] Mass export
-- [ ] Material Effects
-  - [ ] Environment/Normal Maps
+- [X] Material Effects
+  - [X] Environment/Normal Maps
+  - [ ] Dual Textures
   - [ ] UV Animation
+- [X] Rockstar Specular and Reflection Extensions
 - [ ] 2D Effects
 
 ## Installation

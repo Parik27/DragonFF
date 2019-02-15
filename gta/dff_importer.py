@@ -21,131 +21,10 @@ import math
 import mathutils
 
 from . import dff
-from .col_importer import import_col_mem, link_object, create_collection
-
-#######################################################            
-def set_object_mode(obj, mode):
-        
-        # Blender 2.79 compatibility
-        if (2, 80, 0) > bpy.app.version:
-            bpy.context.scene.objects.active = obj
-        else:
-            bpy.context.view_layer.objects.active = obj
-            
-        bpy.ops.object.mode_set(mode=mode, toggle=False)
-        
-#######################################################
-class material_helper:
-
-    """ Material Helper for Blender 2.7x and Blender 2.8 compatibility"""
-
-    #######################################################
-    def set_base_color(self, color):
-
-        if self.principled:
-            self.principled.base_color = [i / 255 for i in color[:3]]
-
-            # Set Alpha
-            node = self.principled.node_principled_bsdf.inputs["Base Color"]
-            node.default_value[3] = color[3] / 255
-            
-        else:
-            self.material.diffuse_color = [i / 255 for i in color[:3]]
-            self.material.alpha = color[3] / 255
-
-    #######################################################
-    def set_texture(self, image, label=""):
-        
-        if self.principled:
-            self.principled.base_color_texture.node_image.label = label
-            self.principled.base_color_texture.image            = image
-            
-        else:
-            slot               = self.material.texture_slots.add()
-            slot.texture       = bpy.data.textures.new(
-                name           = label,
-                type           = "IMAGE"
-            )
-            slot.texture.image = image
-
-    #######################################################
-    def set_surface_properties(self, props):
-
-        if self.principled:
-            self.principled.specular       = props.specular
-            self.principled.roughness      = props.diffuse
-            self.material.dff.ambient = props.ambient
-            
-        else:
-            self.material.diffuse_intensity  = props.diffuse
-            self.material.specular_intensity = props.specular
-            self.material.ambient            = props.ambient
-
-    #######################################################
-    def set_normal_map(self, image, label, intensity):
-
-        if self.principled:
-            self.principled.node_normalmap_get()
-            
-            self.principled.normalmap_texture.image = image
-            self.principled.node_normalmap.label    = label
-            self.principled.normalmap_strength      = intensity
-
-        else:
-            slot = self.material.texture_slots.add()
-            slot.texture = bpy.data.textures.new(
-                name = label,
-                type = "IMAGE"
-            )
-            
-            slot.texture.image = image
-            slot.texture.use_normal_map = True
-            slot.use_map_color_diffuse  = False
-            slot.use_map_normal         = True
-            slot.normal_factor          = intensity
-        pass
-
-    #######################################################
-    def set_environment_map(self, plugin):
-
-        if plugin.env_map:
-            self.material.dff.env_map_tex      = plugin.env_map.name
-
-        self.material.dff.export_env_map       = True
-        self.material.dff.env_map_coef         = plugin.coefficient
-        self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha        
-
-    #######################################################
-    def set_specular_material(self, plugin):
-        
-        self.material.dff.export_specular = True
-        self.material.dff.specular_level = plugin.level
-        self.material.dff.specular_texture = plugin.texture.decode('ascii')
-
-    #######################################################
-    def set_reflection_material(self, plugin):
-
-        self.material.dff.export_reflection = True
-
-        self.material.dff.reflection_scale_x = plugin.s_x
-        self.material.dff.reflection_scale_y = plugin.s_y
-
-        self.material.dff.reflection_offset_y = plugin.o_y
-        self.material.dff.reflection_offset_x = plugin.o_x
-
-        self.material.dff.reflection_intensity = plugin.intensity
-    
-    #######################################################
-    def __init__(self, material):
-        self.material   = material
-        self.principled = None
-
-        # Init Principled Wrapper for Blender 2.8
-        if bpy.app.version >= (2, 80, 0):
-            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-            
-            self.principled = PrincipledBSDFWrapper(self.material,
-                                                    is_readonly=False)
+from .importer_common import (
+        link_object, create_collection,
+        material_helper, set_object_mode)
+from .col_importer import import_col_mem
 
 #######################################################
 class dff_importer:
@@ -431,7 +310,7 @@ class dff_importer:
 
             e_bone['bone_id'] = bone.id
             e_bone['type'] = bone.type
-            
+
             matrix = skinned_obj_data.bone_matrices[bone.index]
             matrix = mathutils.Matrix(matrix).transposed()
             matrix = matrix.inverted()
@@ -444,17 +323,21 @@ class dff_importer:
                                           )
             )
             
+            # Setting parent. See "set parent" note below
+            if bone_frame.parent != -1:
+                try:
+                    e_bone.parent = bone_list[bone_frame.parent]
+                    if self.use_bone_connect:
+                        e_bone.parent.tail = e_bone.head
+                        #e_bone.use_connect = self.use_bone_connect
+                        
+                except BaseException:
+                    print("DragonFF: Bone parent not found")
+            
             bone_list[self.bones[bone.id]['index']] = e_bone
             print(bone_frame.name, self.bones[bone.id]['index'],
                   bone_frame.parent)
             
-            # Setting parent. See "set parent" note below
-            if bone_frame.parent != -1:
-                try:
-                    e_bone.use_connect = self.use_bone_connect
-                    e_bone.parent = bone_list[bone_frame.parent]
-                except BaseException:
-                    print("DragonFF: Bone parent not found")
                     
         set_object_mode(obj, "OBJECT")
 

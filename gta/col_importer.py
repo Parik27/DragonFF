@@ -18,31 +18,10 @@ import bpy
 import bmesh
 
 from . import col
+from .importer_common import (
+    link_object, create_collection, hide_object, material_helper
+)
 
-#######################################################
-def link_object(obj, collection):
-    collection.objects.link(obj)
-    if (2, 80, 0) > bpy.app.version:
-        bpy.context.scene.objects.link(obj)
-        
-#######################################################        
-def create_collection(name, link=True):
-    if (2, 80, 0) > bpy.app.version:
-        return bpy.data.groups.new(name)
-    else:
-        collection = bpy.data.collections.new(name)
-        if link:
-            bpy.context.scene.collection.children.link(collection)
-            
-        return collection        
-        
-#######################################################
-def hide_object(object, hide=True):
-    if (2, 80, 0) > bpy.app.version:
-        object.hide = hide
-    else:
-        object.hide_viewport = hide
-        
 #######################################################        
 class col_importer:
     
@@ -77,13 +56,31 @@ class col_importer:
             obj.location = entity.center
             obj.scale = [entity.radius] * 3
             obj.empty_display_type = 'SPHERE'
-        
+
+            obj["col_surface"] = entity.surface
+            
             link_object(obj, collection)
 
     #######################################################
+    def __add_mesh_mats(self, object, materials):
+
+        # TODO: materials.ini integration needed
+        for surface in materials:
+            mat = bpy.data.materials.new("")
+
+            mat.dff.is_col_material = True
+            mat.dff.col_mat_index   = surface.material
+            mat.dff.col_brightness  = surface.brightness
+            mat.dff.col_light       = surface.light
+
+            object.data.materials.append(mat)
+            
+    #######################################################
     def __add_mesh(self, collection, name, verts, faces):
 
-        mesh = bpy.data.meshes.new(name)
+        mesh      = bpy.data.meshes.new(name)
+        materials = {}
+        
         bm = bmesh.new()
 
         for v in verts:
@@ -92,19 +89,30 @@ class col_importer:
         bm.verts.ensure_lookup_table()
             
         for f in faces:
-            bm.faces.new(
+            face = bm.faces.new(
                 [
                     bm.verts[f.a],
                     bm.verts[f.b],
                     bm.verts[f.c]
                 ]
             )
+            if hasattr(f, "surface"):
+                surface = f.surface
+            else:
+                surface = col.TSurface(f.material, 0, 1, f.light)
 
+            if surface not in materials:
+                materials[surface] = len(materials)
+                
+            face.material_index = materials[surface]
+                
         bm.to_mesh(mesh)
         bm.free()
         
         obj = bpy.data.objects.new(name, mesh)
         link_object(obj, collection)
+
+        self.__add_mesh_mats(obj, materials)
             
     #######################################################
     def add_to_scene(self, collection_prefix, link=True):

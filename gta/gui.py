@@ -252,76 +252,106 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         default     = False
     )
 
+    #######################################################
+    def draw_col_menu(self, context):
+
+        layout = self.layout
+        settings = context.material.dff
+
+        props = [["col_mat_index", "Material"],
+                 ["col_brightness", "Brightness"],
+                 ["col_light", "Light"]]
+        
+        for prop in props:
+            self.draw_labelled_prop(layout.row(), settings, [prop[0]], prop[1])
+
+    #######################################################
+    def draw_labelled_prop(self, row, settings, props, label, text=""):
+
+        row.label(text=label)
+        for prop in props:
+            row.prop(settings, prop, text=text)
+        
+    #######################################################
+    def draw_env_map_box(self, context, box):
+
+        settings = context.material.dff
+
+        box.row().prop(context.material.dff, "export_env_map")
+        if settings.export_env_map:
+            box.row().prop(settings, "env_map_tex", text="Texture")
+
+            self.draw_labelled_prop(
+                box.row(), settings, ["env_map_coef"], "Coefficient")
+            self.draw_labelled_prop(
+                box.row(), settings, ["env_map_fb_alpha"], "Use FB Alpha")
+
+    #######################################################
+    def draw_bump_map_box(self, context, box):
+
+        settings = context.material.dff
+        box.row().prop(settings, "export_bump_map")
+        
+        if settings.export_bump_map:
+            box.row().prop(settings, "bump_map_tex", text="Diffuse Texture")
+
+    #######################################################
+    def draw_refl_box(self, context, box):
+
+        settings = context.material.dff
+        box.row().prop(settings, "export_reflection")
+
+        if settings.export_reflection:
+            self.draw_labelled_prop(
+                box.row(), settings, ["reflection_scale_x", "reflection_scale_y"],
+                "Scale"
+            )
+            self.draw_labelled_prop(
+                box.row(), settings, ["reflection_offset_x", "reflection_offset_y"],
+                "Offset"
+            )
+            self.draw_labelled_prop(
+                box.row(), settings, ["reflection_intensity"], "Intensity"
+            )
+
+    #######################################################
+    def draw_specl_box(self, context, box):
+
+        settings = context.material.dff
+        box.row().prop(settings, "export_specular")
+
+        if settings.export_specular:
+            self.draw_labelled_prop(
+                box.row(), settings, ["specular_level"], "Level"
+            )
+            box.row().prop(settings, "specular_texture", text="Texture")
+        
+    #######################################################
+    def draw_mesh_menu(self, context):
+
+        layout = self.layout
+        settings = context.material.dff
+
+        layout.prop(settings, "ambient")
+
+        self.draw_env_map_box  (context, layout.box())
+        self.draw_bump_map_box (context, layout.box())
+        self.draw_refl_box     (context, layout.box())
+        self.draw_specl_box    (context, layout.box())
+        
+    #######################################################
     def draw(self, context):
 
         if not context.material.dff:
             return
         
         layout = self.layout
-        layout.prop(context.material.dff, "ambient")
 
-        # Environment Map Panel
-        box = layout.box()
-        row = box.row()
-        row.prop(context.material.dff, "export_env_map")
+        if context.material.dff.is_col_material:
+            self.draw_col_menu(context)
+            return
 
-        if context.material.dff.export_env_map:
-            row = box.row()
-            row.prop(context.material.dff, "env_map_tex", text="Texture")
-
-            row = box.row()
-            row.label(text="Coefficient")
-            row.prop(context.material.dff, "env_map_coef", text="")
-
-            row = box.row()
-            row.label(text="Use FB Alpha")
-            row.prop(context.material.dff, "env_map_fb_alpha", text="")
-
-        # Bump Map Panel
-        box = layout.box()
-        row = box.row()
-        row.prop(context.material.dff, "export_bump_map")
-
-        if context.material.dff.export_bump_map:
-            row = box.row()
-            row.prop(context.material.dff, "bump_map_tex",
-                     text="Diffuse Texture")
-            row = box.row()
-
-        # Reflection Panel
-        box = layout.box()
-        row = box.row()
-        row.prop(context.material.dff, "export_reflection")
-
-        if context.material.dff.export_reflection:
-            row = box.row()
-            row.label(text="Scale")
-            row.prop(context.material.dff, "reflection_scale_x", text="")
-            row.prop(context.material.dff, "reflection_scale_y", text="")
-
-            row = box.row()
-            row.label(text="Offset")
-            row.prop(context.material.dff, "reflection_offset_x", text="")
-            row.prop(context.material.dff, "reflection_offset_y", text="")
-
-            row = box.row()
-            row.label(text="Intensity")
-            row.prop(context.material.dff, "reflection_intensity", text="")
-            
-        # Specular Panel
-        box = layout.box()
-        row = box.row()
-        row.prop(context.material.dff, "export_specular")
-
-        if context.material.dff.export_specular:
-            row = box.row()
-            row.label(text="Level")
-            row.prop(context.material.dff, "specular_level", text="")
-            
-            row = box.row()
-            row.prop(context.material.dff, "specular_texture", text="Texture")
-
-    pass
+        self.draw_mesh_menu(context)
     
 #######################################################
 def import_dff_func(self, context):
@@ -335,8 +365,9 @@ def export_dff_func(self, context):
 
 # Custom properties
 class DFFMaterialProps(bpy.types.PropertyGroup):
-    ambient           = bpy.props.FloatProperty  (name="Ambient Shading")
 
+    ambient           = bpy.props.FloatProperty  (name="Ambient Shading")
+    
     # Environment Map
     export_env_map    = bpy.props.BoolProperty   (name="Environment Map")
     env_map_tex       = bpy.props.StringProperty ()
@@ -359,6 +390,12 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     export_specular  = bpy.props.BoolProperty(name="Specular Material")
     specular_level   = bpy.props.FloatProperty  ()
     specular_texture = bpy.props.StringProperty ()
+
+    # Collision Data
+    is_col_material = bpy.props.BoolProperty()
+    col_brightness  = bpy.props.IntProperty()
+    col_light       = bpy.props.IntProperty()
+    col_mat_index   = bpy.props.IntProperty()
     
     def register():
         bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
