@@ -302,7 +302,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
         box.row().prop(settings, "export_animation")
         if settings.export_animation:
-            box.row().prop(settings, "animation_name")
+            box.row().prop(settings, "animation_name", text="Name")
             
             
     #######################################################
@@ -348,6 +348,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         self.draw_bump_map_box (context, layout.box())
         self.draw_refl_box     (context, layout.box())
         self.draw_specl_box    (context, layout.box())
+        self.draw_uv_anim_box  (context, layout.box())
         
     #######################################################
     def draw(self, context):
@@ -406,7 +407,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     col_mat_index   = bpy.props.IntProperty()
 
     # UV Animation
-    export_animation = bpy.props.BoolProperty   ()
+    export_animation = bpy.props.BoolProperty   (name="UV Animation")
     animation_name   = bpy.props.StringProperty ()
     
     def register():

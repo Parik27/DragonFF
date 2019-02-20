@@ -174,6 +174,9 @@ class material_helper:
                 mapping.keyframe_insert("translation", -1, frame.time * fps)
                 mapping.keyframe_insert("scale", -1, frame.time * fps)
 
+        self.material.dff.animation_name   = uv_anim.name
+        self.material.dff.export_animation = True
+        
     #######################################################
     def __init__(self, material):
         self.material   = material

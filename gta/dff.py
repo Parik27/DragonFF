@@ -179,6 +179,9 @@ class Sections:
             _data += Sections.write(Vector, data.right)
             _data += Sections.write(Vector, data.up)
             _data += Sections.write(Vector, data.at)
+
+        elif type is UVFrame:
+            _data +=  pack("<f6fi", data.time, *data.uv, data.prev)
             
         if chunk_type is not None:
             _data = Sections.write_chunk(_data, chunk_type)
@@ -267,7 +270,8 @@ class Material:
         'is_textured',
         'surface_properties',
         'textures',
-        'plugins'
+        'plugins',
+        '_hasMatFX'
     ]
     
     #######################################################
@@ -279,7 +283,7 @@ class Material:
         self.surface_properties = None
         self.textures           = []
         self.plugins            = {}
-
+        self._hasMatFX         = False #Used only internally for export
     
     #######################################################
     def from_mem(data):
@@ -372,10 +376,11 @@ class Material:
 
         # UV Animation PLG
         if 'uv_anim' in self.plugins:
-            _data = len(self.plugins['uv_anim'])
+            _data = pack("<I", len(self.plugins['uv_anim']))
             for frame_name in self.plugins['uv_anim']:
-                _data = pack("<32s", frame_name.encode('ascii'))
+                _data += pack("<32s", frame_name.encode('ascii'))
 
+            _data = Sections.write_chunk(_data, types["Struct"])
             data += Sections.write_chunk(_data, types["UV Animation PLG"])
 
         return data
@@ -408,11 +413,13 @@ class Material:
             effectType = 5
 
         if effectType == 0:
+            self._hasMatFX = False
             return b''
             
         if effectType != 3 or effectType != 6: #Both effects are set
             data += pack("<I", 0)
-    
+
+        self._hasMatFX = True
         data = pack("<I", effectType) + data
         return Sections.write_chunk(data, types["Material Effects PLG"])
         
@@ -551,11 +558,11 @@ class UVAnim:
 
     #######################################################
     def __init__(self):
-        self.type_id = None
-        self.flags = None
+        self.type_id = 0x1C1
+        self.flags = 0
         self.duration = 0
         self.name = ""
-        self.node_to_uv = []
+        self.node_to_uv = [0] * 8
         self.frames = []
 
     #######################################################
@@ -577,6 +584,23 @@ class UVAnim:
         self.name = self.name[:strlen(self.name)].decode('ascii')
             
         return self
+
+    #######################################################
+    def to_mem(self):
+
+        data = pack("<iiiif4x32s8f",
+                    0x100,
+                    self.type_id,
+                    len(self.frames),
+                    self.flags,
+                    self.duration,
+                    self.name.encode('ascii'),
+                    *self.node_to_uv)
+
+        for frame in self.frames:
+            data += Sections.write(UVFrame, frame)
+
+        return Sections.write_chunk(data, types["Animation Anim"])
     
 #######################################################
 class SkinPLG:
@@ -695,7 +719,8 @@ class Geometry:
         'normals',
         'materials',
         'extensions',
-        'export_flags'
+        'export_flags',
+        '_hasMatFX'
     ]
     
     ##################################################################
@@ -704,7 +729,7 @@ class Geometry:
         self.triangles          = []
         self.vertices           = []
         self.surface_properties = None
-        self.prelit_colors     = []
+        self.prelit_colors      = []
         self.uv_layers          = []
         self.bounding_sphere    = None
         self.has_vertices       = None
@@ -716,8 +741,9 @@ class Geometry:
         # used for export
         self.export_flags = {
             "light"              : True,
-            "modulate_color"    : True
+            "modulate_color"     : True
             }
+        self._hasMatFX = False
 
     #######################################################
     def from_mem(data, parent_chunk):
@@ -816,6 +842,7 @@ class Geometry:
 
         for material in self.materials:
             data += material.to_mem()
+            self._hasMatFX = material._hasMatFX if not self._hasMatFX else True
 
         return Sections.write_chunk(data, types["Material List"])
 
@@ -1448,14 +1475,28 @@ class dff:
                 pack("<II", 0x0116, 1),
                 types["Right to Render"]
             )
+        if self.geometry_list[atomic.geometry]._hasMatFX:
+            ext_data += Sections.write_chunk(
+                pack("<I", 1),
+                types["Material Effects PLG"]
+            )
+            
         data += Sections.write_chunk(ext_data, types["Extension"])
         return Sections.write_chunk(data, types["Atomic"])
-    
-    #######################################################
-    def write_memory(self, version):
 
-        data = b''
-        Sections.set_library_id(version, 0xFFFF)
+    #######################################################
+    def write_uv_dict(self):
+        data = pack("<I", len(self.uvanim_dict))
+        data = Sections.write_chunk(data, types["Struct"])
+        
+        dictionary: UVAnim
+        for dictionary in self.uvanim_dict:
+            data += dictionary.to_mem()
+
+        return Sections.write_chunk(data, types["UV Animation Dictionary"])
+
+    #######################################################
+    def write_clump(self):
 
         data = Sections.write(Clump, (len(self.atomic_list), 0,0), types["Struct"])
 
@@ -1475,6 +1516,17 @@ class dff:
         data += Sections.write_chunk(b"", types["Extension"])
             
         return Sections.write_chunk(data, types["Clump"])
+    
+    #######################################################
+    def write_memory(self, version):
+
+        data = b''
+        Sections.set_library_id(version, 0xFFFF)
+
+        data += self.write_uv_dict()
+        data += self.write_clump()
+
+        return data
             
     #######################################################
     def write_file(self, filename: str, version):

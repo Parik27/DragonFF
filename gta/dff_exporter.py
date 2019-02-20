@@ -188,10 +188,18 @@ class material_helper:
 
         #TODO: Add Blender Internal Support
 
+        anim = dff.UVAnim()
+
+        # See if export_animation checkbox is checked
+        if not self.material.dff.export_animation:
+            return None
+
+        anim.name = self.material.dff.animation_name
+        
         if self.principled:
             if self.principled.base_color_texture.has_mapping_node():
                 anim_data = self.material.node_tree.animation_data
-                anim = dff.UVAnim()
+                
                 fps = bpy.context.scene.render.fps
                 
                 if anim_data:
@@ -222,7 +230,7 @@ class material_helper:
 
                             anim.frames[i] = dff.UVFrame._make(_frame)
                             anim.duration = max(anim.frames[i].time,anim.duration)
-
+                            
                     return anim
     
     #######################################################
@@ -298,6 +306,7 @@ class dff_exporter:
     #######################################################
     def generate_material_list(obj):
         materials = []
+        self = dff_exporter
 
         for b_material in obj.data.materials:
             material = dff.Material()
@@ -318,10 +327,9 @@ class dff_exporter:
 
             anim = helper.get_uv_animation()
             if anim:
-                for i in anim.frames:
-                    print(i)
-                print(anim.duration)
+                print(anim.name)
                 material.add_plugin('uv_anim', anim.name)
+                self.dff.uvanim_dict.append(anim)
                 
             materials.append(material)
                 

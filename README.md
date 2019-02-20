@@ -26,7 +26,7 @@ The following is a list of supported features by the addon
 - [X] Material Effects
   - [X] Environment/Normal Maps
   - [ ] Dual Textures
-  - [ ] UV Animation
+  - [X] UV Animation
 - [X] Rockstar Specular and Reflection Extensions
 - [ ] 2D Effects
 
