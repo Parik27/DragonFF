@@ -15,17 +15,18 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
+from . import dff
 
 #######################################################            
 def set_object_mode(obj, mode):
         
-        # Blender 2.79 compatibility
-        if (2, 80, 0) > bpy.app.version:
-            bpy.context.scene.objects.active = obj
-        else:
-            bpy.context.view_layer.objects.active = obj
-            
-        bpy.ops.object.mode_set(mode=mode, toggle=False)
+    # Blender 2.79 compatibility
+    if (2, 80, 0) > bpy.app.version:
+        bpy.context.scene.objects.active = obj
+    else:
+        bpy.context.view_layer.objects.active = obj
+        
+    bpy.ops.object.mode_set(mode=mode, toggle=False)
 
 #######################################################
 def link_object(obj, collection):
@@ -124,7 +125,7 @@ class material_helper:
         pass
 
     #######################################################
-    def set_environment_map(self, plugin):
+    def set_environment_map(self, plugin: dff.EnvMapFX):
 
         if plugin.env_map:
             self.material.dff.env_map_tex      = plugin.env_map.name
@@ -134,14 +135,14 @@ class material_helper:
         self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha        
 
     #######################################################
-    def set_specular_material(self, plugin):
+    def set_specular_material(self, plugin: dff.SpecularMat):
         
         self.material.dff.export_specular = True
         self.material.dff.specular_level = plugin.level
         self.material.dff.specular_texture = plugin.texture.decode('ascii')
 
     #######################################################
-    def set_reflection_material(self, plugin):
+    def set_reflection_material(self, plugin: dff.ReflMat):
 
         self.material.dff.export_reflection = True
 
@@ -152,7 +153,27 @@ class material_helper:
         self.material.dff.reflection_offset_x = plugin.o_x
 
         self.material.dff.reflection_intensity = plugin.intensity
-    
+        
+    #######################################################
+    def set_uv_animation(self, uv_anim: dff.UVAnim):
+
+        #TODO: Add Blender Internal Support for this
+        
+        if self.principled:
+            mapping = self.principled.base_color_texture.node_mapping_get()
+            mapping.vector_type = 'POINT'
+
+            fps = bpy.context.scene.render.fps
+            print(uv_anim.node_to_uv)
+            
+            for frame in uv_anim.frames:
+                mapping.translation = frame.uv[-2:] + [0]
+                mapping.scale = frame.uv[1:3] + [0]
+
+                # Could also use round here perhaps. I don't know what's better
+                mapping.keyframe_insert("translation", -1, frame.time * fps)
+                mapping.keyframe_insert("scale", -1, frame.time * fps)
+
     #######################################################
     def __init__(self, material):
         self.material   = material

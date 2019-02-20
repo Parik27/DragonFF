@@ -553,7 +553,7 @@ class UVAnim:
     def __init__(self):
         self.type_id = None
         self.flags = None
-        self.duration = None
+        self.duration = 0
         self.name = ""
         self.node_to_uv = []
         self.frames = []
@@ -574,6 +574,8 @@ class UVAnim:
             )
             print(self.frames[-1])
 
+        self.name = self.name[:strlen(self.name)].decode('ascii')
+            
         return self
     
 #######################################################
@@ -1109,10 +1111,6 @@ class dff:
             if effect_type == 4:
                 material.add_plugin('dual', self.read_matfx_dual())
 
-            # UV Animation
-            if effect_type == 5:
-                material.add_plugin('uv_anim', [])
-
     #######################################################
     def read_texture(self):
         chunk = self.read_chunk() 
@@ -1220,6 +1218,8 @@ class dff:
                                         
                                     if chunk.type == types["UV Animation PLG"]:
 
+                                        chunk = self.read_chunk()
+                                        
                                         anim_count = unpack_from("<I",
                                                                  self.data,
                                                                  self._read(4))
@@ -1233,7 +1233,7 @@ class dff:
                                                                         self.pos
                                                                     ),
                                                                     self._read(32)
-                                                                )
+                                                                ).decode('ascii')
                                             )
                                             
                                     self.pos = __chunk_end
@@ -1358,7 +1358,7 @@ class dff:
                     self.pos += chunk.size
 
     #######################################################
-    def read_uv_anim_dict(self, root_chunk):
+    def read_uv_anim_dict(self):
         chunk = self.read_chunk()
         
         if chunk.type == types["Struct"]:
@@ -1374,7 +1374,7 @@ class dff:
                 )
 
             self._read(chunk.size)
-                    
+            
     #######################################################
     def load_memory(self, data: str):
 
@@ -1386,7 +1386,7 @@ class dff:
                 self.read_clump(chunk)
 
             elif chunk.type == types["UV Animation Dictionary"]:
-                self.read_uv_anim_dict(chunk)
+                self.read_uv_anim_dict()
                 
 
     #######################################################
@@ -1487,9 +1487,3 @@ class dff:
     def __init__(self):
         
         self.clear()
-
-test = dff()
-test.load_file("/home/parik/monster.dff")
-for geometry in test.geometry_list:
-    for material in geometry.materials:
-        print(material.color)

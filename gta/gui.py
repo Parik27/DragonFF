@@ -296,6 +296,16 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             box.row().prop(settings, "bump_map_tex", text="Diffuse Texture")
 
     #######################################################
+    def draw_uv_anim_box(self, context, box):
+
+        settings = context.material.dff
+
+        box.row().prop(settings, "export_animation")
+        if settings.export_animation:
+            box.row().prop(settings, "animation_name")
+            
+            
+    #######################################################
     def draw_refl_box(self, context, box):
 
         settings = context.material.dff
@@ -333,7 +343,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         settings = context.material.dff
 
         layout.prop(settings, "ambient")
-
+        
         self.draw_env_map_box  (context, layout.box())
         self.draw_bump_map_box (context, layout.box())
         self.draw_refl_box     (context, layout.box())
@@ -345,8 +355,6 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         if not context.material.dff:
             return
         
-        layout = self.layout
-
         if context.material.dff.is_col_material:
             self.draw_col_menu(context)
             return
@@ -396,6 +404,10 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     col_brightness  = bpy.props.IntProperty()
     col_light       = bpy.props.IntProperty()
     col_mat_index   = bpy.props.IntProperty()
+
+    # UV Animation
+    export_animation = bpy.props.BoolProperty   ()
+    animation_name   = bpy.props.StringProperty ()
     
     def register():
         bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)

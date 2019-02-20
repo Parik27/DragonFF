@@ -54,7 +54,7 @@ class dff_importer:
         self = dff_importer
 
         # Variables
-        self.dff = None
+        self.dff: dff.dff = None
         self.meshes = {}
         self.objects = []
         self.file_name = ""
@@ -247,6 +247,18 @@ class dff_importer:
                 plugin = material.plugins['refl'][0]
                 helper.set_reflection_material(plugin)
 
+            # UV Animation
+            # TODO: Figure out ways to add multiple uv animations
+            print(material.plugins)
+            if 'uv_anim' in material.plugins:
+                plugin = material.plugins['uv_anim'][0]
+
+                for uv_anim in self.dff.uvanim_dict:
+                    print(uv_anim.name, plugin, len(uv_anim.name), len(plugin))
+                    if uv_anim.name == plugin:
+                        helper.set_uv_animation(uv_anim)
+                        break
+                
             # Add imported material to the object
             mesh.materials.append(helper.material)
                 

@@ -182,6 +182,49 @@ class material_helper:
             props.reflection_intensity
         )
 
+    
+    #######################################################
+    def get_uv_animation(self):
+
+        #TODO: Add Blender Internal Support
+
+        if self.principled:
+            if self.principled.base_color_texture.has_mapping_node():
+                anim_data = self.material.node_tree.animation_data
+                anim = dff.UVAnim()
+                fps = bpy.context.scene.render.fps
+                
+                if anim_data:
+                    for curve in anim_data.action.fcurves:
+
+                        # Rw doesn't support Z texture coordinate.
+                        if curve.array_index > 1:
+                            continue
+
+                        # Offset in the UV array
+                        uv_offset = {
+                            'nodes["Mapping"].translation': 4,
+                            'nodes["Mapping"].scale': 1,
+                        }
+                        off = uv_offset[curve.data_path]
+                        
+                        for i, frame in enumerate(curve.keyframe_points):
+                            
+                            if len(anim.frames) <= i:
+                                anim.frames.append(dff.UVFrame(0,[0]*6, i-1))
+
+                            _frame = list(anim.frames[i])
+                                
+                            uv = _frame[1]
+                            uv[off + curve.array_index] = frame.co[1]
+
+                            _frame[0] = frame.co[0] / fps
+
+                            anim.frames[i] = dff.UVFrame._make(_frame)
+                            anim.duration = max(anim.frames[i].time,anim.duration)
+
+                    return anim
+    
     #######################################################
     def __init__(self, material):
         self.material = material
@@ -272,7 +315,14 @@ class dff_exporter:
             material.add_plugin('env_map', helper.get_environment_map())
             material.add_plugin('spec', helper.get_specular_material())
             material.add_plugin('refl', helper.get_reflection_material())
-            
+
+            anim = helper.get_uv_animation()
+            if anim:
+                for i in anim.frames:
+                    print(i)
+                print(anim.duration)
+                material.add_plugin('uv_anim', anim.name)
+                
             materials.append(material)
                 
         return materials
@@ -315,28 +365,26 @@ class dff_exporter:
         return skin
 
     #######################################################
-    def get_vertex_shared_loops(vertex, layers_list):
-        temp = [[None] * len(layers) for layers in layers_list]
-        shared_loops = []
+    def get_vertex_shared_loops(vertex, layers_list, funcs):
+        #temp = [[None] * len(layers) for layers in layers_list]
+        shared_loops = {}
         
         for loop in vertex.link_loops:
 
             shared = False
             for i, layers in enumerate(layers_list):
-                for j, layer in enumerate(layers):
+               
+                for j, layer in enumerate(layers, 1):
 
-                    if temp[i][j] is None:
-                        temp[i][j] = loop[layer]
-
-                    if temp[i][j] != loop[layer]:
+                    if funcs[i](loop[layers[j-1]], loop[layer]):
                         shared = True
                         break
 
                 if shared:
-                    shared_loops.append(loop)
+                    shared_loops[loop] = True
                     break
                 
-        return shared_loops
+        return shared_loops.keys()
     
     #######################################################
     def populate_atomic(obj):
@@ -364,18 +412,28 @@ class dff_exporter:
         
         # Vertices and Normals
         # TODO: Check if the normals are same as the custom ones set while importing
-        i = 0        
+        i = 0
+        length = len(bm.verts)
         while i < len(bm.verts):
             vertex = bm.verts[i]
             
             geometry.vertices.append(dff.Vector._make(vertex.co))
             geometry.normals.append(dff.Vector._make(vertex.normal))
 
+            # These are already filtered vertices, no need to check them again
+            if i >= length:
+                i += 1
+                continue
+            
             shared_loops = self.get_vertex_shared_loops(
                 vertex,
                 [
                     bm.loops.layers.uv.values(),
                     bm.loops.layers.color.values()
+                ],
+                [
+                    lambda a, b: a.uv != b.uv,
+                    lambda a, b: a != b
                 ]
             )
             
@@ -383,13 +441,15 @@ class dff_exporter:
             for loop in shared_loops:
                 face = loop.face
                 face.loops.index_update()
-                
+
                 if face.index not in override_faces:
                     override_faces[face.index] = [
                         vert.index for vert in face.verts
                     ]
                 else:
                     continue
+
+                print(face.index, len(bm.verts))
                         
                 override_faces[face.index][loop.index] = len(bm.verts)
                 
