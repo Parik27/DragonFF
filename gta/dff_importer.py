@@ -288,9 +288,12 @@ class dff_importer:
         armature = bpy.data.armatures.new(frame.name)
         obj = bpy.data.objects.new(frame.name, armature)
         link_object(obj, dff_importer.current_collection)
+
+        skinned_obj_index = frame.parent if frame.parent in self.skin_data \
+            else next(iter(self.skin_data))
         
-        skinned_obj_data = self.skin_data[frame.parent]
-        skinned_obj = self.objects[frame.parent]
+        skinned_obj_data = self.skin_data[skinned_obj_index]
+        skinned_obj = self.objects[skinned_obj_index]
         
         # armature edit bones are only available in edit mode :/
         set_object_mode(obj, "EDIT")

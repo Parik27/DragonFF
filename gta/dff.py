@@ -1225,14 +1225,15 @@ class dff:
                                                                  self._read(4))
 
                                         # Read n animations
-                                        for i in range(anim_count):
+                                        for i in range(anim_count[0]):
                                             material.add_plugin('uv_anim',
                                                                 self.raw(
                                                                     strlen(
                                                                         self.data,
                                                                         self.pos
-                                                                    )
-                                                                ), self._read(32)
+                                                                    ),
+                                                                    self._read(32)
+                                                                )
                                             )
                                             
                                     self.pos = __chunk_end
