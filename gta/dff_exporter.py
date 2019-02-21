@@ -515,8 +515,8 @@ class dff_exporter:
                 # Set prelit faces for this face
                 if has_prelit_colors:
                     for index, layer in enumerate(bm.loops.layers.color.values()):
-                        color = loop[layer]
-                        if bpy.app.version < (2, 80, 0):
+                        color = list(loop[layer])
+                        if len(color) < 4:
                             color.append(1)
                         
                         prelit_color = dff.RGBA._make(
