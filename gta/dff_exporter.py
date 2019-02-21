@@ -39,8 +39,8 @@ class material_helper:
             return dff.RGBA._make(
                 list(int(255 * x) for x in node.default_value)
             )
-        alpha = self.material.alpha
-        return dff.RGBA(
+        alpha = int(self.material.alpha * 255)
+        return dff.RGBA._make(
                     list(int(255*x) for x in self.material.diffuse_color) + [alpha]
                 )
 
@@ -516,6 +516,9 @@ class dff_exporter:
                 if has_prelit_colors:
                     for index, layer in enumerate(bm.loops.layers.color.values()):
                         color = loop[layer]
+                        if bpy.app.version < (2, 80, 0):
+                            color.append(1)
+                        
                         prelit_color = dff.RGBA._make(
                             int(c * 255) for c in color
                         )
@@ -662,11 +665,15 @@ class dff_exporter:
         
         objects = {}
 
-        # TODO: Blender 2.7x compatibility
+        # TODO: 2.79 -> Support Mass Export
         
         # Export collections
-        root_collection = bpy.context.scene.collection
-        collections = root_collection.children.values() + [root_collection]
+        if bpy.app.version < (2, 80, 0):
+            collections = [bpy.data]
+
+        else:
+            root_collection = bpy.context.scene.collection
+            collections = root_collection.children.values() + [root_collection]
             
         for collection in collections:
             for obj in collection.objects:
