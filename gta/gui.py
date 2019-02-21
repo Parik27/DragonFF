@@ -412,3 +412,6 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     
     def register():
         bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
+
+class DFFMeshProps(bpy.types.PropertyGroup):
+    pass

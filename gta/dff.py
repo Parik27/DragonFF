@@ -1528,6 +1528,10 @@ class dff:
 
     #######################################################
     def write_uv_dict(self):
+
+        if len(self.uvanim_dict) < 1:
+            return b''
+        
         data = pack("<I", len(self.uvanim_dict))
         data = Sections.write_chunk(data, types["Struct"])
         
@@ -1555,7 +1559,9 @@ class dff:
         for atomic in self.atomic_list:
             data += self.write_atomic(atomic)
 
-        data += Sections.write_chunk(b"", types["Extension"])
+        for coll_data in self.collisions:
+            _data = Sections.write_chunk(coll_data, types["Collision Model"])
+            data += Sections.write_chunk(_data, types["Extension"])
             
         return Sections.write_chunk(data, types["Clump"])
     

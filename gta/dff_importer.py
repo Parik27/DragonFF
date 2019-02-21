@@ -396,6 +396,7 @@ class dff_importer:
 
         # Initialise bone indices for use in armature construction
         self.construct_bone_dict()
+        coll_set = False
         
         for index, frame in enumerate(self.dff.frame_list):
             
@@ -453,7 +454,10 @@ class dff_importer:
             if  frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
                 
-            self.objects.append(obj)            
+            self.objects.append(obj)
+
+            # Set a collision model used for export
+            obj["gta_coll"] = self.dff.collisions
 
                 
     #######################################################

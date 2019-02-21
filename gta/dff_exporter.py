@@ -477,6 +477,7 @@ class dff_exporter:
         uv_layers_count = len(bm.loops.layers.uv)
         geometry.uv_layers = [[dff.TexCoords(0,0)] * len(bm.verts)
                               for i in range(uv_layers_count)]
+        extra_vert = None
         if has_prelit_colors:
             geometry.prelit_colors = [dff.RGBA(255,255,255,255)] * len(bm.verts)
 
@@ -642,6 +643,11 @@ class dff_exporter:
 
             elif obj.type == "ARMATURE":
                 self.export_armature(obj)
+
+            # Set collision
+            if 'gta_coll' in obj:
+                if len(obj['gta_coll']) > 0:
+                    self.dff.collisions = obj['gta_coll']
                 
         if name is None:
             self.dff.write_file(self.file_name, self.version )
