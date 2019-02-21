@@ -94,6 +94,9 @@ class dff_importer:
             # Add Vertex Colors
             if geom.flags & dff.rpGEOMETRYPRELIT:
                 vertex_color = bm.loops.layers.color.new()
+
+            if 'extra_vert_color' in geom.extensions:
+                extra_vertex_color = bm.loops.layers.color.new()
             
             for f in geom.triangles:
                 try:
@@ -124,7 +127,15 @@ class dff_importer:
                                 c / 255.0 for c in
                                 geom.prelit_colors[loop.vert.index]
                             ]
-                    
+                        # Night/Extra Vertex Colors
+                        if extra_vertex_color:
+                            extension = geom.extensions['extra_vert_color']
+                            loop[extra_vertex_color] = [
+                                c / 255.0 for c in
+                                extension.colors[loop.vert.index]
+                            ]
+                            print(loop[extra_vertex_color])
+                            
                     face.smooth = True
                 except BaseException as e:
                     print(e)

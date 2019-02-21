@@ -413,6 +413,7 @@ class dff_exporter:
         skin = self.init_skin_plg(obj)
 
         has_prelit_colors = len(obj.data.vertex_colors) > 0
+        has_night_colors  = len(obj.data.vertex_colors) > 1
 
         # These are used to set the vertex indices for new vertices
         # created in the next loop to get rid of shared vertices.
@@ -456,9 +457,7 @@ class dff_exporter:
                     ]
                 else:
                     continue
-
-                print(face.index, len(bm.verts))
-                        
+                
                 override_faces[face.index][loop.index] = len(bm.verts)
                 
                 # Update the SkinPLG to include the duplicated vertex
@@ -480,6 +479,12 @@ class dff_exporter:
                               for i in range(uv_layers_count)]
         if has_prelit_colors:
             geometry.prelit_colors = [dff.RGBA(255,255,255,255)] * len(bm.verts)
+
+            if has_night_colors:
+                extra_vert = dff.ExtraVertColorExtension(
+                    [dff.RGBA(255,255,255,255)] * len(bm.verts)
+                )
+            
         # Faces
         for face in bm.faces:
 
@@ -510,10 +515,15 @@ class dff_exporter:
                 if has_prelit_colors:
                     for index, layer in enumerate(bm.loops.layers.color.values()):
                         color = loop[layer]
-                        geometry.prelit_colors[verts[loop.index]] = dff.RGBA._make(
+                        prelit_color = dff.RGBA._make(
                             int(c * 255) for c in color
                         )
-                        break #only once
+                        if index == 0:
+                            geometry.prelit_colors[verts[loop.index]] = prelit_color
+                            
+                        elif index == 1:
+                            extra_vert.colors[verts[loop.index]] = prelit_color
+                            break # upto 2 vertex colors
                 
         self.create_frame(obj)
 
@@ -534,7 +544,9 @@ class dff_exporter:
 
         if skin is not None:
             geometry.extensions['skin'] = skin
-        
+        if extra_vert:
+            geometry.extensions['extra_vert_color'] = extra_vert
+            
         # Add Geometry to list
         self.dff.geometry_list.append(geometry)
         

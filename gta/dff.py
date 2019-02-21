@@ -87,6 +87,7 @@ types = {
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
     "Specular Material"       : 39056118,
+    "Extra Vert Color"        : 39056121,
     "Collision Model"         : 39056122,
     "Reflection Material"     : 39056124,
     "Frame"                   : 39056126,
@@ -411,6 +412,7 @@ class Material:
 
         elif 'uv_anim' in self.plugins:
             effectType = 5
+            data += pack("<I", 5)
 
         if effectType == 0:
             self._hasMatFX = False
@@ -701,6 +703,39 @@ class SkinPLG:
             pos += calcsize(unpack_format)
             
         return self
+
+#######################################################
+class ExtraVertColorExtension:
+
+    #######################################################
+    def __init__(self, colors):
+        self.colors = colors
+
+    #######################################################
+    def from_mem(data, offset, geometry):
+
+        magic = unpack_from("<I", data, offset)[0]
+        if magic != 0:
+            colors = []
+            for i in range(len(geometry.vertices)):
+
+                offset += 4
+                colors.append(
+                    Sections.read(
+                        RGBA, data, offset
+                    )
+                )
+                
+            return ExtraVertColorExtension(colors)
+                
+    #######################################################
+    def to_mem(self):
+        
+        data = pack("<I", 1)
+        for color in self.colors:
+            data += Sections.write(RGBA, color)
+
+        return Sections.write_chunk(data, types["Extra Vert Color"])
     
 #######################################################
 class Geometry:
@@ -741,7 +776,8 @@ class Geometry:
         # used for export
         self.export_flags = {
             "light"              : True,
-            "modulate_color"     : True
+            "modulate_color"     : True,
+            "export_normals"     : True
             }
         self._hasMatFX = False
 
@@ -867,7 +903,7 @@ class Geometry:
             flags |= rpGEOMETRYTEXTURED
         if len(self.prelit_colors) > 0:
             flags |= rpGEOMETRYPRELIT
-        if self.normals is not None:
+        if len(self.normals) > 0 and self.export_flags["export_normals"]:
             flags |= rpGEOMETRYNORMALS
         flags |= rpGEOMETRYLIGHT * self.export_flags["light"]
         flags |= rpGEOMETRYMODULATEMATERIALCOLOR * \
@@ -899,15 +935,16 @@ class Geometry:
         data += Sections.write(Sphere, self.bounding_sphere)
         data += pack("<II",
                      1 if len(self.vertices) > 0 else 0,
-                     1 if len(self.normals) > 0 else 0)
+                     1 if flags & rpGEOMETRYNORMALS else 0)
 
         # Write Vertices
         for vertex in self.vertices:
             data += Sections.write(Vector, vertex)
 
         # Write Normals
-        for normal in self.normals:
-            data += Sections.write(Vector, normal)
+        if flags & rpGEOMETRYNORMALS:
+            for normal in self.normals:
+                data += Sections.write(Vector, normal)
 
         data = Sections.write_chunk(data, types["Struct"])
         
@@ -1302,11 +1339,9 @@ class dff:
 
                         chunk = self.read_chunk()
 
-                        # MATERIAL LIST
                         if chunk.type == types["Material List"]:  
                             self.read_material_list(chunk)
 
-                        # EXTENSION
                         elif chunk.type == types["Extension"]:  
                             pass # will fallthrough
 
@@ -1316,12 +1351,19 @@ class dff:
                             geometry.extensions["skin"] = skin
                             
                             self._read(chunk.size)
-                        
+
+                        elif chunk.type == types["Extra Vert Color"]:
+                            
+                            geometry.extensions['extra_vert_color'] = \
+                                ExtraVertColorExtension.from_mem (
+                                    self.data, self._read(chunk.size), geometry
+                                )
+                            
+                            
                         #BIN MESH PLG
                         #elif chunk.type == types["Bin Mesh PLG"]: 
                         #   self.read_mesh_plg(chunk,geometry)
 
-                        #OTHER
                         else:
                             self._read(chunk.size)
 
