@@ -363,7 +363,7 @@ class coll:
         return data
             
     #######################################################
-    def __write_col_legacy(self, model: ColModel):
+    def __write_col_legacy(self, model):
         data = b''
 
         data += self.__write_block(TSphere, model.spheres)
@@ -375,7 +375,7 @@ class coll:
         return data
 
     #######################################################
-    def __write_col_new(self, model: ColModel):
+    def __write_col_new(self, model):
         data = b''
 
         flags = 0
@@ -438,7 +438,7 @@ class coll:
         return header_data + data
     
     #######################################################
-    def __write_col(self, model: ColModel):
+    def __write_col(self, model):
 
         Sections.init_sections(model.version)
         

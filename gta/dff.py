@@ -342,7 +342,7 @@ class Material:
 
     #######################################################
     def envfx_to_mem(self):
-        env_map: BumpMapFX = self.plugins['env_map'][0]
+        BumpMapFX = self.plugins['env_map'][0]
         
         data = pack("<IfII",
                     2,
@@ -1445,7 +1445,7 @@ class dff:
             self._read(chunk.size)
             
     #######################################################
-    def load_memory(self, data: str):
+    def load_memory(self, data):
 
         self.data = data
         while self.pos < len(data) - 12:
@@ -1470,7 +1470,7 @@ class dff:
         self.data          = ""
             
     #######################################################
-    def load_file(self, filename: str):
+    def load_file(self, filename):
 
         with open(filename, mode='rb') as file:
             content = file.read()
@@ -1535,7 +1535,6 @@ class dff:
         data = pack("<I", len(self.uvanim_dict))
         data = Sections.write_chunk(data, types["Struct"])
         
-        dictionary: UVAnim
         for dictionary in self.uvanim_dict:
             data += dictionary.to_mem()
 
@@ -1577,7 +1576,7 @@ class dff:
         return data
             
     #######################################################
-    def write_file(self, filename: str, version):
+    def write_file(self, filename, version):
 
         with open(filename, mode='wb') as file:
             content = self.write_memory(version)

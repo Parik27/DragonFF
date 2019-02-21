@@ -54,7 +54,7 @@ class dff_importer:
         self = dff_importer
 
         # Variables
-        self.dff: dff.dff = None
+        self.dff = None
         self.meshes = {}
         self.objects = []
         self.file_name = ""

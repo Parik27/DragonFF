@@ -125,7 +125,7 @@ class material_helper:
         pass
 
     #######################################################
-    def set_environment_map(self, plugin: dff.EnvMapFX):
+    def set_environment_map(self, plugin):
 
         if plugin.env_map:
             self.material.dff.env_map_tex      = plugin.env_map.name
@@ -135,14 +135,14 @@ class material_helper:
         self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha        
 
     #######################################################
-    def set_specular_material(self, plugin: dff.SpecularMat):
+    def set_specular_material(self, plugin):
         
         self.material.dff.export_specular = True
         self.material.dff.specular_level = plugin.level
         self.material.dff.specular_texture = plugin.texture.decode('ascii')
 
     #######################################################
-    def set_reflection_material(self, plugin: dff.ReflMat):
+    def set_reflection_material(self, plugin):
 
         self.material.dff.export_reflection = True
 
@@ -155,7 +155,7 @@ class material_helper:
         self.material.dff.reflection_intensity = plugin.intensity
         
     #######################################################
-    def set_uv_animation(self, uv_anim: dff.UVAnim):
+    def set_uv_animation(self, uv_anim):
 
         #TODO: Add Blender Internal Support for this
         

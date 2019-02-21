@@ -30,7 +30,7 @@ class col_importer:
         self.col = col
 
     #######################################################
-    def from_file(filename: str):
+    def from_file(filename):
 
         collision = col.coll()
         collision.load_file(filename)
@@ -38,7 +38,7 @@ class col_importer:
         return col_importer(collision)
 
     #######################################################
-    def from_mem(memory: str):
+    def from_mem(memory):
 
         collision = col.coll()
         collision.load_memory(memory)
