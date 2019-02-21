@@ -95,6 +95,7 @@ class dff_importer:
             if geom.flags & dff.rpGEOMETRYPRELIT:
                 vertex_color = bm.loops.layers.color.new()
 
+            extra_vertex_color = None
             if 'extra_vert_color' in geom.extensions:
                 extra_vertex_color = bm.loops.layers.color.new()
             
@@ -134,7 +135,6 @@ class dff_importer:
                                 c / 255.0 for c in
                                 extension.colors[loop.vert.index]
                             ]
-                            print(loop[extra_vertex_color])
                             
                     face.smooth = True
                 except BaseException as e:
@@ -260,12 +260,10 @@ class dff_importer:
 
             # UV Animation
             # TODO: Figure out ways to add multiple uv animations
-            print(material.plugins)
             if 'uv_anim' in material.plugins:
                 plugin = material.plugins['uv_anim'][0]
 
                 for uv_anim in self.dff.uvanim_dict:
-                    print(uv_anim.name, plugin, len(uv_anim.name), len(plugin))
                     if uv_anim.name == plugin:
                         helper.set_uv_animation(uv_anim)
                         break
@@ -361,8 +359,6 @@ class dff_importer:
                     print("DragonFF: Bone parent not found")
             
             bone_list[self.bones[bone.id]['index']] = e_bone
-            print(bone_frame.name, self.bones[bone.id]['index'],
-                  bone_frame.parent)
             
                     
         set_object_mode(obj, "OBJECT")
