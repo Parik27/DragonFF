@@ -89,25 +89,29 @@ class col_importer:
         bm.verts.ensure_lookup_table()
             
         for f in faces:
-            face = bm.faces.new(
-                [
-                    bm.verts[f.a],
-                    bm.verts[f.b],
-                    bm.verts[f.c]
-                ]
-            )
-            if hasattr(f, "surface"):
-                surface = f.surface
-            else:
-                surface = col.TSurface(f.material, 0, 1, f.light)
+            try:
+                face = bm.faces.new(
+                    [
+                        bm.verts[f.a],
+                        bm.verts[f.b],
+                        bm.verts[f.c]
+                    ]
+                )
+                if hasattr(f, "surface"):
+                    surface = f.surface
+                else:
+                    surface = col.TSurface(f.material, 0, 1, f.light)
 
-            if surface not in materials:
-                materials[surface] = len(materials)
+                if surface not in materials:
+                    materials[surface] = len(materials)
                 
-            face.material_index = materials[surface]
+                face.material_index = materials[surface]
+
+            except Exception as e:
+                print(e)
                 
-        bm.to_mesh(mesh)
-        bm.free()
+            bm.to_mesh(mesh)
+            bm.free()
         
         obj = bpy.data.objects.new(name, mesh)
         link_object(obj, collection)

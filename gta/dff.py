@@ -529,7 +529,6 @@ class HAnimPLG:
             for i in range(self.header.bone_count):
                 bone = Sections.read(Bone, data, pos)
                 self.bones.append(bone)
-
                 pos += 12
 
         return self
@@ -581,7 +580,6 @@ class UVAnim:
             self.frames.append(
                 Sections.read(UVFrame, data, pos)
             )
-            print(self.frames[-1])
 
         self.name = self.name[:strlen(self.name)].decode('ascii')
             
@@ -1086,8 +1084,6 @@ class dff:
         if contains_bump_map:
             bump_chunk = self.read_chunk()
             chunk_end = self.pos + bump_chunk.size
-
-            print(bump_chunk)
             
             if bump_chunk.type != types["Texture"]:
                 raise RuntimeError("Invalid format")
@@ -1562,6 +1558,8 @@ class dff:
             _data = Sections.write_chunk(coll_data, types["Collision Model"])
             data += Sections.write_chunk(_data, types["Extension"])
             
+        data += Sections.write_chunk(b'', types["Extension"])
+            
         return Sections.write_chunk(data, types["Clump"])
     
     #######################################################
@@ -1586,3 +1584,10 @@ class dff:
     def __init__(self):
         
         self.clear()
+
+test = dff()
+test.load_file("/home/parik/player.dff")
+for matrix in test.geometry_list[0].extensions['skin'].bone_matrices:
+    for value in matrix:
+        print(value)
+    print()

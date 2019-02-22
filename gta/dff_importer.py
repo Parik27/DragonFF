@@ -282,8 +282,7 @@ class dff_importer:
                 if bone_id != 4294967295: #-1
                     self.bones[bone_id] = {'frame': frame,
                                               'index': index}
-                    
-                
+                        
     #######################################################
     def align_roll( vec, vecz, tarz ):
 
@@ -338,11 +337,12 @@ class dff_importer:
             matrix = skinned_obj_data.bone_matrices[bone.index]
             matrix = mathutils.Matrix(matrix).transposed()
             matrix = matrix.inverted()
+
             e_bone.transform(matrix, False, False)
             e_bone.roll = self.align_roll(e_bone.vector,
                                           e_bone.z_axis,
                                           self.multiply_matrix(
-                                              matrix,
+                                              matrix.to_3x3(),
                                               mathutils.Vector((0,0,1))
                                           )
             )
@@ -350,15 +350,20 @@ class dff_importer:
             # Setting parent. See "set parent" note below
             if bone_frame.parent != -1:
                 try:
-                    e_bone.parent = bone_list[bone_frame.parent]
+                    e_bone.parent = bone_list[bone_frame.parent][0]
                     if self.use_bone_connect:
-                        e_bone.parent.tail = e_bone.head
-                        #e_bone.use_connect = self.use_bone_connect
+
+                        if not bone_list[bone_frame.parent][1]:
+
+                            e_bone.parent.tail = e_bone.head
+                            e_bone.use_connect = self.use_bone_connect
+                            
+                            bone_list[bone_frame.parent][1] = True
                         
                 except BaseException:
                     print("DragonFF: Bone parent not found")
             
-            bone_list[self.bones[bone.id]['index']] = e_bone
+            bone_list[self.bones[bone.id]['index']] = [e_bone, False]
             
                     
         set_object_mode(obj, "OBJECT")
@@ -392,7 +397,6 @@ class dff_importer:
 
         # Initialise bone indices for use in armature construction
         self.construct_bone_dict()
-        coll_set = False
         
         for index, frame in enumerate(self.dff.frame_list):
             
@@ -454,8 +458,7 @@ class dff_importer:
 
             # Set a collision model used for export
             obj["gta_coll"] = self.dff.collisions
-
-                
+            
     #######################################################
     def import_dff(file_name):
         self = dff_importer
