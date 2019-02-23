@@ -400,15 +400,16 @@ class dff_exporter:
     def get_vertex_shared_loops(vertex, layers_list, funcs):
         #temp = [[None] * len(layers) for layers in layers_list]
         shared_loops = {}
-        
-        for loop in vertex.link_loops:
 
+        start_loop = vertex.link_loops[0]
+        for loop in vertex.link_loops:
+            
             shared = False
             for i, layers in enumerate(layers_list):
                
-                for j, layer in enumerate(layers, 1):
+                for layer in layers:
 
-                    if funcs[i](loop[layers[j-1]], loop[layer]):
+                    if funcs[i](start_loop[layer], loop[layer]):
                         shared = True
                         break
 
@@ -444,7 +445,6 @@ class dff_exporter:
         override_faces = {}
         
         # Vertices and Normals
-        # TODO: Check if the normals are same as the custom ones set while importing
         i = 0
         length = len(bm.verts)
         while i < len(bm.verts):
@@ -479,8 +479,6 @@ class dff_exporter:
                     override_faces[face.index] = [
                         vert.index for vert in face.verts
                     ]
-                else:
-                    continue
                 
                 override_faces[face.index][loop.index] = len(bm.verts)
                 

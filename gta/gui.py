@@ -131,11 +131,11 @@ class EXPORT_OT_dff(bpy.types.Operator):
         
         dff_exporter.export_dff(
             {
-                "file_name"   : self.filepath,
-                "directory"   : self.directory,
-                "selected"    : self.only_selected,
-                "mass_export" : self.mass_export,
-                "version"     : self.get_selected_rw_version()
+                "file_name"      : self.filepath,
+                "directory"      : self.directory,
+                "selected"       : self.only_selected,
+                "mass_export"    : self.mass_export,
+                "version"        : self.get_selected_rw_version()
             }
         )
             
@@ -201,6 +201,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         name    = "Scan for Images",
         default = True
     )
+
+    remove_doubles  =  bpy.props.BoolProperty(
+        name        = "Remove Doubles",
+        default     = True
+    )
+
     
     image_ext = bpy.props.EnumProperty(
         items =
@@ -230,6 +236,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
             box.prop(self, "image_ext")
         
         layout.prop(self, "read_mat_split")
+        layout.prop(self, "remove_doubles")
         
     #######################################################
     def execute(self, context):
@@ -246,10 +253,11 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     
                 dff_importer.import_dff(
                     {
-                        'file_name'    : file,
-                        'image_ext'    : image_ext,
-                        'connect_bones': self.connect_bones,
-                        'use_mat_split': self.read_mat_split
+                        'file_name'      : file,
+                        'image_ext'      : image_ext,
+                        'connect_bones'  : self.connect_bones,
+                        'use_mat_split'  : self.read_mat_split,
+                        'remove_doubles' : self.remove_doubles,
                     }
                 )
         return {'FINISHED'}

@@ -29,10 +29,11 @@ from .col_importer import import_col_mem
 #######################################################
 class dff_importer:
 
-    image_ext = "png"
-    use_bone_connect = False
+    image_ext          = "png"
+    use_bone_connect   = False
     current_collection = None
-    use_mat_split = False
+    use_mat_split      = False
+    remove_doubles     = False
 
     __slots__ = [
         'dff',
@@ -147,7 +148,7 @@ class dff_importer:
                     face.smooth = True
                 except BaseException as e:
                     print(e)
-
+                    
             bm.to_mesh(mesh)
             bm.free()
 
@@ -159,7 +160,7 @@ class dff_importer:
 
                 mesh.normals_split_custom_set(normals)
                 mesh.use_auto_smooth = True
-
+                
             mesh.update()
 
             # Import materials and add the mesh to the meshes list
@@ -403,7 +404,20 @@ class dff_importer:
                 weight = skin_data.vertex_bone_weights[i][j]
 
                 obj.vertex_groups[bone].add([i], weight, 'ADD')
-    
+
+    #######################################################
+    def remove_object_doubles():
+        self = dff_importer
+
+        for mesh in self.meshes:
+            bm = bmesh.new()
+            bm.from_mesh(self.meshes[mesh])
+
+            bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
+            
+            bm.to_mesh(self.meshes[mesh])
+            bm.free()
+                
     #######################################################
     def import_frames():
         self = dff_importer
@@ -453,7 +467,7 @@ class dff_importer:
 
                 # Set empty display properties to something decent
                 if mesh is None:
-                    self.set_empty_draw_properties(obj)
+                    self.set_empty_draw_properties(obj)                        
 
                 # Set vertex groups
                 if index in self.skin_data:
@@ -471,6 +485,9 @@ class dff_importer:
 
             # Set a collision model used for export
             obj["gta_coll"] = self.dff.collisions
+
+        if self.remove_doubles:
+            self.remove_object_doubles()
             
     #######################################################
     def import_dff(file_name):
@@ -505,5 +522,6 @@ def import_dff(options):
     dff_importer.image_ext        = options['image_ext']
     dff_importer.use_bone_connect = options['connect_bones']
     dff_importer.use_mat_split    = options['use_mat_split']
+    dff_importer.remove_doubles   = options['remove_doubles']
     
     dff_importer.import_dff(options['file_name'])
