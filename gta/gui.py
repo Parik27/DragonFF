@@ -190,6 +190,17 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         description = "Whether to connect bones (not recommended for anim editing)",
         default     = False
     )
+
+    read_mat_split  =  bpy.props.BoolProperty(
+        name        = "Read Material Split",
+        description = "Whether to read material split for loading triangles",
+        default     = True
+    )
+
+    load_images = bpy.props.BoolProperty(
+        name    = "Scan for Images",
+        default = True
+    )
     
     image_ext = bpy.props.EnumProperty(
         items =
@@ -200,10 +211,9 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
             ("TGA", ".TGA", "Load a TGA image"),
             ("BMP", ".BMP", "Load a BMP image"),
             ("TIF", ".TIF", "Load a TIF image"),
-            ("TIFF", ".TIFF", "Load a TIFF image"),
-            ("NONE", "None", "Don't import textures from images" )
+            ("TIFF", ".TIFF", "Load a TIFF image")
         ),
-        name        = "Image extension",
+        name        = "Extension",
         description = "Image extension to search textures in"
     )
 
@@ -213,7 +223,13 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
 
         layout.prop(self, "load_txd")
         layout.prop(self, "connect_bones")
-        layout.prop(self, "image_ext")
+        
+        box = layout.box()
+        box.prop(self, "load_images")
+        if self.load_images:
+            box.prop(self, "image_ext")
+        
+        layout.prop(self, "read_mat_split")
         
     #######################################################
     def execute(self, context):
@@ -223,11 +239,17 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                 col_importer.import_col_file(file, os.path.basename(file))
                             
             else:
+                # Set image_ext to none if scan images is disabled
+                image_ext = self.image_ext
+                if not self.load_images:
+                    image_ext = None
+                    
                 dff_importer.import_dff(
                     {
                         'file_name'    : file,
-                        'image_ext'    : self.image_ext,
-                        'connect_bones': self.connect_bones
+                        'image_ext'    : image_ext,
+                        'connect_bones': self.connect_bones,
+                        'use_mat_split': self.read_mat_split
                     }
                 )
         return {'FINISHED'}

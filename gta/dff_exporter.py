@@ -19,6 +19,7 @@ import bmesh
 import mathutils
 
 from . import dff
+from .importer_common import set_object_mode
 
 #######################################################
 def clear_extension(string):
@@ -245,6 +246,29 @@ class material_helper:
                                                     is_readonly=False)
         
         
+
+#######################################################
+def edit_bone_matrix(edit_bone):
+
+    """ A helper function to return correct matrix from any
+        bone setup there might. 
+        
+        Basically resets the Tail to +0.05 in Y Axis to make a correct
+        prediction
+    """
+
+    return edit_bone.matrix
+    
+    # What I wrote above is rubbish, by the way. This is a hack-ish solution
+    original_tail = list(edit_bone.tail)
+    edit_bone.tail = edit_bone.head + mathutils.Vector([0, 0.05, 0])
+    matrix = edit_bone.matrix
+
+    print(matrix)
+    edit_bone.tail = original_tail
+    print(matrix)
+    return matrix
+            
 #######################################################
 class dff_exporter:
 
@@ -622,7 +646,6 @@ class dff_exporter:
             )
             frame.bone_data = bone_data
             self.dff.frame_list.append(frame)
-        
         
     #######################################################
     def export_objects(objects, name=None):

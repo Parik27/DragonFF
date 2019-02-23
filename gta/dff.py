@@ -342,7 +342,7 @@ class Material:
 
     #######################################################
     def envfx_to_mem(self):
-        BumpMapFX = self.plugins['env_map'][0]
+        env_map = self.plugins['env_map'][0]
         
         data = pack("<IfII",
                     2,
@@ -834,6 +834,7 @@ class Geometry:
             # Read Triangles
             for i in range(num_triangles):
                 triangle = Sections.read(Triangle, data, pos)
+                print(triangle)
                 self.triangles.append(triangle)
                 
                 pos += 8
@@ -1026,8 +1027,7 @@ class dff:
 
     #######################################################
     def read_mesh_plg(self, parent_chunk, geometry):
-        # TODO: Add support for Triangle Strips
-        geometry.triangles = []
+        triangles = []
         
         _Header      = namedtuple("_Header","flags mesh_count total_indices")
         _SplitHeader = namedtuple("_SplitHeader","indices_count material")
@@ -1038,38 +1038,74 @@ class dff:
         # calculate if the indices are stored in 32 bit or 16 bit
         opengl = 12 + header.mesh_count * 8 \
         + (header.total_indices * 4) > parent_chunk.size
+
+        is_tri_strip = header.flags == 1
         
         for i in range(header.mesh_count):
-
-            # Read header
             
+            # Read header
             split_header = _SplitHeader._make(unpack_from("<II",
                                                           self.data,
                                                           self._read(8)))
 
-            unpack_format = "<HHH" if opengl else "<H2xH2xH2x"
-            for j in range(0,split_header.indices_count,3):
+            unpack_format = "<H" if opengl else "<H2x"
+            total_iterations = split_header.indices_count
+            
+            # Read 3 integers instead of 1 incase of triangle lists
+            if not is_tri_strip: 
+                unpack_format = "<" + (unpack_format[1:] * 3)
+                total_iterations //= 3
+                
+            previous_vertices = []
+            for j in range(total_iterations):
 
-                _triangle = _Triangle._make
-                (
-                    unpack_from
-                    (
+                # Read Triangle Strip
+                if is_tri_strip:
+
+                    vertex = unpack_from(
                         unpack_format,
                         self.data,
-                        self._read(6 if opengl else 12)
-                    )
-                )
+                        self._read(2 if opengl else 4)
+                    )[0]
 
-                self.pos += 6 if opengl else 12
-                triangle = Triangle._make
-                (
-                    (_triangle.a,
-                     _triangle.b,
-                     split_header.material,
-                     _triangle.c)
-                )
-                    
-                geometry.triangles.append(triangle)
+                    if len(previous_vertices) < 2:
+                        previous_vertices.append(vertex)
+                        continue
+
+                    triangle = Triangle(
+                        previous_vertices[0],
+                        vertex,
+                        split_header.material,
+                        previous_vertices[1]
+                    )
+                    print(triangle)
+                
+                    previous_vertices[0] = previous_vertices[1]
+                    previous_vertices[1] = vertex
+
+                # Read Triangle List
+                else:
+
+                    _triangle = _Triangle._make(
+                        unpack_from(
+                            unpack_format,
+                            self.data,
+                            self._read(6 if opengl else 12)
+                        )
+                    )
+
+                    triangle = Triangle._make(
+                        (
+                            _triangle.b,
+                            _triangle.a,
+                            split_header.material,
+                            _triangle.c
+                        )
+                    )
+
+                triangles.append(triangle)
+
+        geometry.extensions['mat_split'] = triangles
 
     #######################################################
     def read_matfx_bumpmap(self):
@@ -1355,10 +1391,8 @@ class dff:
                                     self.data, self._read(chunk.size), geometry
                                 )
                             
-                            
-                        #BIN MESH PLG
-                        #elif chunk.type == types["Bin Mesh PLG"]: 
-                        #   self.read_mesh_plg(chunk,geometry)
+                        elif chunk.type == types["Bin Mesh PLG"]: 
+                           self.read_mesh_plg(chunk,geometry)
 
                         else:
                             self._read(chunk.size)
@@ -1584,10 +1618,3 @@ class dff:
     def __init__(self):
         
         self.clear()
-
-test = dff()
-test.load_file("/home/parik/player.dff")
-for matrix in test.geometry_list[0].extensions['skin'].bone_matrices:
-    for value in matrix:
-        print(value)
-    print()

@@ -32,6 +32,7 @@ class dff_importer:
     image_ext = "png"
     use_bone_connect = False
     current_collection = None
+    use_mat_split = False
 
     __slots__ = [
         'dff',
@@ -62,6 +63,7 @@ class dff_importer:
         self.bones = {}
 
     #######################################################
+    # TODO: Cyclomatic Complexity too high
     def import_atomics():
         self = dff_importer
 
@@ -98,8 +100,14 @@ class dff_importer:
             extra_vertex_color = None
             if 'extra_vert_color' in geom.extensions:
                 extra_vertex_color = bm.loops.layers.color.new()
+
+            if dff_importer.use_mat_split and 'mat_split' in geom.extensions:
+                faces = geom.extensions['mat_split']
+            else:
+                faces = geom.triangles
+                 
             
-            for f in geom.triangles:
+            for f in faces:
                 try:
                     face = bm.faces.new(
                         [
@@ -188,7 +196,7 @@ class dff_importer:
             helper.set_base_color(material.color)
 
             # Loading Texture
-            if material.is_textured == 1:
+            if material.is_textured == 1 and self.image_ext:
                 texture = material.textures[0]
                 path    = os.path.dirname(self.file_name)
 
@@ -338,7 +346,7 @@ class dff_importer:
             matrix = mathutils.Matrix(matrix).transposed()
             matrix = matrix.inverted()
 
-            e_bone.transform(matrix, False, False)
+            e_bone.transform(matrix, True, False)
             e_bone.roll = self.align_roll(e_bone.vector,
                                           e_bone.z_axis,
                                           self.multiply_matrix(
@@ -355,10 +363,15 @@ class dff_importer:
 
                         if not bone_list[bone_frame.parent][1]:
 
-                            e_bone.parent.tail = e_bone.head
-                            e_bone.use_connect = self.use_bone_connect
+                            mat = [e_bone.parent.head, e_bone.parent.tail, e_bone.head]
+                            mat = mathutils.Matrix(mat)
+                            if abs(mat.determinant()) < 0.0000001:
+                                
+                                length = (e_bone.parent.head - e_bone.head).length
+                                e_bone.length      = length
+                                e_bone.use_connect = self.use_bone_connect
                             
-                            bone_list[bone_frame.parent][1] = True
+                                bone_list[bone_frame.parent][1] = True
                         
                 except BaseException:
                     print("DragonFF: Bone parent not found")
@@ -491,5 +504,6 @@ def import_dff(options):
     # Shadow function
     dff_importer.image_ext        = options['image_ext']
     dff_importer.use_bone_connect = options['connect_bones']
+    dff_importer.use_mat_split    = options['use_mat_split']
     
     dff_importer.import_dff(options['file_name'])
