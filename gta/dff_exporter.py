@@ -553,6 +553,12 @@ class dff_exporter:
                 
         self.create_frame(obj)
 
+        # Custom Split Normals
+        obj.data.calc_normals_split()
+
+        for loop in obj.data.loops:
+            geometry.normals[loop.vertex_index] = loop.normal
+        
         # Bounding sphere
         sphere_center = 0.125 * sum(
             (mathutils.Vector(b) for b in obj.bound_box),
