@@ -1072,12 +1072,21 @@ class dff:
                         previous_vertices.append(vertex)
                         continue
 
-                    triangle = Triangle(
-                        previous_vertices[0],
-                        vertex,
-                        split_header.material,
-                        previous_vertices[1]
-                    )
+                    if(j % 2 == 0):
+                        triangle = Triangle(
+                            previous_vertices[1],
+                            previous_vertices[0],
+                            split_header.material,
+                            vertex
+                        )
+                    else:
+                        triangle = Triangle(
+                            previous_vertices[0],
+                            previous_vertices[1],
+                            split_header.material,
+                            vertex
+                        )
+                        
                     print(triangle)
                 
                     previous_vertices[0] = previous_vertices[1]
