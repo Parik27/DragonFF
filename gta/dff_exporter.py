@@ -401,8 +401,8 @@ class dff_exporter:
         #temp = [[None] * len(layers) for layers in layers_list]
         shared_loops = {}
 
-        start_loop = vertex.link_loops[0]
         for loop in vertex.link_loops:
+            start_loop = vertex.link_loops[0]
             
             shared = False
             for i, layers in enumerate(layers_list):

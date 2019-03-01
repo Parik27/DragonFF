@@ -111,7 +111,6 @@ class col_importer:
                 print(e)
                 
             bm.to_mesh(mesh)
-            bm.free()
         
         obj = bpy.data.objects.new(name, mesh)
         link_object(obj, collection)

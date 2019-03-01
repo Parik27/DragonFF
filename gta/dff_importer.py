@@ -150,7 +150,6 @@ class dff_importer:
                     print(e)
                     
             bm.to_mesh(mesh)
-            bm.free()
 
             # Set loop normals
             if geom.has_normals:
@@ -416,8 +415,6 @@ class dff_importer:
             bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
             
             bm.to_mesh(self.meshes[mesh])
-
-        bm.free()
                 
     #######################################################
     def import_frames():
