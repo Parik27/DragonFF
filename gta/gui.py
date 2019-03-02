@@ -194,7 +194,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     read_mat_split  =  bpy.props.BoolProperty(
         name        = "Read Material Split",
         description = "Whether to read material split for loading triangles",
-        default     = True
+        default     = False
     )
 
     load_images = bpy.props.BoolProperty(
@@ -203,7 +203,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     )
 
     remove_doubles  =  bpy.props.BoolProperty(
-        name        = "Remove Doubles",
+        name        = "Use Edge Split",
         default     = True
     )
 

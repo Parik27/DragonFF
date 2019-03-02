@@ -264,9 +264,7 @@ def edit_bone_matrix(edit_bone):
     edit_bone.tail = edit_bone.head + mathutils.Vector([0, 0.05, 0])
     matrix = edit_bone.matrix
 
-    print(matrix)
     edit_bone.tail = original_tail
-    print(matrix)
     return matrix
             
 #######################################################
@@ -351,7 +349,6 @@ class dff_exporter:
 
             anim = helper.get_uv_animation()
             if anim:
-                print(anim.name)
                 material.add_plugin('uv_anim', anim.name)
                 self.dff.uvanim_dict.append(anim)
                 
@@ -360,7 +357,7 @@ class dff_exporter:
         return materials
 
     #######################################################
-    def init_skin_plg(obj):
+    def init_skin_plg(obj, mesh):
 
         # Returns a SkinPLG object if the object has an armature modifier
         armature = None
@@ -384,7 +381,7 @@ class dff_exporter:
             )
 
         # Set vertex group weights
-        for vertex in obj.data.vertices:
+        for vertex in mesh.vertices:
             skin.vertex_bone_indices.append([0,0,0,0])
             skin.vertex_bone_weights.append([0,0,0,0])
             for index, group in enumerate(vertex.groups):
@@ -418,6 +415,18 @@ class dff_exporter:
                     break
                 
         return shared_loops.keys()
+
+    #######################################################
+    def convert_to_mesh(obj):
+
+        """ 
+        A Blender 2.8 <=> 2.7 compatibility function for bpy.types.Object.to_mesh
+        """
+
+        if bpy.app.version < (2, 80, 0):
+            return obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
+
+        return obj.to_mesh(bpy.context.depsgraph, True)
     
     #######################################################
     def populate_atomic(obj):
@@ -425,9 +434,16 @@ class dff_exporter:
 
         # Create geometry
         geometry = dff.Geometry()
+
+        # Temporarily disable armature
+        for modifier in obj.modifiers:
+            if modifier.type == 'ARMATURE':
+                modifier.show_viewport = False
+
+        mesh = self.convert_to_mesh(obj)
+        bm   = bmesh.new()
         
-        bm       = bmesh.new()
-        bm.from_mesh(obj.data)
+        bm.from_mesh(mesh)
 
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
 
@@ -435,10 +451,10 @@ class dff_exporter:
         bm.verts.index_update()
 
         # Set SkinPLG
-        skin = self.init_skin_plg(obj)
+        skin = self.init_skin_plg(obj, mesh)
 
-        has_prelit_colors = len(obj.data.vertex_colors) > 0
-        has_night_colors  = len(obj.data.vertex_colors) > 1
+        has_prelit_colors = len(mesh.vertex_colors) > 0
+        has_night_colors  = len(mesh.vertex_colors) > 1
 
         # These are used to set the vertex indices for new vertices
         # created in the next loop to get rid of shared vertices.
@@ -554,9 +570,9 @@ class dff_exporter:
         self.create_frame(obj)
 
         # Custom Split Normals
-        obj.data.calc_normals_split()
+        mesh.calc_normals_split()
 
-        for loop in obj.data.loops:
+        for loop in mesh.loops:
             geometry.normals[loop.vertex_index] = loop.normal
         
         # Bounding sphere

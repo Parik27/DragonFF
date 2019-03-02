@@ -834,7 +834,6 @@ class Geometry:
             # Read Triangles
             for i in range(num_triangles):
                 triangle = Sections.read(Triangle, data, pos)
-                print(triangle)
                 self.triangles.append(triangle)
                 
                 pos += 8
@@ -1086,8 +1085,6 @@ class dff:
                             split_header.material,
                             vertex
                         )
-                        
-                    print(triangle)
                 
                     previous_vertices[0] = previous_vertices[1]
                     previous_vertices[1] = vertex
