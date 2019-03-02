@@ -408,13 +408,23 @@ class dff_importer:
     def remove_object_doubles():
         self = dff_importer
 
-        for mesh in self.meshes:
+        for frame in self.meshes:
             bm = bmesh.new()
-            bm.from_mesh(self.meshes[mesh])
+            bm.from_mesh(self.meshes[frame])
 
-            bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
+            # Mark edges with 1 linked face, sharp
+            for edge in bm.edges:
+                if len(edge.link_loops) == 1:
+                    edge.smooth = False
             
-            bm.to_mesh(self.meshes[mesh])
+            bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
+
+            # Add an edge split modifier
+            object   = self.objects[frame]
+            modifier = object.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
+            modifier.use_edge_angle = False
+            
+            bm.to_mesh(self.meshes[frame])
                 
     #######################################################
     def import_frames():
