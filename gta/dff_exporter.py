@@ -422,11 +422,24 @@ class dff_exporter:
         """ 
         A Blender 2.8 <=> 2.7 compatibility function for bpy.types.Object.to_mesh
         """
+        
+        # Temporarily disable armature
+        disabled_modifiers = []
+        for modifier in obj.modifiers:
+            if modifier.type == 'ARMATURE':
+                modifier.show_viewport = False
+                disabled_modifiers.append(modifier)
 
         if bpy.app.version < (2, 80, 0):
-            return obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
+            mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
+        else:
+            mesh = obj.to_mesh(bpy.context.depsgraph, True)
 
-        return obj.to_mesh(bpy.context.depsgraph, True)
+        # Re enable disabled modifiers
+        for modifier in disabled_modifiers:
+            modifier.show_viewport = True
+
+        return mesh
     
     #######################################################
     def populate_atomic(obj):
@@ -434,11 +447,6 @@ class dff_exporter:
 
         # Create geometry
         geometry = dff.Geometry()
-
-        # Temporarily disable armature
-        for modifier in obj.modifiers:
-            if modifier.type == 'ARMATURE':
-                modifier.show_viewport = False
 
         mesh = self.convert_to_mesh(obj)
         bm   = bmesh.new()
@@ -699,6 +707,12 @@ class dff_exporter:
             self.dff.write_file(self.file_name, self.version )
         else:
             self.dff.write_file("%s/%s" % (self.path, name), self.version)
+
+    #######################################################
+    def is_selected(obj):
+        if bpy.app.version < (2, 80, 0):
+            return obj.select
+        return obj.select_get()
             
     #######################################################
     def export_dff(filename):

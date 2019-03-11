@@ -87,6 +87,7 @@ types = {
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
     "Specular Material"       : 39056118,
+    "2d Effect"               : 39056120,
     "Extra Vert Color"        : 39056121,
     "Collision Model"         : 39056122,
     "Reflection Material"     : 39056124,
@@ -734,6 +735,175 @@ class ExtraVertColorExtension:
             data += Sections.write(RGBA, color)
 
         return Sections.write_chunk(data, types["Extra Vert Color"])
+
+#######################################################
+class EffectLight2d:
+
+    #######################################################
+    class Flags1(Enum):
+        CORONA_CHECK_OBSTACLES = 1
+        FOG_TYPE = 2
+        FOG_TYPE2 = 4
+        WITHOUT_CORONA = 8
+        CORONA_ONLY_AT_LONG_DISTANCE = 16
+        AT_DAY = 32
+        AT_NIGHT = 64
+        BLINKING1 = 128
+
+    #######################################################
+    class Flags2(Enum):
+        CORONA_ONLY_FROM_BELOW = 1
+        BLINKING2 = 2
+        UDPDATE_HEIGHT_ABOVE_GROUND = 4
+        CHECK_DIRECTION = 8
+        BLINKING3 = 16
+        
+    #######################################################
+    def __init__(self, loc):
+
+        self.effect_id = 0
+
+        self.loc = loc
+        self.color = [0,0,0]
+        self.coronaFarClip = 0
+        self.pointlightRange = 0
+        self.coronaSize = 0
+        self.shadowSize = 0
+        self.coronaShowMode = 0
+        self.coronaEnableReflection = 0
+        self.coronaFlareType = 0
+        self.shadowColorMultiplier = 0
+        self._flags1 = 0
+        self.coronaTexName = ""
+        self.shadowTexName = ""
+        self.shadowZDistance = 0
+        self._flags2 = 0
+        self.lookDirection = None
+    
+    #######################################################
+    def from_mem(loc, data, offset, size):
+        self = EffectLight2d(loc)
+
+        self.color = Sections.read(RGBA, data, offset)
+        
+        self.coronaFarClip   , self.pointlightRange        , \
+        self.coronaSize      , self.shadowSize             , \
+        self.coronaShowMode  , self.coronaEnableReflection , \
+        self.coronaFlareType , self.shadowColorMultiplier  , \
+        self._flags1         , self.coronaTexName          , \
+        self.shadowTexName   , self.shadowZDistance        , \
+        self._flags2 =  unpack_from("<ffffBBBBB24s24sBB", data, offset + 4)
+
+        # 80 bytes structure
+        if size > 76:
+            self.lookDirection = unpack_from("<BBB", data, offset + 76)
+
+        # Convert byte arrays to strings here
+        self.coronaTexName = self.coronaTexName[:strlen(self.coronaTexName)]
+        self.shadowTexName = self.shadowTexName[:strlen(self.shadowTexName)]
+
+        self.coronaTexName = self.coronaTexName.decode('ascii')
+        self.shadowTexName = self.shadowTexName.decode('ascii')
+            
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = Sections.write(RGBA, self.color)
+
+        # 76 bytes
+        data += pack(
+            "<ffffBBBBB24s24sBB",
+            self.coronaFarClip   , self.pointlightRange,
+            self.coronaSize      , self.shadowSize,
+            self.coronaShowMode  , self.coronaEnableReflection,
+            self.coronaFlareType , self.shadowColorMultiplier,
+            self._flags1         , self.coronaTexName,
+            self.shadowTexName   , self.shadowZDistance,
+            self._flags2
+        )
+
+        # 80 bytes
+        if self.lookDirection is not None:
+            data += pack("<BBB2x", *self.lookDirection)
+
+        # 76 bytes (padding)
+        else:
+            data += pack("<x")
+
+        return data
+    
+    #######################################################
+    def set_flag(self, flag):
+        self._flag |= flag
+
+    #######################################################
+    def set_flag2(self, flag):
+        self._flag2 |= flag
+        
+#######################################################
+class Extension2dfx:
+
+    #######################################################
+    def __init__(self):
+        self.entries = []
+
+    #######################################################
+    def append_entry(self, entry):
+        self.entries.append(entry)
+
+    #######################################################
+    def from_mem(data, offset):
+
+        self = Extension2dfx()
+        entries_count = unpack_from("<I", data, offset)[0]
+
+        pos = 4 + offset
+        for i in range(entries_count):
+
+            # Stores classes for each effect
+            entries_funcs = {
+                0: EffectLight2d
+            }
+            
+            loc = Sections.read(Vector, data, pos)
+            entry_type, size = unpack_from("<II", data, pos + 12)
+
+            pos += 20
+            if entry_type in entries_funcs:
+                self.append_entry(
+                    entries_funcs[entry_type].from_mem(loc, data, pos, size)
+                )
+            else:
+                print("Unimplemented Effect: %d" % (entry_type))
+
+            pos += size
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+
+        # Write only if there are entries
+        if len(self.entries) == 0:
+            return b''
+        
+        # Entries length
+        data = pack("<I", len(self.entries))
+
+        # Entries
+        for entry in self.entries:
+            entry_data = entry.to_mem()
+
+            data += pack("<II", entry.effect_id)
+            data += entry_data
+
+        return Sections.write_chunk(data, types['2d Effect'])
+            
+    #######################################################
+    def __add__(self, other):
+        self.entries += other.entries # concatinate entries
+        return self
     
 #######################################################
 class Geometry:
@@ -881,17 +1051,21 @@ class Geometry:
         return Sections.write_chunk(data, types["Material List"])
 
     #######################################################
-    def extensions_to_mem(self):
+    def extensions_to_mem(self, extra_extensions = []):
 
         data = b''
         for extension in self.extensions:
             if self.extensions[extension] is not None:
                 data += self.extensions[extension].to_mem()
 
+        # Write extra extensions
+        for extra_extension in extra_extensions:
+            data += extra_extension.to_mem()
+            
         return Sections.write_chunk(data, types["Extension"])
         
     #######################################################
-    def to_mem(self):
+    def to_mem(self, extra_extensions = []):
 
         # Set flags
         flags = rpGEOMETRYPOSITIONS
@@ -948,7 +1122,7 @@ class Geometry:
         
         # Write Material List and extensions
         data += self.material_list_to_mem()
-        data += self.extensions_to_mem()
+        data += self.extensions_to_mem(extra_extensions)
         return Sections.write_chunk(data, types["Geometry"])
 
 #######################################################
@@ -1396,6 +1570,13 @@ class dff:
                                 ExtraVertColorExtension.from_mem (
                                     self.data, self._read(chunk.size), geometry
                                 )
+
+                        # 2dfx (usually at the last geometry index)
+                        elif chunk.type == types["2d Effect"]:
+                            self.ext_2dfx += Extension2dfx.from_mem(
+                                self.data,
+                                self._read(chunk.size)
+                            )
                             
                         elif chunk.type == types["Bin Mesh PLG"]: 
                            self.read_mesh_plg(chunk,geometry)
@@ -1502,6 +1683,7 @@ class dff:
         self.atomic_list   = []
         self.uvanim_dict   = []
         self.light_list    = []
+        self.ext_2dfx      = Extension2dfx()
         self.pos           = 0
         self.data          = ""
             
@@ -1537,7 +1719,13 @@ class dff:
 
         data = Sections.write_chunk(data, types["Struct"])
         
-        for geometry in self.geometry_list:
+        for index, geometry in enumerate(self.geometry_list):
+
+            # Append 2dfx to extra extensions in the last geometry
+            extra_extensions = []
+            if index == len(self.geometry_list):
+                extra_extensions.append(self.ext_2dfx)
+            
             data += geometry.to_mem()
         
         return Sections.write_chunk(data, types["Geometry List"])
