@@ -737,7 +737,7 @@ class ExtraVertColorExtension:
         return Sections.write_chunk(data, types["Extra Vert Color"])
 
 #######################################################
-class EffectLight2d:
+class Light2dfx:
 
     #######################################################
     class Flags1(Enum):
@@ -782,7 +782,7 @@ class EffectLight2d:
     
     #######################################################
     def from_mem(loc, data, offset, size):
-        self = EffectLight2d(loc)
+        self = Light2dfx(loc)
 
         self.color = Sections.read(RGBA, data, offset)
         
@@ -840,6 +840,94 @@ class EffectLight2d:
     #######################################################
     def set_flag2(self, flag):
         self._flag2 |= flag
+
+#######################################################
+class Particle2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 1
+        self.effect = ""
+
+    #######################################################
+    def from_mem(loc, data, offset, size):
+
+        self = Particle2dfx(loc)
+        self.effect = data[offset:strlen(data, offset)].decode('ascii')
+                
+        return self
+
+    #######################################################
+    def to_mem(self):
+        return pack("<24s", self.effect)
+
+#######################################################
+class PedAttractor2dfx:
+
+    #######################################################
+    # See: https://gtamods.com/wiki/2d_Effect_(RW_Section)
+    #######################################################
+    class Types(Enum):
+
+        PED_ATM_ATTRACTOR = 0
+        PED_SEAT_ATTRACTOR = 1
+        PED_STOP_ATTRACTOR = 2
+        PED_PIZZA_ATTRACTOR = 3
+        PED_SHELTER_ATTRACTOR = 4
+        PED_TRIGGER_SCRIPT_ATTRACTOR = 5
+        PED_LOOK_AT_ATTRACTOR = 6
+        PED_SCRIPTED_ATTRACTOR = 7
+        PED_PARK_ATTRACTOR = 8
+        PED_STEP_ATTRACTOR = 9
+        
+    #######################################################
+    def __init__(self, loc):
+
+        self.effect_id = 3
+        
+        self.loc = loc
+        self.type = 0
+        self.rotation_matrix = None
+        self.external_script = ""
+        self.ped_existing_probability = 0
+
+    #######################################################
+    def from_mem(loc, data, offset, size):
+        self = PedAttractor2dfx()
+
+        self.type = unpack_from("<I", data, offset)[0]
+        self.rotation_matrix = Sections.read(Matrix, data, offset + 4)
+        self.external_script = data[offset + 40: strlen(data, offset + 40)]
+        self.ped_existing_probabiliy = unpack_from("<I", data, offset + 48)[0]
+
+        self.external_script = self.external_script.decode('ascii')
+        
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = pack("<I", self.type)
+        data += Sections.write(Matrix, self.rotation_matrix)
+        data += pack("<8sI", self.external_script, self.ped_existing_probability)
+
+        return data
+
+#######################################################
+class SunGlare2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 4
+
+    #######################################################
+    def from_mem(loc, data, offset, size):
+        return SunGlare2dfx(loc)
+
+    #######################################################
+    def to_mem(self):
+        return b''
         
 #######################################################
 class Extension2dfx:
@@ -863,7 +951,10 @@ class Extension2dfx:
 
             # Stores classes for each effect
             entries_funcs = {
-                0: EffectLight2d
+                0: Light2dfx,
+                1: Particle2dfx,
+                3: PedAttractor2dfx,
+                4: SunGlare2dfx
             }
             
             loc = Sections.read(Vector, data, pos)
@@ -1812,3 +1903,16 @@ class dff:
     def __init__(self):
         
         self.clear()
+
+# Test (remove) - only in case I forgot to remove the code
+if __name__ == "__main__":
+    test = dff()
+    test.load_file("/home/parik/Downloads/at400-def.dff")
+    for entry in test.ext_2dfx.entries:
+        attrs = vars(entry)
+        print(',\n'.join("%s => %s" % item for item in attrs.items()))
+        print("\n\n")
+    for entry in test.ext_2dfx.entries:
+        attrs = vars(entry)
+        print(',\n'.join("%s => %s" % item for item in attrs.items()))
+        print("\n\n")

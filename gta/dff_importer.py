@@ -27,6 +27,39 @@ from .importer_common import (
 from .col_importer import import_col_mem
 
 #######################################################
+class ext_2dfx_importer:
+
+    """ Helper class for 2dfx importing """
+    # Basically I didn't want to have such functions in
+    # the main dfff_importer, as the functions wouldn't
+    # make any sense being there.
+    
+    #######################################################
+    def __init__(self, effects):
+        self.effects = effects
+
+    #######################################################
+    def import_light(self, entry):
+        pass
+    
+    #######################################################
+    def get_objects(self):
+
+        """ Import and return the list of imported objects """
+
+        functions = {
+            0: self.import_light
+        }
+
+        objects = []
+        
+        for entry in self.effects.entries:
+            if entry.effect_id in functions:
+                objects.append(functions[entry.effect_id](entry))
+
+        return objects
+    
+#######################################################
 class dff_importer:
 
     image_ext          = "png"
@@ -176,6 +209,12 @@ class dff_importer:
             empty.empty_display_type = 'CUBE'
             empty.empty_display_size = 0.05
         pass
+
+    ##################################################################
+    def import_2dfx(self, effects):
+        
+        for effect in effects.entries:
+            pass
     
     ##################################################################
     # TODO: MatFX: Dual Textures
@@ -432,6 +471,7 @@ class dff_importer:
 
         # Initialise bone indices for use in armature construction
         self.construct_bone_dict()
+        #self.import_2dfx(self.dff.ext_2dfx)
         
         for index, frame in enumerate(self.dff.frame_list):
             
@@ -496,6 +536,36 @@ class dff_importer:
 
         if self.remove_doubles:
             self.remove_object_doubles()
+
+    #######################################################
+    def preprocess_atomics():
+        self = dff_importer
+
+        atomic_frames = []
+        to_be_preprocessed = [] #these will be assigned a new frame
+        
+        for index, atomic in enumerate(self.dff.atomic_list):
+
+            frame = self.dff.frame_list[atomic.frame]
+
+            # For GTA SA bones, which have the frame of the pedestrian
+            # (incorrectly?) set in the atomic to a bone
+            if frame.bone_data is not None:
+                to_be_preprocessed.append(index)
+
+            atomic_frames.append(atomic.frame)
+
+        # Assign every atomic in the list a new (possibly valid) frame
+        for atomic in to_be_preprocessed:
+
+            for index, frame in enumerate(self.dff.frame_list):
+
+                if frame.bone_data is None and index not in atomic_frames:
+                    _atomic = list(self.dff.atomic_list[atomic])
+                    _atomic[0] = index # _atomic.frame = index
+
+                    self.dff.atomic_list[atomic] = dff.Atomic(*_atomic)
+                    
             
     #######################################################
     def import_dff(file_name):
@@ -507,6 +577,8 @@ class dff_importer:
         self.dff.load_file(file_name)
         self.file_name = file_name
 
+        self.preprocess_atomics()
+        
         # Create a new group/collection
         self.current_collection = create_collection(
             os.path.basename(file_name)
