@@ -550,7 +550,7 @@ class dff_importer:
 
             # For GTA SA bones, which have the frame of the pedestrian
             # (incorrectly?) set in the atomic to a bone
-            if frame.bone_data is not None:
+            if frame.bone_data is not None and frame.bone_data.header.id != -1:
                 to_be_preprocessed.append(index)
 
             atomic_frames.append(atomic.frame)
@@ -560,11 +560,14 @@ class dff_importer:
 
             for index, frame in enumerate(self.dff.frame_list):
 
-                if frame.bone_data is None and index not in atomic_frames:
+                # Find an empty frame
+                if (frame.bone_data is None or frame.bone_data.header.id == -1) \
+                   and index not in atomic_frames:
                     _atomic = list(self.dff.atomic_list[atomic])
                     _atomic[0] = index # _atomic.frame = index
 
                     self.dff.atomic_list[atomic] = dff.Atomic(*_atomic)
+                    break
                     
             
     #######################################################
