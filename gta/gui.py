@@ -402,7 +402,9 @@ def export_dff_func(self, context):
 
     self.layout.operator(EXPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff)")
 
+    
 # Custom properties
+#######################################################
 class DFFMaterialProps(bpy.types.PropertyGroup):
 
     ambient           = bpy.props.FloatProperty  (name="Ambient Shading")
@@ -443,5 +445,16 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     def register():
         bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
 
+#######################################################
 class DFFMeshProps(bpy.types.PropertyGroup):
     pass
+
+#######################################################
+class DFFObjectProps(bpy.types.PropertyGroup):
+
+    # Atomic Properties
+    is_col_material = bpy.props.BoolProperty()
+    
+    #######################################################    
+    def register():
+        bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)

@@ -346,6 +346,27 @@ class dff_importer:
         
         else:
             return -math.asin( sine_roll ) - math.pi
+
+    #######################################################
+    def get_skinned_obj_index(frame, frame_index):
+        self = dff_importer
+
+        possible_frames = [
+            frame.parent, # The parent frame 
+            frame_index - 1, # The previous frame
+            0 # The first frame
+        ]
+        
+        for possible_frame in possible_frames:
+            
+            if possible_frame in self.skin_data:
+                return possible_frame
+
+        # Find an arbritary frame
+        for _, index in enumerate(self.skin_data):
+            return index
+
+        raise Exception("Cannot construct an armature without skinned mesh")
         
     #######################################################
     def construct_armature(frame, frame_index):
@@ -356,8 +377,10 @@ class dff_importer:
         obj = bpy.data.objects.new(frame.name, armature)
         link_object(obj, dff_importer.current_collection)
 
-        skinned_obj_index = frame.parent if frame.parent in self.skin_data \
-            else next(iter(self.skin_data))
+        try:
+            skinned_obj_index = self.get_skinned_obj_index(frame, frame_index)
+        except Exception as e:
+            raise e
         
         skinned_obj_data = self.skin_data[skinned_obj_index]
         skinned_obj = self.objects[skinned_obj_index]
@@ -497,7 +520,11 @@ class dff_importer:
                 
                 # Construct an armature
                 if frame.bone_data.header.bone_count > 0:
-                    mesh, obj = self.construct_armature(frame, index)
+                    try:
+                        mesh, obj = self.construct_armature(frame, index)
+                    except Exception as e:
+                        print(e)
+                        continue
                     
                 # Skip bones
                 elif frame.bone_data.header.id in self.bones and mesh is None:
@@ -557,7 +584,7 @@ class dff_importer:
 
         # Assign every atomic in the list a new (possibly valid) frame
         for atomic in to_be_preprocessed:
-
+            
             for index, frame in enumerate(self.dff.frame_list):
 
                 # Find an empty frame
@@ -565,7 +592,6 @@ class dff_importer:
                    and index not in atomic_frames:
                     _atomic = list(self.dff.atomic_list[atomic])
                     _atomic[0] = index # _atomic.frame = index
-
                     self.dff.atomic_list[atomic] = dff.Atomic(*_atomic)
                     break
                     

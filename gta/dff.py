@@ -118,7 +118,7 @@ class Sections:
         Chunk       : "<3I",
         Clump       : "<3I",
         Vector      : "<3f",
-        HAnimHeader : "<3I",
+        HAnimHeader : "<3i",
         Bone        : "<3i",
         RGBA        : "<4B",
         GeomSurfPro : "<3f",
@@ -1253,7 +1253,6 @@ class dff:
 
         for i in range(frames_count):
             frame = Frame.from_mem(self.data[self.pos:])
-
             self.frame_list.append(frame)
             self._read(Frame.size())
 
