@@ -55,7 +55,10 @@ class col_importer:
             
             obj.location = entity.center
             obj.scale = [entity.radius] * 3
-            obj.empty_display_type = 'SPHERE'
+            if (2, 80, 0) > bpy.app.version:
+                obj.empty_draw_type = 'SPHERE'
+            else:
+                obj.empty_display_type = 'SPHERE'
 
             obj["col_surface"] = entity.surface
             
