@@ -22,7 +22,7 @@ from bpy.utils import register_class, unregister_class
 bl_info = {
     "name": "GTA DragonFF",
     "author": "Parik",
-    "version": (0, 1),
+    "version": (0, 0, 2),
     "blender": (2, 80, 0),
     "category": "Import-Export",
     "location": "File > Import/Export",
