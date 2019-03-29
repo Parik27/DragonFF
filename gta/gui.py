@@ -18,10 +18,10 @@ import bpy
 import os
 from . import dff_importer, dff_exporter, col_importer
 
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper, ExportHelper
 
 #######################################################
-class EXPORT_OT_dff(bpy.types.Operator):
+class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     
     bl_idname      = "export_dff.scene"
     bl_description = "Export a Renderware DFF or COL File"
