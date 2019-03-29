@@ -1760,6 +1760,7 @@ class dff:
 
             if chunk.type == types["Clump"]:
                 self.read_clump(chunk)
+                self.rw_version = Sections.get_rw_version(chunk.version)
 
             elif chunk.type == types["UV Animation Dictionary"]:
                 self.read_uv_anim_dict()
@@ -1776,6 +1777,7 @@ class dff:
         self.ext_2dfx      = Extension2dfx()
         self.pos           = 0
         self.data          = ""
+        self.rw_version    = ""
             
     #######################################################
     def load_file(self, filename):

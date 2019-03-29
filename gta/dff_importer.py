@@ -67,6 +67,7 @@ class dff_importer:
     current_collection = None
     use_mat_split      = False
     remove_doubles     = False
+    version            = ""
 
     __slots__ = [
         'dff',
@@ -616,6 +617,9 @@ class dff_importer:
         self.import_atomics()
         self.import_frames()
 
+        # Set imported version
+        self.version = "0x%05x" % self.dff.rw_version
+        
         # Add collisions
         for collision in self.dff.collisions:
             col = import_col_mem(collision, os.path.basename(file_name), False)
@@ -634,3 +638,4 @@ def import_dff(options):
     dff_importer.remove_doubles   = options['remove_doubles']
     
     dff_importer.import_dff(options['file_name'])
+    return dff_importer.version
