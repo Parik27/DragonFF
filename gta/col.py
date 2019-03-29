@@ -279,6 +279,13 @@ class coll:
             verts_count = (shadow_faces_offset - shadow_verts_offset) // 6
             model.shadow_verts += self.__read_block(TVertex, verts_count)
 
+            for i, vertex in enumerate(model.shadow_verts):
+                model.shadow_verts[i] = (
+                    vertex.x / 128,
+                    vertex.y / 128,
+                    vertex.z / 128
+                )
+            
             # Faces
             self._pos = shadow_faces_offset + 4
             model.shadow_faces += self.__read_block(TFace, shadow_mesh_face_count)
