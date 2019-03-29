@@ -67,6 +67,7 @@ class dff_importer:
     current_collection = None
     use_mat_split      = False
     remove_doubles     = False
+    group_materials    = False
     version            = ""
 
     __slots__ = [
@@ -96,6 +97,7 @@ class dff_importer:
         self.file_name = ""
         self.skin_data = {}
         self.bones = {}
+        self.materials = {}
 
     #######################################################
     # TODO: Cyclomatic Complexity too high
@@ -227,6 +229,11 @@ class dff_importer:
         # Refactored
         for index, material in enumerate(geometry.materials):
 
+            # Check for equal materials
+            if self.group_materials and hash(material) in self.materials:
+                mesh.materials.append(self.materials[hash(material)])
+                continue
+            
             # Generate a nice name with index and frame
             name = "%s.%d" % (frame.name, index)
 
@@ -318,7 +325,10 @@ class dff_importer:
                 
             # Add imported material to the object
             mesh.materials.append(helper.material)
-                
+
+            # Add imported material to lookup table for similar materials
+            if self.group_materials:
+                self.materials[hash(material)] = helper.material
 
     #######################################################
     def construct_bone_dict():
@@ -636,6 +646,7 @@ def import_dff(options):
     dff_importer.use_bone_connect = options['connect_bones']
     dff_importer.use_mat_split    = options['use_mat_split']
     dff_importer.remove_doubles   = options['remove_doubles']
+    dff_importer.group_materials  = options['group_materials']
     
     dff_importer.import_dff(options['file_name'])
     return dff_importer.version

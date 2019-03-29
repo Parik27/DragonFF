@@ -215,6 +215,10 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         default     = True
     )
 
+    group_materials =  bpy.props.BoolProperty(
+        name        = "Group Similar Materials",
+        default     = True
+    )
     
     image_ext = bpy.props.EnumProperty(
         items =
@@ -245,6 +249,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         
         layout.prop(self, "read_mat_split")
         layout.prop(self, "remove_doubles")
+        layout.prop(self, "group_materials")
         
     #######################################################
     def execute(self, context):
@@ -266,6 +271,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'connect_bones'  : self.connect_bones,
                         'use_mat_split'  : self.read_mat_split,
                         'remove_doubles' : self.remove_doubles,
+                        'group_materials': self.group_materials
                     }
                 )
 

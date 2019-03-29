@@ -280,12 +280,12 @@ class Material:
     def __init__(self):
 
         self.flags              = None
-        self.color             = None
+        self.color              = None
         self.is_textured        = None
         self.surface_properties = None
         self.textures           = []
         self.plugins            = {}
-        self._hasMatFX         = False #Used only internally for export
+        self._hasMatFX          = False #Used only internally for export
     
     #######################################################
     def from_mem(data):
@@ -301,7 +301,7 @@ class Material:
             self.surface_properties = Sections.read(GeomSurfPro, data, 16)
 
         self.flags       = array_data[0]
-        self.color      = array_data[1]
+        self.color       = array_data[1]
         self.is_textured = array_data[3]
         self.textures    = []
         self.plugins     = {}
@@ -444,6 +444,10 @@ class Material:
 
         data += Sections.write_chunk(self.plugins_to_mem(), types["Extension"])
         return Sections.write_chunk(data, types["Material"])
+
+    #######################################################
+    def __hash__(self):
+        return hash(self.to_mem())
                 
 #######################################################
 class Frame:
@@ -1902,18 +1906,4 @@ class dff:
             
     #######################################################
     def __init__(self):
-        
         self.clear()
-
-# Test (remove) - only in case I forgot to remove the code
-if __name__ == "__main__":
-    test = dff()
-    test.load_file("/home/parik/Downloads/at400-def.dff")
-    for entry in test.ext_2dfx.entries:
-        attrs = vars(entry)
-        print(',\n'.join("%s => %s" % item for item in attrs.items()))
-        print("\n\n")
-    for entry in test.ext_2dfx.entries:
-        attrs = vars(entry)
-        print(',\n'.join("%s => %s" % item for item in attrs.items()))
-        print("\n\n")
