@@ -898,7 +898,7 @@ class PedAttractor2dfx:
 
     #######################################################
     def from_mem(loc, data, offset, size):
-        self = PedAttractor2dfx()
+        self = PedAttractor2dfx(loc)
 
         self.type = unpack_from("<I", data, offset)[0]
         self.rotation_matrix = Sections.read(Matrix, data, offset + 4)
