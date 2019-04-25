@@ -287,7 +287,7 @@ class dff_exporter:
         return a @ b
     
     #######################################################
-    def create_frame(obj, append=True):
+    def create_frame(obj, append=True, set_parent=True):
         self = dff_exporter
         
         frame       = dff.Frame()
@@ -315,8 +315,9 @@ class dff_exporter:
 
         id_array = self.bones if is_bone else self.frames
         
-        if obj.parent is not None:
-            frame.parent = id_array[obj.parent.name]
+        if set_parent and obj.parent is not None:
+            frame.parent = id_array[obj.parent.name]            
+            
 
         id_array[obj.name] = frame_index
 
@@ -373,13 +374,21 @@ class dff_exporter:
         
         bones = armature.data.bones
         skin.num_bones = len(bones)
-        
-        for bone in bones:
+
+        bone_groups = {} # This variable will store the bone groups
+                         # to export keyed by their indices
+                         
+        for index, bone in enumerate(bones):
             matrix = bone.matrix_local.inverted().transposed()
             skin.bone_matrices.append(
                 matrix
             )
+            try:
+                bone_groups[obj.vertex_groups[bone.name].index] = index
 
+            except KeyError:
+                pass
+            
         # Set vertex group weights
         for vertex in mesh.vertices:
             skin.vertex_bone_indices.append([0,0,0,0])
@@ -387,10 +396,13 @@ class dff_exporter:
             for index, group in enumerate(vertex.groups):
 
                 # Only upto 4 vertices per group are supported
-                if index > 4:
+                if index >= 4:
                     break
-                skin.vertex_bone_indices[-1][index] = group.group
-                skin.vertex_bone_weights[-1][index] = group.weight
+                
+                if group.group in bone_groups:
+                    skin.vertex_bone_indices[-1][index] = bone_groups[group.group]
+                    skin.vertex_bone_weights[-1][index] = group.weight
+                    
         return skin
 
     #######################################################
@@ -627,7 +639,20 @@ class dff_exporter:
             depth += 1
 
         return depth        
+
+    #######################################################
+    def check_armature_parent(obj):
+
+        # This function iterates through all modifiers of the parent's modifier,
+        # and check if its parent has an armature modifier set to obj.
         
+        for modifier in obj.parent.modifiers:
+            if modifier.type == 'ARMATURE':
+                if modifier.object == obj:
+                    return True
+
+        return False
+    
     #######################################################
     def export_armature(obj):
         self = dff_exporter
