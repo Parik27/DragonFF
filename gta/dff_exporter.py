@@ -445,7 +445,13 @@ class dff_exporter:
         if bpy.app.version < (2, 80, 0):
             mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
         else:
-            mesh = obj.to_mesh(bpy.context.depsgraph, True)
+            
+            try:
+                depsgraph = bpy.context.depsgraph #Blender 2.8 Beta
+            except AttributeError:
+                depsgraph = bpy.context.evaluated_depsgraph_get() # New Blender 2.8
+                
+            mesh = obj.to_mesh(depsgraph, True)
 
         # Re enable disabled modifiers
         for modifier in disabled_modifiers:
