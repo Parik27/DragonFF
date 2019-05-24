@@ -448,10 +448,11 @@ class dff_exporter:
             
             try:
                 depsgraph = bpy.context.depsgraph #Blender 2.8 Beta
-            except AttributeError:
-                depsgraph = bpy.context.evaluated_depsgraph_get() # New Blender 2.8
+                mesh = obj.to_mesh(depsgraph, True)
                 
-            mesh = obj.to_mesh(depsgraph, True)
+            except AttributeError:
+                mesh = obj.to_mesh()
+            
 
         # Re enable disabled modifiers
         for modifier in disabled_modifiers:
