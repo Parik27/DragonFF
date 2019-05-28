@@ -554,7 +554,7 @@ class dff_importer:
                 # Set empty display properties to something decent
                 if mesh is None:
                     self.set_empty_draw_properties(obj)                        
-
+                    
                 # Set vertex groups
                 if index in self.skin_data:
                     self.set_vertex_groups(obj, self.skin_data[index])

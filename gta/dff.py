@@ -86,6 +86,7 @@ types = {
     "Material Effects PLG"    : 288,
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
+    "Pipeline Set"            : 39056115,
     "Specular Material"       : 39056118,
     "2d Effect"               : 39056120,
     "Extra Vert Color"        : 39056121,
@@ -1018,6 +1019,7 @@ class Geometry:
         'materials',
         'extensions',
         'export_flags',
+        'pipeline',
         '_hasMatFX'
     ]
     
@@ -1035,13 +1037,15 @@ class Geometry:
         self.normals            = []
         self.materials          = []
         self.extensions         = {}
+        self.pipeline           = None
 
         # used for export
         self.export_flags = {
             "light"              : True,
             "modulate_color"     : True,
-            "export_normals"     : True
-            }
+            "export_normals"     : True,
+            "write_mesh_plg"     : True
+        }
         self._hasMatFX = False
 
     #######################################################
@@ -1146,6 +1150,30 @@ class Geometry:
         return Sections.write_chunk(data, types["Material List"])
 
     #######################################################
+    # TODO: Triangle Strips support
+    # TODO: OpenGL support
+    def write_bin_split(self):
+        
+        data = b''
+        
+        meshes = {}
+
+        for triangle in self.triangles:
+            
+            if triangle.material not in meshes:
+                meshes[triangle.material] = []
+                
+            meshes[triangle.material] += [triangle.a, triangle.b, triangle.c]
+
+        data += pack("<III", 0, len(meshes), len(self.triangles) * 3)
+        
+        for mesh in meshes:
+            data += pack("<II", len(meshes[mesh]), mesh)
+            data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
+
+        return Sections.write_chunk(data, types["Bin Mesh PLG"])
+    
+    #######################################################
     def extensions_to_mem(self, extra_extensions = []):
 
         data = b''
@@ -1156,6 +1184,10 @@ class Geometry:
         # Write extra extensions
         for extra_extension in extra_extensions:
             data += extra_extension.to_mem()
+
+        # Write Bin Mesh PLG
+        if self.export_flags['write_mesh_plg']:
+            data += self.write_bin_split()
             
         return Sections.write_chunk(data, types["Extension"])
         
@@ -1684,16 +1716,26 @@ class dff:
     def read_atomic(self, parent_chunk):
 
         chunk_end = self.pos + parent_chunk.size
-        while True:
+        
+        atomic = None
+        pipeline = None
+        
+        while self.pos < chunk_end:
             chunk = self.read_chunk()
 
             # STRUCT
             if chunk.type == types["Struct"]:
                 atomic = Sections.read(Atomic, self.data, self.pos)
                 self.atomic_list.append(atomic)
-                break
 
-        self.pos = chunk_end
+            if chunk.type == types["Pipeline Set"]:
+                pipeline = unpack_from("<I", self.data, self.pos)
+                
+            self.pos += chunk.size
+
+        # Set geometry's pipeline
+        if pipeline and atomic:
+            self.geometry_list[atomic.geometry].pipeline = pipeline
 
     #######################################################
     def read_clump(self, root_chunk):
