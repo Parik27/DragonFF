@@ -560,7 +560,7 @@ class dff_exporter:
             
             if has_night_colors:
                 night_cols = dff.ExtraVertColorExtension(
-                    [dff.RGBA(255,255,255,255)] * len(mesh.verts)
+                    [dff.RGBA(255,255,255,255)] * len(mesh.vertices)
                 )
         
         for loop in mesh.loops:
