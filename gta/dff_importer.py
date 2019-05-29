@@ -113,6 +113,12 @@ class dff_importer:
             mesh = bpy.data.meshes.new(frame.name)
             bm   = bmesh.new()
 
+            # Temporary Custom Properties that'll be used to set Object properties
+            # later.
+            mesh['dragon_normals'] = False
+            mesh['dragon_pipeline'] = 'NONE'
+            mesh['dragon_cust_pipeline'] = None
+
             uv_layers = []
             
             # Vertices
@@ -195,6 +201,18 @@ class dff_importer:
 
                 mesh.normals_split_custom_set(normals)
                 mesh.use_auto_smooth = True
+                mesh['dragon_normals'] = True
+
+            # Set pipeline
+            if geom.pipeline is not None:
+                
+                pipeline = "0x%X" % (geom.pipeline)
+
+                if pipeline in ["0x53F20098", "0x53F2009A"]:
+                    mesh['dragon_pipeline'] = pipeline
+                else:
+                    mesh['dragon_pipeline'] = "CUSTOM"
+                    mesh['dragon_cust_pipeline'] = pipeline
                 
             mesh.update()
 
@@ -554,6 +572,19 @@ class dff_importer:
                 # Set empty display properties to something decent
                 if mesh is None:
                     self.set_empty_draw_properties(obj)                        
+
+                else:
+                    # Set object properties from mesh properties
+                    obj.dff.pipeline       = mesh['dragon_pipeline']
+                    obj.dff.export_normals = mesh['dragon_normals']
+
+                    if obj.dff.pipeline == 'CUSTOM':
+                        obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
+                    
+                    # Delete temporary properties used earlier
+                    del mesh['dragon_pipeline'      ]
+                    del mesh['dragon_normals'       ]
+                    del mesh['dragon_cust_pipeline' ]
                     
                 # Set vertex groups
                 if index in self.skin_data:

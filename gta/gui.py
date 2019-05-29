@@ -514,17 +514,29 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
             icon = "ERROR" if col.alert else "NONE"
 
             col.prop(settings, "custom_pipeline", icon=icon, text="Custom Pipeline")
-        
+        box.prop(settings, "export_normals", text="Export Normals")
+        box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
+
+            
         properties = [         
-            ["export_normals", "Export Normals"],
-            ["uv_map1", "UV Map 1"],
-            ["uv_map2", "UV Map 2"],
             ["day_cols", "Day Vertex Colours"],
             ["night_cols", "Night Vertex Colours"],
         ]
 
+        box = layout.box()
+        box.label(text="Export Vertex Colours")
+        
         for property in properties:
-            layout.prop(settings, property[0], text=property[1])
+            box.prop(settings, property[0], text=property[1])
+
+        box = layout.box()
+        box.label(text="Export UV Maps")
+
+        box.prop(settings, "uv_map1", text="UV Map 1")
+
+        # Second UV Map can only be disabled if the first UV map is enabled.
+        if settings.uv_map1:
+            box.prop(settings, "uv_map2", text="UV Map 2")
     
     #######################################################
     def draw_obj_menu(self, context):
@@ -641,14 +653,41 @@ class DFFObjectProps(bpy.types.PropertyGroup):
                 'Night Vertex Colors (0x53F2009C)'
             ),
             ('CUSTOM', 'Custom Pipeline', 'Set a different pipeline')
-        )
+        ),
+        name="Pipeline",
+        description="Select the Engine rendering pipeline"
     )
-    custom_pipeline = bpy.props.StringProperty()
-    export_normals = bpy.props.BoolProperty()
-    uv_map1 = bpy.props.BoolProperty()
-    uv_map2 = bpy.props.BoolProperty()
-    day_cols = bpy.props.BoolProperty()
-    night_cols = bpy.props.BoolProperty()
+    custom_pipeline = bpy.props.StringProperty(name="Custom Pipeline")
+    
+    export_normals = bpy.props.BoolProperty(
+        default=True,
+        description="Whether Normals will be exported. (Disable for Map objects)"
+    )
+    
+    uv_map1 = bpy.props.BoolProperty(
+        default=True,
+        description="First UV Map will be exported")
+    
+    uv_map2 = bpy.props.BoolProperty(
+        default=True,
+        description="Second UV Map will be exported"
+    )
+    
+    day_cols = bpy.props.BoolProperty(
+        default=True,
+        description="Whether Day Vertex Prelighting Colours will be exported"
+    )
+    
+    night_cols = bpy.props.BoolProperty(
+        default=True,
+        description="Extra prelighting colours. (Tip: Disable export normals)"
+    )
+    
+    export_binsplit = bpy.props.BoolProperty(
+        default=True,
+        description="Enabling will increase file size, but will increase\
+compatibiility with DFF Viewers"
+    )
     
     
     #######################################################    

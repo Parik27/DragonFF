@@ -1728,9 +1728,11 @@ class dff:
                 atomic = Sections.read(Atomic, self.data, self.pos)
                 self.atomic_list.append(atomic)
 
+            if chunk.type == types["Extension"]:
+                self.pos -= chunk.size
+
             if chunk.type == types["Pipeline Set"]:
-                pipeline = unpack_from("<I", self.data, self.pos)
-                
+                pipeline = unpack_from("<I", self.data, self.pos)[0]               
             self.pos += chunk.size
 
         # Set geometry's pipeline
@@ -1872,19 +1874,26 @@ class dff:
     def write_atomic(self, atomic):
 
         data = Sections.write(Atomic, atomic, types["Struct"])
+        geometry = self.geometry_list[atomic.geometry]
         
         ext_data = b''
-        if "skin" in self.geometry_list[atomic.geometry].extensions:
+        if "skin" in geometry.extensions:
             ext_data += Sections.write_chunk(
                 pack("<II", 0x0116, 1),
                 types["Right to Render"]
             )
-        if self.geometry_list[atomic.geometry]._hasMatFX:
+        if geometry._hasMatFX:
             ext_data += Sections.write_chunk(
                 pack("<I", 1),
                 types["Material Effects PLG"]
             )
-            
+        if geometry.pipeline is not None:
+            ext_data += Sections.write_chunk(
+                pack("<I", geometry.pipeline),
+                types["Pipeline Set"]
+            )
+            pass
+        
         data += Sections.write_chunk(ext_data, types["Extension"])
         return Sections.write_chunk(data, types["Atomic"])
 
