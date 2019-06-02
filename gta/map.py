@@ -14,106 +14,229 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# Initially ported from OpenRW
+# https://github.com/rwengine/openrw/blob/master/rwengine/src/loaders/LoaderIPL.cpp
 
-#######################################################
-
-# Direct port of OpenRW's LoaderIPL.cpp ( https://github.com/rwengine/openrw/blob/master/rwengine/src/loaders/LoaderIPL.cpp )
-# Seems to only support model INSTances and ZONEs. Though I believe the
-# INSTances alone should give us enough info to import the entire maps
-# of III / VC / SA.
-
-import os 
 from enum import Enum
+from collections import namedtuple
+
+# Data types
+Section_INST = namedtuple("Section_INST"  , "id model posX posY posZ scaleX "+
+    "scaleY scaleZ rotX rotY rotZ rotW")
+Section_PICK = namedtuple("Section_PICK"  , "")
+Section_CULL = namedtuple("Section_CULL"  , "")
+Section_ZONE = namedtuple("Section_ZONE"  , "name type minX minY minZ maxX maxY "+
+    "maxZ island gangCarDensityDay gangCarDensityNight gangDensityDay"+
+    "gangDensityNight pedGroupDay pedGroupNight")
+Vector = namedtuple("Vector"			  , "x y z")
 
 #######################################################
-class SectionTypes(Enum):
-	INST = 1
-	PICK = 2
-	CULL = 3
-	ZONE = 4
-	NONE = 5
+class IPLSection: 
+
+    # Base for all IPL section classes
+    # Shares loop for reading individual lines inside of assigned
+    # section and calls readLine, which should be individually
+    # overriden by inheriting classes
+
+    #######################################################
+    def __init__(self, iplLoader):
+        self.iplLoader = iplLoader
+
+    #######################################################
+    def read(self, fileStream):
+
+        line = fileStream.readline().strip()
+        while line != "end":
+            self.readLine(line)
+            line = fileStream.readline().strip()
+
+    #######################################################
+    def readLine(self, line):
+        pass
+
+    #######################################################
+    def write(self):
+        pass
 
 #######################################################
-def loadIPL(filepath):
+class IPLSection_INST(IPLSection):
 
-	section = SectionTypes.NONE
+    #######################################################
+    def readLine(self, line):
 
-	with open(filepath) as fp:
+        # Split line and trim individual elements
+        array = [e.strip() for e in line.split(",")]
+        
+        # Convert list into the Section_INST namedTuple
+        data = Section_INST(*array)
+        self.iplLoader.inst_list.append(data)
 
-		line = fp.readline()
-		linesCount = 0
-		while line:
 
-			linesCount += 1
-			line = line.strip()
-			print("Line {}: {}".format(linesCount, line))
-			
-			if len(line) > 0 and line[0] == "#":
-				# Nothing, just a comment
-				pass
+#######################################################
+class IPLSection_ZONE(IPLSection):
 
-			elif line == "end":
-				# Terminating a section
-				section = SectionTypes.NONE
+    def readLine(self, line):
 
-			# Section definers
-			elif section == SectionTypes.NONE:
-				if line == "inst":
-					section = SectionTypes.INST
-				
-				if line == "pick":
-					section = SectionTypes.PICK
-				
-				if line == "cull":
-					section = SectionTypes.CULL
-				
-				if line == "zone":
-					section = SectionTypes.ZONE
-			
-			# Actual data
-			else :
-				if section == SectionTypes.INST:
+        # Split line and trim individual elements
+        array = [e.strip() for e in line.split(",")]
+        
+        # Convert list into the Section_ZONE namedTuple
+        data = Section_ZONE(*array)
+        self.iplLoader.zone_list.append(data)
 
-					params = line.split(",")
+#######################################################
+class IPLSection_PICK(IPLSection):
+    # TODO
+    pass
 
-					id =     params[0].strip()
-					model =  params[1].strip()
-					posX =   params[2].strip()
-					posY =   params[3].strip()
-					posZ =   params[4].strip()
-					scaleX = params[5].strip()
-					scaleY = params[6].strip()
-					scaleZ = params[7].strip()
-					rotX =   params[8].strip()
-					rotY =   params[9].strip()
-					rotZ =   params[10].strip()
-					rotW =   params[11].strip()
+#######################################################
+class IPLSection_CULL(IPLSection):
+    # TODO
+    pass
 
-					# TODO: Call for a dff/txd import with given coordinates
-					# or just save this model instance into memory and import
-					# everything later.
+#######################################################
+class IPL:
 
-					# TODO: We should probably create classes for objects in
-					# which we could store all these parameters.
+    #######################################################
+    def __init__(self):	
 
-				elif section == SectionTypes.ZONE:
+        self.inst_list = []
+        self.pickup_list = []
+        self.cull_list = []
+        self.zone_list = []
 
-					params = line.split(",")
+        self.sections = {
+            'inst': IPLSection_INST,
+            'pick': IPLSection_PICK,
+            'cull': IPLSection_CULL,
+            'zone': IPLSection_ZONE
+        }
 
-					name =   params[0].strip()
-					type =   params[1].strip()
-					minX =   params[2].strip()
-					minY =   params[3].strip()
-					minZ =   params[4].strip()
-					maxX =   params[5].strip()
-					maxY =   params[6].strip()
-					maxZ =   params[7].strip()
-					island = params[8].strip()
+        self.currentSectionName = None
 
-					# Gang spawn densities for this zone, apparently just arrays filled with zeroes at the moment...
-					gangCarDensityDay = gangCarDensityNight = gangDensityDay = gangDensityNight = [0] * 13
-					# Ped groups
-					pedGroupDay = 0
-					pedGroupNight = 0
-		
-			line = fp.readline()
+    #######################################################
+    def read(self, filename):
+
+        with open(filename) as fileStream:
+
+            line = fileStream.readline().strip()
+            while line:
+
+                # Read a section if we recognize it's name
+                if line in self.sections:
+                    section = self.sections[line](self)
+                    section.read(fileStream)
+
+                # Get next section
+                line = fileStream.readline().strip()
+
+    #######################################################
+    def printContents(self):
+        print(self.inst_list)
+        print(self.pickup_list)
+        print(self.cull_list)
+        print(self.zone_list)
+
+
+
+# Experimentals... for future reference
+
+# class IPLModel:
+# 	def __init__(self):
+# 		self.id = None
+# 		self.model = None
+# 		self.posX = 0
+# 		self.posY = 0
+# 		self.posZ = 0
+# 		self.scaleX = 1
+# 		self.scaleY = 1
+# 		self.scaleZ = 1
+# 		self.rotX = 0
+# 		self.rotY = 0
+# 		self.rotZ = 0
+# 		self.rotW = 1
+
+# class IPLZone:
+
+# 	zone_gang_count = 13
+
+# 	def __init__(self):
+# 		self.name = None
+# 		self.type = None
+# 		self.minX = 0
+# 		self.minY = 0
+# 		self.minZ = 0
+# 		self.maxX = 0
+# 		self.maxY = 0
+# 		self.maxZ = 0
+# 		self.island = None
+# 		self.gangCarDensityDay = [0] * IPLZone.zone_gang_count
+# 		self.gangCarDensityNight = [0] * IPLZone.zone_gang_count
+# 		self.gangDensityDay = [0] * IPLZone.zone_gang_count
+# 		self.gangDensityNight = [0] * IPLZone.zone_gang_count
+# 		self.pedGroupDay = 0
+# 		self.pedGroupNight = 0
+
+# class IPLSectionLoader_INST(IPLSectionLoaderBase):
+
+# 	def processLine(self, line):
+# 		params = line.split(",")
+
+# 		model = IPLModel()
+# 		model.id =     params[0].strip()
+# 		model.model =  params[1].strip()
+# 		model.posX =   params[2].strip()
+# 		model.posY =   params[3].strip()
+# 		model.posZ =   params[4].strip()
+# 		model.scaleX = params[5].strip()
+# 		model.scaleY = params[6].strip()
+# 		model.scaleZ = params[7].strip()
+# 		model.rotX =   params[8].strip()
+# 		model.rotY =   params[9].strip()
+# 		model.rotZ =   params[10].strip()
+# 		model.rotW =   params[11].strip()
+
+# 		self.iplLoader.inst_list.append(model)
+
+# class IPLSectionLoader_ZONE(IPLSectionLoaderBase):
+
+# 	def processLine(self, line):
+# 		params = line.split(",")
+
+# 		zone = IPLZone()
+# 		zone.name =   params[0].strip()
+# 		zone.type =   params[1].strip()
+# 		zone.minX =   params[2].strip()
+# 		zone.minY =   params[3].strip()
+# 		zone.minZ =   params[4].strip()
+# 		zone.maxX =   params[5].strip()
+# 		zone.maxY =   params[6].strip()
+# 		zone.maxZ =   params[7].strip()
+# 		zone.island = params[8].strip()
+
+# 		self.iplLoader.zone_list.append(zone)
+
+# class IPLSectionLoader_PICK(IPLSectionLoaderBase): pass
+
+# class IPLSectionLoader_CULL(IPLSectionLoaderBase): pass
+
+
+        # inst = IPLModel()
+        # inst.id =     params[0].strip()
+        # inst.model =  params[1].strip()
+        # inst.posX =   params[2].strip()
+        # inst.posY =   params[3].strip()
+        # inst.posZ =   params[4].strip()
+        # inst.scaleX = params[5].strip()
+        # inst.scaleY = params[6].strip()
+        # inst.scaleZ = params[7].strip()
+        # inst.rotX =   params[8].strip()
+        # inst.rotY =   params[9].strip()
+        # inst.rotZ =   params[10].strip()
+        # inst.rotW =   params[11].strip()
+
+        # lineData = Section_INST()
+        # for i in range(len(Section_INST)):
+        # 	lineData[i] = params[i]
+            
+        # self.iplLoader.inst_list.append(model)
