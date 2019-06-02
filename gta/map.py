@@ -120,8 +120,8 @@ class IPL:
             while line:
 
                 # Read a section if we recognize it's name
-                if line in self.sections:
-                    section = self.sections[line](self)
+                if line in IPL.sections:
+                    section = IPL.sections[line](self)
                     section.read(fileStream)
 
                 # Get next section
