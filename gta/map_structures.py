@@ -28,19 +28,20 @@ SA_structures = {}
 # MULT - couldn't confirm format
 
 # INST
-# Used to place objects in the world
+# Places objects defined in objs, tobj, anim or tanm into the world
 III_structures['inst'] = namedtuple("IPL_INST_3",  "id modelName posX posY posZ scaleX scaleY scaleZ rotX rotY rotZ rotW")
 VC_structures['inst'] =  namedtuple("IPL_INST_VC", "id modelName interior posX posY posZ scaleX scaleY scaleZ rotX rotY rotZ rotW")
 SA_structures['inst'] =  namedtuple("IPL_INST_SA", "id modelName interior posX posY posZ rotX rotY rotZ rotW lod")
 
 # CULL
-# Create a culling zone
+# Creates zones with special attributes
 III_structures['cull'] = namedtuple("IPL_CULL_3",      "centerX centerY centerZ lowerLeftX lowerLeftY lowerLeftZ upperRightX upperRightY upperRightZ flags wantedLevelDrop")
 VC_structures['cull'] =  namedtuple("IPL_CULL_VC",     "centerX centerY centerZ lowerLeftX lowerLeftY lowerLeftZ upperRightX upperRightY upperRightZ flags wantedLevelDrop")
 SA_structures['cull_1'] =  namedtuple("IPL_CULL_SA_1", "centerX centerY centerZ unknown1 widthY bottomZ widthX unknown2 topZ flag unknown3")
 SA_structures['cull_2'] =  namedtuple("IPL_CULL_SA_2", "centerX centerY centerZ unknown1 widthY bottomZ widthX unknown2 topZ flag Vx Vy Vz cm")
 
 # ZONE
+# Creates map, navigation, and info zones
 III_structures['zone'] = namedtuple("IPL_ZONE_3",  "name type x1 y1 z1 x2 y2 z2 level")
 VC_structures['zone'] =  namedtuple("IPL_ZONE_VC", "name type x1 y1 z1 x2 y2 z2 level")
 SA_structures['zone'] =  namedtuple("IPL_ZONE_SA", "name type x1 y1 z1 x2 y2 z2 level")
@@ -54,7 +55,7 @@ SA_structures['grge'] = namedtuple("IPL_GRGE_SA", "posX posY posZ lineX lineY cu
 SA_structures['enex'] = namedtuple("IPL_ENEX_SA", "x1 y1 z1 enterAngle sizeX sizeY sizeZ x2 y2 z2 exitAngle targetInterior flags name sky numPedsToSpawn timeOn timeOff")
 
 # PICK
-# Creates a weapon pickup
+# Creates pickups. This section exists in GTA III, GTA Vice City, and GTA IV, but is only functional in GTA San Andreas
 SA_structures['pick'] = namedtuple("IPL_PICK_SA", "id posX posY posZ")
 
 # JUMP
@@ -71,7 +72,7 @@ SA_structures['auzo_2'] = namedtuple("IPL_AUZO_SA_2", "name id switch x1 y1 z1 x
 SA_structures['cars'] = namedtuple("IPL_CARS_SA", "posX posY posZ angle carId primCol secCol forceSpawn alarm doorLock unknown1 unknown2")
 
 # OCCL
-# Creates zones for separated rendering
+# Creates occlusion zones for separated rendering
 VC_structures['occl'] = namedtuple("IPL_OCCL_VC", "midX midY bottomZ widthX widthY height rotation")
 SA_structures['occl'] = namedtuple("IPL_OCCL_SA", "midX midY bottomZ widthX widthY height rotation")
 
@@ -85,11 +86,10 @@ SA_structures['occl'] = namedtuple("IPL_OCCL_SA", "midX midY bottomZ widthX widt
 
 # Not present
 # PATH
-# TXDP
 # WEAP - couldn't confirm format, or even supporting games
 
 # OBJS
-# Used to define standard static map objects
+# Defines simple objects. They can be placed into the world through the inst section of the item placement files.
 III_structures['objs_1'] = namedtuple("IDE_OBJS_3_1",  "id modelName txdName drawDistance flags")
 III_structures['objs_2'] = namedtuple("IDE_OBJS_3_2",  "id modelName txdName meshCount drawDistance flags")
 III_structures['objs_3'] = namedtuple("IDE_OBJS_3_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags")
@@ -106,7 +106,9 @@ SA_structures['objs_3'] = namedtuple("IDE_OBJS_SA_3",  "id modelName txdName mes
 SA_structures['objs_4'] = namedtuple("IDE_OBJS_SA_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags")
 
 # TOBJ
-# Used to define timed map objects. All but the last two columns are the same as the OBJS section.
+# Defines time objects. The section functions similarly to objs but has two additional
+# parameters defining the in-game time range the object can get rendered. These objects
+# can be placed into the world through the inst section of the item placement files.
 III_structures['tobj_1'] = namedtuple("IDE_TOBJ_3_1",  "id modelName txdName drawDistance flags timeOn timeOff")
 III_structures['tobj_2'] = namedtuple("IDE_TOBJ_3_2",  "id modelName txdName meshCount drawDistance flags timeOn timeOff")
 III_structures['tobj_3'] = namedtuple("IDE_TOBJ_3_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags timeOn timeOff")
@@ -123,17 +125,19 @@ SA_structures['tobj_3'] =  namedtuple("IDE_TOBJ_SA_3",  "id modelName txdName me
 SA_structures['tobj_4'] =  namedtuple("IDE_TOBJ_SA_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags timeOn timeOff")
 
 # ANIM
-# Animated Map Objects
+# Defines animated objects. The section functions similarly to objs but has one
+# additional parameter indicating an IFP or WAD animation file to assign an
+# animation to the object. 
 SA_structures['anim'] = namedtuple("IDE_ANIM_SA", "id modelName textureName animName drawDist flags")
 
 # PEDS
-# Used to define characters and pedestrians
+# Defines pedestrian objects (random NPC's)
 III_structures['peds'] = namedtuple("IDE_PEDS_3",  "id modelName txdName pedType behavior animGroup vehClass")
 VC_structures['peds'] =  namedtuple("IDE_PEDS_VC", "id modelName txdName pedType behavior animGroup vehClass animfile radio1 radio2")
 SA_structures['peds'] =  namedtuple("IDE_PEDS_SA", "id modelName txdName pedType behavior animGroup vehClass flags animfile radio1 radio2 voiceArchive voice1 voice2")
 
 # CARS
-# Used to define vehicles
+# Defines vehicle objects
 # See: https://www.grandtheftwiki.com/CARS_(IDE_Section)
 III_structures['cars_boat'] =  namedtuple("IDE_CARS_3_BOAT",  "id modelName txdName type handlingId gameName vehicleClass frequency level compRules")
 III_structures['cars_train'] = namedtuple("IDE_CARS_3_TRAIN", "id modelName txdName type handlingId gameName vehicleClass frequency level compRules")
@@ -150,7 +154,7 @@ VC_structures['cars_bike'] =   namedtuple("IDE_CARS_VC_BIKE",  "id modelName txd
 SA_structures['cars'] =        namedtuple("IDE_CARS_SA", "id modelName txdName type handlingId gameName anims vehicleClass frequency flags comprules wheelId wheelScaleFront wheelScaleRear unknownValue")
 
 # HIER
-# Used to define cutscene objects
+# Defines clump objects for use in cutscenes
 SA_structures['hier'] = namedtuple("IDE_HIER_SA", "id modelName txdName")
 
 # TXDP
