@@ -21,78 +21,11 @@ from enum import Enum
 from collections import namedtuple
 
 # Data types
-Section_INST = namedtuple("Section_INST"  , "id model posX posY posZ scaleX "+
-    "scaleY scaleZ rotX rotY rotZ rotW")
-Section_PICK = namedtuple("Section_PICK"  , "")
-Section_CULL = namedtuple("Section_CULL"  , "")
-Section_ZONE = namedtuple("Section_ZONE"  , "name type minX minY minZ maxX maxY "+
-    "maxZ island gangCarDensityDay gangCarDensityNight gangDensityDay"+
-    "gangDensityNight pedGroupDay pedGroupNight")
-Vector = namedtuple("Vector"			  , "x y z")
+# IPL and IDE section formats taken from
+# gta.fandom.com/wiki/Item_Placement
+# gta.fandom.com/wiki/IDE
 
-#######################################################
-class IPLSection: 
-
-    # Base for all IPL section classes
-    # Shares loop for reading individual lines inside of assigned
-    # section and calls readLine, which should be individually
-    # overriden by inheriting classes
-
-    #######################################################
-    def __init__(self, iplLoader):
-        self.iplLoader = iplLoader
-
-    #######################################################
-    def read(self, fileStream):
-
-        line = fileStream.readline().strip()
-        while line != "end":
-            self.readLine(line)
-            line = fileStream.readline().strip()
-
-    #######################################################
-    def readLine(self, line):
-        pass
-
-    #######################################################
-    def write(self):
-        pass
-
-#######################################################
-class IPLSection_INST(IPLSection):
-
-    #######################################################
-    def readLine(self, line):
-
-        # Split line and trim individual elements
-        array = [e.strip() for e in line.split(",")]
-        
-        # Convert list into the Section_INST namedTuple
-        data = Section_INST(*array)
-        self.iplLoader.inst_list.append(data)
-
-
-#######################################################
-class IPLSection_ZONE(IPLSection):
-
-    def readLine(self, line):
-
-        # Split line and trim individual elements
-        array = [e.strip() for e in line.split(",")]
-        
-        # Convert list into the Section_ZONE namedTuple
-        data = Section_ZONE(*array)
-        self.iplLoader.zone_list.append(data)
-
-#######################################################
-class IPLSection_PICK(IPLSection):
-    # TODO
-    pass
-
-#######################################################
-class IPLSection_CULL(IPLSection):
-    # TODO
-    pass
+Vector = namedtuple("Vector", "x y z")
 
 #######################################################
 class IPL:
@@ -133,3 +66,68 @@ class IPL:
         print(self.pickup_list)
         print(self.cull_list)
         print(self.zone_list)
+
+#######################################################
+class RWUtility: 
+
+    # Base for all IPL / IDE section reader / writer classes
+    # readLine should be overridden by inheriting classes,
+    # parsing the provided parameters appropriately according
+    # to the individual section type
+
+    #######################################################
+    def __init__(self, iplObject):
+        self.iplObject = iplObject
+
+    #######################################################
+    def read(self, fileStream):
+
+        line = fileStream.readline().strip()
+        while line != "end":
+
+            # Split line and trim individual elements
+            lineParams = [e.strip() for e in line.split(",")]
+
+            # Call a specific readLine override
+            self.readLine(lineParams)
+
+            # Read next line
+            line = fileStream.readline().strip()
+
+    #######################################################
+    def readLine(self, line):
+        pass
+
+    #######################################################
+    def write(self):
+        pass
+
+#######################################################
+class IPLSection_INST(RWUtility):
+
+    #######################################################
+    def readLine(self, lineParams):
+
+        # Convert list into the Section_INST namedTuple
+        data = Section_INST(*lineParams)
+        self.iplObject.inst_list.append(data)
+
+
+#######################################################
+class IPLSection_ZONE(RWUtility):
+
+    def readLine(self, line):
+
+        # Convert list into the Section_ZONE namedTuple
+        data = Section_ZONE(*lineParams)
+        self.iplObject.zone_list.append(data)
+
+#######################################################
+class IPLSection_PICK(IPLSection):
+    # TODO
+    pass
+
+#######################################################
+class IPLSection_CULL(IPLSection):
+    # TODO
+    pass
