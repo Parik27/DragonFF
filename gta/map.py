@@ -14,120 +14,112 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Initially ported from OpenRW
-# https://github.com/rwengine/openrw/blob/master/rwengine/src/loaders/LoaderIPL.cpp
-
 from enum import Enum
+import os.path
 from collections import namedtuple
+from map_structures import III_structures, VC_structures, SA_structures
 
 # Data types
-# IPL and IDE section formats taken from
-# gta.fandom.com/wiki/Item_Placement
-# gta.fandom.com/wiki/IDE
-
 Vector = namedtuple("Vector", "x y z")
 
+# List of IPL/IDE sections which require a section utility that's different
+# from the default one. E.g. sections with variable number of parameters in
+# their data structures
+specialSections = [
+    'objs': OBJSSectionUtility,
+    'tobj': TOBJSectionUtility
+]
+
+# Utility for reading / writing to map data files (.IPL, .IDE)
+# Returns a dictionary of sections found in the given file
 #######################################################
-class IPL:
-
-    sections = {
-        'inst': IPLSection_INST,
-        'pick': IPLSection_PICK,
-        'cull': IPLSection_CULL,
-        'zone': IPLSection_ZONE
-    }
+class MapDataUtility:
 
     #######################################################
-    def __init__(self):	
-        self.inst_list = []
-        self.pickup_list = []
-        self.cull_list = []
-        self.zone_list = []
+    def read(filename, dataStructures):
 
-    #######################################################
-    def read(self, filename):
+        if not os.path.exists(filename):
+            print("MapDataUtility error: File not found")
+            return {}
+
+        # File sections
+        sections = {}
 
         with open(filename) as fileStream:
 
+            # Read the file
             line = fileStream.readline().strip()
             while line:
-
+                
                 # Read a section if we recognize it's name
-                if line in IPL.sections:
-                    section = IPL.sections[line](self)
-                    section.read(fileStream)
+                if line in dataStructures:
+                    
+                    sectionName = line
+                    if sectionName in specialSections:
+                        # Section requires some special reading / writing procedures
+                        sectionUtility = specialSections[sectionName](dataStructures[sectionName])
+                    else
+                        # Section is generic, can be read / written to with the default utility
+                        sectionUtility = GenericSectionUtility(dataStructures[sectionName])
+
+                    # Read section
+                    sections[sectionName].read(fileStream)
 
                 # Get next section
                 line = fileStream.readline().strip()
+        
+        return sections
 
-    #######################################################
-    def printContents(self):
-        print(self.inst_list)
-        print(self.pickup_list)
-        print(self.cull_list)
-        print(self.zone_list)
-
+# Base for all IPL / IDE section reader / writer classes
 #######################################################
-class RWUtility: 
+class GenericSectionUtility: 
 
-    # Base for all IPL / IDE section reader / writer classes
-    # readLine should be overridden by inheriting classes,
-    # parsing the provided parameters appropriately according
-    # to the individual section type
+    def __init__(self, sectionDataStructure):
+        self.sectionDataStructure = sectionDataStructure
 
     #######################################################
-    def __init__(self, iplObject):
-        self.iplObject = iplObject
+    def read(fileStream):
 
-    #######################################################
-    def read(self, fileStream):
+        # Section entries
+        entries = []
 
+        # Read the entire section
         line = fileStream.readline().strip()
         while line != "end":
 
             # Split line and trim individual elements
             lineParams = [e.strip() for e in line.split(",")]
-
-            # Call a specific readLine override
-            self.readLine(lineParams)
-
+            # Read the line
+            entries.append(self.readLine(lineParams))
             # Read next line
             line = fileStream.readline().strip()
 
+        return entries
+
     #######################################################
-    def readLine(self, line):
-        pass
+    def readLine(line):
+
+        # Number of list elements and namedTuple fileds
+        # must match.
+        if(len(self.sectionDataStructure._fields) != len(lineParams)):
+            print("GenericSectionUtility error: Number of line parameters doesn't match the number of structure fields.")
+            print("Section name: " + self.sectionDataStructure.__name__)
+            print("Section structure: " + self.sectionDataStructure._fields)
+            print("Line parameters: " + lineParams)
+            return None
+
+        # Convert the parameter list into the appropriate
+        # data structure's namedTuple.
+        return self.sectionDataStructure(*lineParams)
 
     #######################################################
     def write(self):
         pass
 
-#######################################################
-class IPLSection_INST(RWUtility):
+class OBJSSectionUtility: 
+    def readLine(line):
+        pass
 
-    #######################################################
-    def readLine(self, lineParams):
-
-        # Convert list into the Section_INST namedTuple
-        data = Section_INST(*lineParams)
-        self.iplObject.inst_list.append(data)
-
-
-#######################################################
-class IPLSection_ZONE(RWUtility):
-
-    def readLine(self, line):
-
-        # Convert list into the Section_ZONE namedTuple
-        data = Section_ZONE(*lineParams)
-        self.iplObject.zone_list.append(data)
-
-#######################################################
-class IPLSection_PICK(IPLSection):
-    # TODO
-    pass
-
-#######################################################
-class IPLSection_CULL(IPLSection):
-    # TODO
-    pass
+class TOBJSectionUtility: 
+    def readLine(line):
+        pass
