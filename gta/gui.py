@@ -453,7 +453,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
     #######################################################
     def draw(self, context):
 
-        if not context.material.dff:
+        if not context.material or not context.material.dff:
             return
         
         if context.material.dff.is_col_material:
