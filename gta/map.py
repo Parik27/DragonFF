@@ -14,112 +14,145 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from enum import Enum
-import os.path
+import map_structures
 from collections import namedtuple
-from map_structures import III_structures, VC_structures, SA_structures
 
 # Data types
 Vector = namedtuple("Vector", "x y z")
-
-# List of IPL/IDE sections which require a section utility that's different
-# from the default one. E.g. sections with variable number of parameters in
-# their data structures
-specialSections = [
-    'objs': OBJSSectionUtility,
-    'tobj': TOBJSectionUtility
-]
-
-# Utility for reading / writing to map data files (.IPL, .IDE)
-# Returns a dictionary of sections found in the given file
-#######################################################
-class MapDataUtility:
-
-    #######################################################
-    def read(filename, dataStructures):
-
-        if not os.path.exists(filename):
-            print("MapDataUtility error: File not found")
-            return {}
-
-        # File sections
-        sections = {}
-
-        with open(filename) as fileStream:
-
-            # Read the file
-            line = fileStream.readline().strip()
-            while line:
-                
-                # Read a section if we recognize it's name
-                if line in dataStructures:
-                    
-                    sectionName = line
-                    if sectionName in specialSections:
-                        # Section requires some special reading / writing procedures
-                        sectionUtility = specialSections[sectionName](dataStructures[sectionName])
-                    else
-                        # Section is generic, can be read / written to with the default utility
-                        sectionUtility = GenericSectionUtility(dataStructures[sectionName])
-
-                    # Read section
-                    sections[sectionName].read(fileStream)
-
-                # Get next section
-                line = fileStream.readline().strip()
-        
-        return sections
 
 # Base for all IPL / IDE section reader / writer classes
 #######################################################
 class GenericSectionUtility: 
 
-    def __init__(self, sectionDataStructure):
-        self.sectionDataStructure = sectionDataStructure
+    def __init__(self, sectionName, dataStructures):
+        self.sectionName = sectionName
+        self.dataStructures = dataStructures
 
     #######################################################
-    def read(fileStream):
+    def read(self, fileStream):
 
-        # Section entries
         entries = []
 
-        # Read the entire section
         line = fileStream.readline().strip()
         while line != "end":
 
             # Split line and trim individual elements
             lineParams = [e.strip() for e in line.split(",")]
-            # Read the line
-            entries.append(self.readLine(lineParams))
-            # Read next line
-            line = fileStream.readline().strip()
+
+            # Get the correct data structure for this section entry
+            dataStructure = self.getDataStructure(lineParams)
+
+            # Validate data structure
+            if(dataStructure == None):
+                print(type(self).__name__+" error: No appropriate data structure found")
+                print("    Section name: " + self.sectionName)
+                print("    Line parameters: " + str(lineParams))
+            elif(len(dataStructure._fields) != len(lineParams)):
+                print(
+                    type(self).__name__+" error: Number of line parameters "
+                    "doesn't match the number of structure fields."
+                )
+                print("    Section name: " + self.sectionName)
+                print("    Data structure name: " + dataStructure.__name__)
+                print("    Data structure: " + str(dataStructure._fields))
+                print("    Line parameters: " + str(lineParams))
+            else:
+                # Add entry
+                entries.append(dataStructure(*lineParams))
+                # Read next line
+                line = fileStream.readline().strip()
 
         return entries
 
-    #######################################################
-    def readLine(line):
-
-        # Number of list elements and namedTuple fileds
-        # must match.
-        if(len(self.sectionDataStructure._fields) != len(lineParams)):
-            print("GenericSectionUtility error: Number of line parameters doesn't match the number of structure fields.")
-            print("Section name: " + self.sectionDataStructure.__name__)
-            print("Section structure: " + self.sectionDataStructure._fields)
-            print("Line parameters: " + lineParams)
-            return None
-
-        # Convert the parameter list into the appropriate
-        # data structure's namedTuple.
-        return self.sectionDataStructure(*lineParams)
+    def getDataStructure(self, lineParams):
+        return self.dataStructures[self.sectionName]
 
     #######################################################
     def write(self):
         pass
 
-class OBJSSectionUtility: 
-    def readLine(line):
-        pass
+#######################################################
+class OBJSSectionUtility(GenericSectionUtility):
+    def getDataStructure(self, lineParams):
 
-class TOBJSectionUtility: 
-    def readLine(line):
-        pass
+        if(len(lineParams) == 5):
+            dataStructure = self.dataStructures["objs_1"]
+        elif(len(lineParams) == 6):
+            dataStructure = self.dataStructures["objs_2"]
+        elif(len(lineParams) == 7):
+            dataStructure = self.dataStructures["objs_3"]
+        elif(len(lineParams) == 8):
+            dataStructure = self.dataStructures["objs_4"]
+        else:
+            print(type(self).__name__ + " error: Unknown number of line parameters")
+            dataStructure = None
+        
+        return dataStructure
+
+#######################################################
+class TOBJSectionUtility(GenericSectionUtility):
+    def getDataStructure(self, lineParams):
+
+        if(len(lineParams) == 7):
+            dataStructure = self.dataStructures["tobj_1"]
+        elif(len(lineParams) == 8):
+            dataStructure = self.dataStructures["tobj_2"]
+        elif(len(lineParams) == 9):
+            dataStructure = self.dataStructures["tobj_3"]
+        elif(len(lineParams) == 10):
+            dataStructure = self.dataStructures["tobj_4"]
+        else:
+            print(type(self).__name__ + " error: Unknown number of line parameters")
+            dataStructure = None
+        
+        return dataStructure
+
+#######################################################
+class CARSSectionUtility(GenericSectionUtility):
+    def getDataStructure(self, lineParams):
+        print("'cars' aren't yet implemented boi")
+
+
+# List of IPL/IDE sections which require a section utility that's different
+# from the default one.
+specialSections = {
+    'objs': OBJSSectionUtility,
+    'tobj': TOBJSectionUtility,
+    'cars': CARSSectionUtility
+}
+
+# Utility for reading / writing to map data files (.IPL, .IDE)
+#######################################################
+class MapDataUtility:
+
+    # Returns a dictionary of sections found in the given file
+    #######################################################
+    def read(filename, dataStructures):
+
+        print('\nMapDataUtility reading: ' + filename)
+
+        sections = {}
+
+        with open(filename) as fileStream:
+            line = fileStream.readline().strip()
+            while line:
+
+                # Presume we have a section start
+                sectionName = line
+                sectionUtility = None
+
+                if line in specialSections:
+                    # Section requires some special reading / writing procedures
+                    sectionUtility = specialSections[sectionName](sectionName, dataStructures)
+                elif line in dataStructures:
+                    # Section is generic, can be read / written to with the default utility
+                    sectionUtility = GenericSectionUtility(sectionName, dataStructures)
+
+                if sectionUtility != None:
+                    sections[sectionName] = sectionUtility.read(fileStream)
+                    print(sectionName + ': ' + str(len(sections[sectionName])) + ' entries')
+
+                # Get next section
+                line = fileStream.readline().strip()
+        
+        return sections

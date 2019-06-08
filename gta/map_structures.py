@@ -19,13 +19,13 @@ SA_structures = {}
 #############
 
 # Sources
+# https://gtamods.com/wiki/Item_Placement
 # https://www.grandtheftwiki.com/Item_Placement
 # https://gta.fandom.com/wiki/Item_Placement
 
-# Not present
+# Known missing:
 # PATH
-# TCYC - couldn't confirm format
-# MULT - couldn't confirm format
+# MULT
 
 # INST
 # Places objects defined in objs, tobj, anim or tanm into the world
@@ -76,17 +76,20 @@ SA_structures['cars'] = namedtuple("IPL_CARS_SA", "posX posY posZ angle carId pr
 VC_structures['occl'] = namedtuple("IPL_OCCL_VC", "midX midY bottomZ widthX widthY height rotation")
 SA_structures['occl'] = namedtuple("IPL_OCCL_SA", "midX midY bottomZ widthX widthY height rotation")
 
+# TCYC
+SA_structures['occl'] = namedtuple("IPL_TCYC_SA", "x1 y1 z1 x2 y2 z2 farClip extraColor extraColorIntensity falloffDist unknown lodDistMult")
+
 #############
 #    IDE    #
 #############
 
 # Sources
+# https://gtamods.com/wiki/Item_Definition
 # https://www.grandtheftwiki.com/Item_Definition
 # https://gta.fandom.com/wiki/IDE
 
-# Not present
+# Known missing:
 # PATH
-# WEAP - couldn't confirm format, or even supporting games
 
 # OBJS
 # Defines simple objects. They can be placed into the world through the inst section of the item placement files.
@@ -95,15 +98,15 @@ III_structures['objs_2'] = namedtuple("IDE_OBJS_3_2",  "id modelName txdName mes
 III_structures['objs_3'] = namedtuple("IDE_OBJS_3_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags")
 III_structures['objs_4'] = namedtuple("IDE_OBJS_3_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags")
 
-VC_structures['objs_1'] = namedtuple("IDE_OBJS_VC_1",  "id modelName txdName drawDistance flags")
-VC_structures['objs_2'] = namedtuple("IDE_OBJS_VC_2",  "id modelName txdName meshCount drawDistance flags")
-VC_structures['objs_3'] = namedtuple("IDE_OBJS_VC_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags")
-VC_structures['objs_4'] = namedtuple("IDE_OBJS_VC_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags")
+VC_structures['objs_1'] =  namedtuple("IDE_OBJS_VC_1",  "id modelName txdName drawDistance flags")
+VC_structures['objs_2'] =  namedtuple("IDE_OBJS_VC_2",  "id modelName txdName meshCount drawDistance flags")
+VC_structures['objs_3'] =  namedtuple("IDE_OBJS_VC_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags")
+VC_structures['objs_4'] =  namedtuple("IDE_OBJS_VC_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags")
 
-SA_structures['objs_1'] = namedtuple("IDE_OBJS_SA_1",  "id modelName txdName drawDistance flags")
-SA_structures['objs_2'] = namedtuple("IDE_OBJS_SA_2",  "id modelName txdName meshCount drawDistance flags")
-SA_structures['objs_3'] = namedtuple("IDE_OBJS_SA_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags")
-SA_structures['objs_4'] = namedtuple("IDE_OBJS_SA_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags")
+SA_structures['objs_1'] =  namedtuple("IDE_OBJS_SA_1",  "id modelName txdName drawDistance flags")
+SA_structures['objs_2'] =  namedtuple("IDE_OBJS_SA_2",  "id modelName txdName meshCount drawDistance flags")
+SA_structures['objs_3'] =  namedtuple("IDE_OBJS_SA_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags")
+SA_structures['objs_4'] =  namedtuple("IDE_OBJS_SA_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags")
 
 # TOBJ
 # Defines time objects. The section functions similarly to objs but has two additional
@@ -160,3 +163,8 @@ SA_structures['hier'] = namedtuple("IDE_HIER_SA", "id modelName txdName")
 # TXDP
 # Used as an extended texture archive
 SA_structures['txpd'] = namedtuple("IDE_TXDP_SA", "txdName txdParentName")
+
+# WEAP
+# Used to define weapon objects
+VC_structures['weap'] = namedtuple("IDE_WEAP_VC", "id modelName txdName animationName meshCount drawDistance")
+SA_structures['weap'] = namedtuple("IDE_WEAP_SA", "id modelName txdName animationName meshCount drawDistance")
