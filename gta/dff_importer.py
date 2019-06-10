@@ -68,6 +68,10 @@ class dff_importer:
     use_mat_split      = False
     remove_doubles     = False
     group_materials    = False
+    initial_object_position = mathutils.Vector((0,0,0))
+    initial_object_rotation = mathutils.Quaternion((1,0,0,0))
+    initial_object_scale = mathutils.Vector((1,1,1))
+    meshes_only        = False
     version            = ""
 
     __slots__ = [
@@ -511,9 +515,10 @@ class dff_importer:
             bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
 
             # Add an edge split modifier
-            object   = self.objects[frame]
-            modifier = object.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
-            modifier.use_edge_angle = False
+            if frame in self.objects:
+                object   = self.objects[frame]
+                modifier = object.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
+                modifier.use_edge_angle = False
             
             bm.to_mesh(self.meshes[frame])
                 
@@ -531,6 +536,8 @@ class dff_importer:
             mesh = None
             if index in self.meshes:
                 mesh = self.meshes[index]
+
+            if self.meshes_only and mesh is None: continue
 
             obj = None
 
@@ -559,15 +566,20 @@ class dff_importer:
                 elif frame.bone_data.header.id in self.bones and mesh is None:
                     continue
                     
-            
             # Create and link the object to the scene
             if obj is None:
                 obj = bpy.data.objects.new(frame.name, mesh)
                 link_object(obj, dff_importer.current_collection)
 
                 obj.rotation_mode       = 'QUATERNION'
-                obj.rotation_quaternion = matrix.to_quaternion()
-                obj.location            = frame.position
+                # obj.rotation_quaternion = matrix.to_quaternion()
+                # obj.location            = frame.position
+
+                # Dirty assignment
+                # Need to take existing location / rotation into account
+                obj.location = self.initial_object_position
+                obj.rotation_quaternion = self.initial_object_rotation
+                obj.scale = self.initial_object_scale
 
                 # Set empty display properties to something decent
                 if mesh is None:
@@ -594,8 +606,11 @@ class dff_importer:
             # Note: I have not considered if frames could have parents
             # that have not yet been defined. If I come across such
             # a model, the code will be modified to support that
-          
-            if  frame.parent != -1:
+
+            # print(frame)
+            # print(frame.parent)
+
+            if  frame.parent != -1 and frame.parent in self.objects:
                 obj.parent = self.objects[frame.parent]
                 
             self.objects.append(obj)
@@ -662,6 +677,7 @@ class dff_importer:
         self.version = "0x%05x" % self.dff.rw_version
         
         # Add collisions
+        # if self.import_collisions:
         for collision in self.dff.collisions:
             col = import_col_mem(collision, os.path.basename(file_name), False)
             
@@ -678,6 +694,13 @@ def import_dff(options):
     dff_importer.use_mat_split    = options['use_mat_split']
     dff_importer.remove_doubles   = options['remove_doubles']
     dff_importer.group_materials  = options['group_materials']
+
+    # Optional parameters
+    dff_importer.initial_object_position = options['position'] if 'position' in options else mathutils.Vector((0,0,0))
+    dff_importer.initial_object_rotation = options['rotation'] if 'rotation' in options else mathutils.Quaternion((1,0,0,0))
+    dff_importer.initial_object_scale = options['scale']    if 'scale'    in options else mathutils.Vector((1,1,1))
+    dff_importer.meshes_only = options['meshes_only'] if 'meshes_only' in options else False
     
     dff_importer.import_dff(options['file_name'])
+
     return dff_importer.version

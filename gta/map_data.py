@@ -168,3 +168,47 @@ SA_structures['txpd'] = namedtuple("IDE_TXDP_SA", "txdName txdParentName")
 # Used to define weapon objects
 VC_structures['weap'] = namedtuple("IDE_WEAP_VC", "id modelName txdName animationName meshCount drawDistance")
 SA_structures['weap'] = namedtuple("IDE_WEAP_SA", "id modelName txdName animationName meshCount drawDistance")
+
+
+
+#################
+#    gta.dat    #
+#################
+
+III_IDE = [
+    {'name': 'generic.IDE',  'path': 'DATA\\MAPS\\generic.IDE'},
+    {'name': 'INDUSTNE.ide', 'path': 'DATA\\MAPS\\INDUSTNE\\INDUSTNE.ide'},
+    {'name': 'INDUSTNW.ide', 'path': 'DATA\\MAPS\\INDUSTNW\\INDUSTNW.ide'},
+    {'name': 'INDUSTSE.ide', 'path': 'DATA\\MAPS\\INDUSTSE\\INDUSTSE.ide'},
+    {'name': 'INDUSTSW.ide', 'path': 'DATA\\MAPS\\INDUSTSW\\INDUSTSW.ide'},
+    {'name': 'MAKING.ide',   'path': 'DATA\\MAPS\\MAKING\\MAKING.ide'},
+    {'name': 'TEMPPART.ide', 'path': 'DATA\\MAPS\\TEMPPART\\TEMPPART.ide'},
+    {'name': 'INDROADS.ide', 'path': 'DATA\\MAPS\\INDROADS\\INDROADS.ide'},
+
+    {'name': 'COMNtop.ide',  'path': 'DATA\\MAPS\\COMNtop\\COMNtop.ide'},
+    {'name': 'COMNbtm.ide',  'path': 'DATA\\MAPS\\COMNbtm\\COMNbtm.ide'},
+    {'name': 'COMSE.ide',    'path': 'DATA\\MAPS\\COMSE\\COMSE.ide'},
+    {'name': 'COMSW.ide',    'path': 'DATA\\MAPS\\COMSW\\COMSW.ide'},
+    {'name': 'COMROAD.ide',  'path': 'DATA\\MAPS\\COMROAD\\COMROAD.ide'},
+
+    {'name': 'LANDne.ide',   'path': 'DATA\\MAPS\\LANDne\\LANDne.ide'},
+    {'name': 'LANDsw.ide',   'path': 'DATA\\MAPS\\LANDsw\\LANDsw.ide'},
+    {'name': 'SUBROADS.ide', 'path': 'DATA\\MAPS\\SUBROADS\\SUBROADS.ide'}
+]
+
+III_IPL = [
+#    {'name': 'CULL.IPL',     'path': 'DATA\\MAPS\\CULL.IPL'},
+   {'name': 'COMNtop.IPL',  'path': 'DATA\\MAPS\\COMNtop\\COMNtop.IPL'},
+#    {'name': 'COMNbtm.IPL',  'path': 'DATA\\MAPS\\COMNbtm\\COMNbtm.IPL'},
+#    {'name': 'COMSE.IPL',    'path': 'DATA\\MAPS\\COMSE\\COMSE.IPL'},
+#    {'name': 'COMSW.IPL',    'path': 'DATA\\MAPS\\COMSW\\COMSW.IPL'},
+#    {'name': 'INDUSTNE.IPL', 'path': 'DATA\\MAPS\\INDUSTNE\\INDUSTNE.IPL'},
+#    {'name': 'INDUSTNW.IPL', 'path': 'DATA\\MAPS\\INDUSTNW\\INDUSTNW.IPL'},
+#    {'name': 'INDUSTSE.IPL', 'path': 'DATA\\MAPS\\INDUSTSE\\INDUSTSE.IPL'},
+#    {'name': 'INDUSTSW.IPL', 'path': 'DATA\\MAPS\\INDUSTSW\\INDUSTSW.IPL'},
+#    {'name': 'LANDne.IPL',   'path': 'DATA\\MAPS\\LANDne\\LANDne.IPL'},
+#    {'name': 'LANDsw.IPL',   'path': 'DATA\\MAPS\\LANDsw\\LANDsw.IPL'},
+#    {'name': 'overview.IPL', 'path': 'DATA\\MAPS\\overview.IPL'},
+#    {'name': 'props.IPL',    'path': 'DATA\\MAPS\\props.IPL'}
+]
+

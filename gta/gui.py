@@ -693,3 +693,97 @@ compatibiility with DFF Viewers"
     #######################################################    
     def register():
         bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
+
+#######################################################
+class DFFSceneProps(bpy.types.PropertyGroup):
+
+    engine_version = bpy.props.EnumProperty(
+        items = (
+            ('III', 'GTA III', 'IPL and IDE data structures used in GTA III'),
+            ('VC', 'GTA VC', 'IPL and IDE data structures used in GTA VC'),
+            ('SA', "GTA SA", 'IPL and IDE data structures used in GTA SA')
+        )
+    )
+
+    game_root = bpy.props.StringProperty \
+        (
+        name = "Game root folder",
+        default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto 3',
+        description = "Game's maps folder",
+        subtype = 'DIR_PATH'
+        )
+
+    # maps_folder = bpy.props.StringProperty \
+    #     (
+    #     name = "maps folder",
+    #     default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto 3\\data\\maps',
+    #     description = "Game's maps folder",
+    #     subtype = 'DIR_PATH'
+    #     )
+
+    # maps_subfolder = bpy.props.StringProperty \
+    #     (
+    #     name = "maps subfolder",
+    #     default = 'comnbtm',
+    #     description = "Type the name of a specific folder within the maps directory which contains an IPL and an IDE file",
+    #     subtype = 'FILE_NAME'
+    #     )
+
+
+
+    dff_folder = bpy.props.StringProperty \
+        (
+        name = "Dff folder",
+        default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\dff',
+        description = "Define a folder where all of the dff models are stored",
+        subtype = 'DIR_PATH'
+        )
+
+    txd_folder = bpy.props.StringProperty \
+        (
+        name = "Txd folder",
+        default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\txd',
+        description = "Define a folder where all of the txd models are stored",
+        subtype = 'DIR_PATH'
+        )
+
+            
+    #######################################################    
+    def register():
+        bpy.types.Scene.dff = bpy.props.PointerProperty(type=DFFSceneProps)
+
+
+class MapImportPanel(bpy.types.Panel):
+    """Creates a Panel in the scene context of the properties editor"""
+    bl_label = "DragonFF - Map Import"
+    bl_idname = "SCENE_PT_layout"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "scene"
+
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+        settings = context.scene.dff
+
+        col = layout.column()
+        col.prop(settings, "engine_version", text="Engine version")
+
+        col = layout.column()
+        col.prop(settings, 'game_root')
+
+        # col = layout.column()
+        # col.prop(settings, 'maps_folder')
+
+        # col = layout.column()
+        # col.prop(settings, 'maps_subfolder')
+
+        col = layout.column()
+        col.prop(settings, 'dff_folder')
+
+        col = layout.column()
+        col.prop(settings, 'txd_folder')
+
+        row = layout.row()
+        row.operator("scene.dragonff_map_import")

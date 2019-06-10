@@ -14,10 +14,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import map_structures
+from . import map_data
+from enum import Enum
 from collections import namedtuple
 
 # Data types
+# class EngineVersion(Enum):
+#     GTA_III = 1
+#     GTA_VC = 2
+#     GTA_SA = 3
+
 Vector = namedtuple("Vector", "x y z")
 
 # Base for all IPL / IDE section reader / writer classes
@@ -110,7 +116,7 @@ class TOBJSectionUtility(GenericSectionUtility):
 #######################################################
 class CARSSectionUtility(GenericSectionUtility):
     def getDataStructure(self, lineParams):
-        print("'cars' aren't yet implemented boi")
+        print("'cars' not yet implemented")
 
 
 # List of IPL/IDE sections which require a section utility that's different
@@ -127,7 +133,8 @@ class MapDataUtility:
 
     # Returns a dictionary of sections found in the given file
     #######################################################
-    def read(filename, dataStructures):
+    @staticmethod
+    def readFile(filename, dataStructures):
 
         print('\nMapDataUtility reading: ' + filename)
 
@@ -148,7 +155,7 @@ class MapDataUtility:
                     # Section is generic, can be read / written to with the default utility
                     sectionUtility = GenericSectionUtility(sectionName, dataStructures)
 
-                if sectionUtility != None:
+                if sectionUtility is not None:
                     sections[sectionName] = sectionUtility.read(fileStream)
                     print(sectionName + ': ' + str(len(sections[sectionName])) + ' entries')
 
@@ -156,3 +163,61 @@ class MapDataUtility:
                 line = fileStream.readline().strip()
         
         return sections
+
+    # Returns ID-keyed dictionaries of all IDE and IPL entries for given game
+    ########################################################################
+    @staticmethod
+    def getMapData(gameEnum, gameRoot):
+        
+        # TODO: choose correct IDE/IPL files dict
+        # if(gameEnum == EngineVersion.GTA_III)
+
+        ide = {}
+
+        for file in map_data.III_IDE:
+            sections = MapDataUtility.readFile(gameRoot + '\\' + file['path'], map_data.III_structures)
+            ide = MapDataUtility.merge_dols(ide, sections)
+
+        ipl = {}
+
+        for file in map_data.III_IPL:
+            sections = MapDataUtility.readFile(gameRoot + '\\' + file['path'], map_data.III_structures)
+            ipl = MapDataUtility.merge_dols(ipl, sections)
+
+        
+        # Extract relevant sections
+        # Maybe there's more in VC / SA, for now, only testing III
+        object_instances = []
+        object_data = {}
+
+        if 'inst' in ipl:
+            for entry in ipl['inst']:
+                # if entry.id in object_instances: print('IPL ERROR!! a duplicate ID!!')
+                object_instances.append(entry)
+                
+        if 'objs' in ide:
+            for entry in ide['objs']:
+                if entry.id in object_data: print('OJBS ERROR!! a duplicate ID!!')
+                object_data[entry.id] = entry
+
+        if 'tobj' in ide:
+            for entry in ide['tobj']:
+                if entry.id in object_data: print('TOBJ ERROR!! a duplicate ID!!')
+                object_data[entry.id] = entry
+
+        print(len(object_instances))
+        print(len(object_data))
+
+        return {
+            'object_instances': object_instances,
+            'object_data': object_data
+            }
+
+    # Merge Dictionaries of Lists
+    @staticmethod
+    def merge_dols(dol1, dol2):
+        result = dict(dol1, **dol2)
+        result.update((k, dol1[k] + dol2[k])
+                        for k in set(dol1).intersection(dol2))
+        return result
+
