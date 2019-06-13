@@ -273,7 +273,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'remove_doubles' : self.remove_doubles,
                         'group_materials': self.group_materials
                     }
-                )
+                ).version
 
                 # Set imported version to scene settings for use later in export.
                 if version in ['0x33002', '0x34003', '0x36003']:
