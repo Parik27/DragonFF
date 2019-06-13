@@ -1,3 +1,19 @@
+# GTA DragonFF - Blender scripts to edit basic GTA formats
+# Copyright (C) 2019  Parik
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 # This document specifies most of renderware era GTAs IPL/IDE data structures,
 # taken directly from GTA wikis, sources available in each section.
 # Sections listed in "Not present" were left out either because they seemed too
@@ -175,6 +191,9 @@ SA_structures['weap'] = namedtuple("IDE_WEAP_SA", "id modelName txdName animatio
 #    gta.dat    #
 #################
 
+# All IDEs should  be always loaded when importing maps
+# TODO: get the VC and SA IDE paths
+
 III_IDE = [
     {'name': 'generic.IDE',  'path': 'DATA\\MAPS\\generic.IDE'},
     {'name': 'INDUSTNE.ide', 'path': 'DATA\\MAPS\\INDUSTNE\\INDUSTNE.ide'},
@@ -195,20 +214,3 @@ III_IDE = [
     {'name': 'LANDsw.ide',   'path': 'DATA\\MAPS\\LANDsw\\LANDsw.ide'},
     {'name': 'SUBROADS.ide', 'path': 'DATA\\MAPS\\SUBROADS\\SUBROADS.ide'}
 ]
-
-III_IPL = [
-#    {'name': 'CULL.IPL',     'path': 'DATA\\MAPS\\CULL.IPL'},
-   {'name': 'COMNtop.IPL',  'path': 'DATA\\MAPS\\COMNtop\\COMNtop.IPL'},
-#    {'name': 'COMNbtm.IPL',  'path': 'DATA\\MAPS\\COMNbtm\\COMNbtm.IPL'},
-#    {'name': 'COMSE.IPL',    'path': 'DATA\\MAPS\\COMSE\\COMSE.IPL'},
-#    {'name': 'COMSW.IPL',    'path': 'DATA\\MAPS\\COMSW\\COMSW.IPL'},
-#    {'name': 'INDUSTNE.IPL', 'path': 'DATA\\MAPS\\INDUSTNE\\INDUSTNE.IPL'},
-#    {'name': 'INDUSTNW.IPL', 'path': 'DATA\\MAPS\\INDUSTNW\\INDUSTNW.IPL'},
-#    {'name': 'INDUSTSE.IPL', 'path': 'DATA\\MAPS\\INDUSTSE\\INDUSTSE.IPL'},
-#    {'name': 'INDUSTSW.IPL', 'path': 'DATA\\MAPS\\INDUSTSW\\INDUSTSW.IPL'},
-#    {'name': 'LANDne.IPL',   'path': 'DATA\\MAPS\\LANDne\\LANDne.IPL'},
-#    {'name': 'LANDsw.IPL',   'path': 'DATA\\MAPS\\LANDsw\\LANDsw.IPL'},
-#    {'name': 'overview.IPL', 'path': 'DATA\\MAPS\\overview.IPL'},
-#    {'name': 'props.IPL',    'path': 'DATA\\MAPS\\props.IPL'}
-]
-

@@ -595,9 +595,6 @@ class dff_importer:
             # that have not yet been defined. If I come across such
             # a model, the code will be modified to support that
 
-            # print(frame)
-            # print(frame.parent)
-
             if  frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
                 

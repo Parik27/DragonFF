@@ -15,14 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from . import map_data
-from enum import Enum
 from collections import namedtuple
-
-# Data types
-# class EngineVersion(Enum):
-#     GTA_III = 1
-#     GTA_VC = 2
-#     GTA_SA = 3
 
 Vector = namedtuple("Vector", "x y z")
 
@@ -70,6 +63,7 @@ class GenericSectionUtility:
 
         return entries
 
+    #######################################################
     def getDataStructure(self, lineParams):
         return self.dataStructures[self.sectionName]
 
@@ -116,8 +110,8 @@ class TOBJSectionUtility(GenericSectionUtility):
 #######################################################
 class CARSSectionUtility(GenericSectionUtility):
     def getDataStructure(self, lineParams):
+        # TODO:
         print("'cars' not yet implemented")
-
 
 # List of IPL/IDE sections which require a section utility that's different
 # from the default one.
@@ -133,7 +127,6 @@ class MapDataUtility:
 
     # Returns a dictionary of sections found in the given file
     #######################################################
-    @staticmethod
     def readFile(filename, dataStructures):
 
         print('\nMapDataUtility reading: ' + filename)
@@ -164,10 +157,8 @@ class MapDataUtility:
         
         return sections
 
-    # Returns ID-keyed dictionaries of all IDE and IPL entries for given game
     ########################################################################
-    @staticmethod
-    def getMapData(gameEnum, gameRoot):
+    def getMapData(gameEnum, gameRoot, iplSection):
         
         # TODO: choose correct IDE/IPL files dict
         # if(gameEnum == EngineVersion.GTA_III)
@@ -180,21 +171,23 @@ class MapDataUtility:
 
         ipl = {}
 
-        for file in map_data.III_IPL:
-            sections = MapDataUtility.readFile(gameRoot + '\\' + file['path'], map_data.III_structures)
-            ipl = MapDataUtility.merge_dols(ipl, sections)
+        sections = MapDataUtility.readFile(gameRoot + '\\' + iplSection, map_data.III_structures)
+        ipl = MapDataUtility.merge_dols(ipl, sections)
 
-        
         # Extract relevant sections
         # Maybe there's more in VC / SA, for now, only testing III
         object_instances = []
         object_data = {}
 
+        # Get all insts into a flat list (array)
+        # Can't be an ID keyed dictionary, because there's many ipl
+        # entries with the same ID - multiple pieces of
+        # the same model (lamps, benches, trees etc.)
         if 'inst' in ipl:
             for entry in ipl['inst']:
-                # if entry.id in object_instances: print('IPL ERROR!! a duplicate ID!!')
                 object_instances.append(entry)
                 
+        # Get all objs and tobjs into flat ID keyed dictionaries
         if 'objs' in ide:
             for entry in ide['objs']:
                 if entry.id in object_data: print('OJBS ERROR!! a duplicate ID!!')
@@ -205,16 +198,13 @@ class MapDataUtility:
                 if entry.id in object_data: print('TOBJ ERROR!! a duplicate ID!!')
                 object_data[entry.id] = entry
 
-        print(len(object_instances))
-        print(len(object_data))
-
         return {
             'object_instances': object_instances,
             'object_data': object_data
             }
 
     # Merge Dictionaries of Lists
-    @staticmethod
+    #######################################################
     def merge_dols(dol1, dol2):
         result = dict(dol1, **dol2)
         result.update((k, dol1[k] + dol2[k])
