@@ -559,7 +559,6 @@ class dff_importer:
                 elif frame.bone_data.header.id in self.bones and mesh is None:
                     continue
                     
-            
             # Create and link the object to the scene
             if obj is None:
                 obj = bpy.data.objects.new(frame.name, mesh)
@@ -568,6 +567,7 @@ class dff_importer:
                 obj.rotation_mode       = 'QUATERNION'
                 obj.rotation_quaternion = matrix.to_quaternion()
                 obj.location            = frame.position
+
 
                 # Set empty display properties to something decent
                 if mesh is None:
@@ -594,7 +594,7 @@ class dff_importer:
             # Note: I have not considered if frames could have parents
             # that have not yet been defined. If I come across such
             # a model, the code will be modified to support that
-          
+
             if  frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
                 
@@ -678,6 +678,7 @@ def import_dff(options):
     dff_importer.use_mat_split    = options['use_mat_split']
     dff_importer.remove_doubles   = options['remove_doubles']
     dff_importer.group_materials  = options['group_materials']
-    
+
     dff_importer.import_dff(options['file_name'])
-    return dff_importer.version
+
+    return dff_importer

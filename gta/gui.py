@@ -264,7 +264,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                 if not self.load_images:
                     image_ext = None
                     
-                version = dff_importer.import_dff(
+                importer = dff_importer.import_dff(
                     {
                         'file_name'      : file,
                         'image_ext'      : image_ext,
@@ -274,6 +274,8 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'group_materials': self.group_materials
                     }
                 )
+
+                version = importer.version
 
                 # Set imported version to scene settings for use later in export.
                 if version in ['0x33002', '0x34003', '0x36003']:
@@ -689,7 +691,95 @@ class DFFObjectProps(bpy.types.PropertyGroup):
 compatibiility with DFF Viewers"
     )
     
-    
     #######################################################    
     def register():
         bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
+
+#######################################################
+class DFFSceneProps(bpy.types.PropertyGroup):
+
+    engine_version = bpy.props.EnumProperty(
+        items = (
+            ('III', 'GTA III', 'IPL and IDE data structures used in GTA III'),
+            # ('VC', 'GTA VC', 'IPL and IDE data structures used in GTA VC'),
+            # ('SA', "GTA SA", 'IPL and IDE data structures used in GTA SA')
+        )
+    )
+
+    # TODO: load appropriate list for each game
+    map_sections = bpy.props.EnumProperty(
+        items = (
+            ('DATA\\MAPS\\INDUSTNE\\INDUSTNE.IPL', 'industne' , ''),
+            ('DATA\\MAPS\\INDUSTNW\\INDUSTNW.IPL', 'industnw' , ''),
+            ('DATA\\MAPS\\INDUSTSE\\INDUSTSE.IPL', 'industse' , ''),
+            ('DATA\\MAPS\\INDUSTSW\\INDUSTSW.IPL', 'industsw' , ''),
+            ('DATA\\MAPS\\COMNtop\\COMNtop.IPL',   'comntop'  , ''),
+            ('DATA\\MAPS\\COMNbtm\\COMNbtm.IPL',   'comnbtm'  , ''),
+            ('DATA\\MAPS\\COMSE\\COMSE.IPL',       'comse'    , ''),
+            ('DATA\\MAPS\\COMSW\\COMSW.IPL',       'comsw'    , ''),
+            ('DATA\\MAPS\\LANDne\\LANDne.IPL',     'landne'   , ''),
+            ('DATA\\MAPS\\LANDsw\\LANDsw.IPL',     'landsw'   , ''),
+            ('DATA\\MAPS\\overview.IPL',           'overview' , ''),
+            ('DATA\\MAPS\\props.IPL',              'props'    , ''),
+            ('DATA\\MAPS\\CULL.IPL',               'cull'     , '')
+        )
+    )
+
+    game_root = bpy.props.StringProperty \
+        (
+        name = 'Game root',
+        default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto 3',
+        description = "Folder with the game's executable",
+        subtype = 'DIR_PATH'
+        )
+
+    dff_folder = bpy.props.StringProperty \
+        (
+        name = 'Dff folder',
+        default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\dff',
+        description = "Define a folder where all of the dff models are stored. Dff files can be extracted from IMG archives with IMGTool.",
+        subtype = 'DIR_PATH'
+        )
+
+    # txd_folder = bpy.props.StringProperty \
+    #     (
+    #     name = 'Txd folder',
+    #     default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\txd',
+    #     description = "Define a folder where all of the txd models are stored. Txd files can be extracted from IMG archives with IMGTool.",
+    #     subtype = 'DIR_PATH'
+    #     )
+
+            
+    #######################################################    
+    def register():
+        bpy.types.Scene.dff = bpy.props.PointerProperty(type=DFFSceneProps)
+
+#######################################################
+class MapImportPanel(bpy.types.Panel):
+    """Creates a Panel in the scene context of the properties editor"""
+    bl_label = "DragonFF - Map Import"
+    bl_idname = "SCENE_PT_layout"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "scene"
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+        settings = context.scene.dff
+
+        flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=True)
+
+        col = flow.column()
+        col.prop(settings, "engine_version", text="Game")
+        col.prop(settings, "map_sections", text="Map section")
+
+        layout.separator()
+
+        layout.prop(settings, 'game_root')
+        layout.prop(settings, 'dff_folder')
+
+        row = layout.row()
+        row.operator("scene.dragonff_map_import")
