@@ -37,7 +37,9 @@ _classes = [
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.DFFMaterialProps,
-    gui.DFFObjectProps
+    gui.DFFObjectProps,
+    gui.MapImportPanel,
+    gui.DFFSceneProps
 ]
 #######################################################
 def register():

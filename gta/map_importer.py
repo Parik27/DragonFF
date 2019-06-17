@@ -69,17 +69,22 @@ class Map_Import_Operator(bpy.types.Operator):
             # Parenting
             for obj in objGroup:
                 if obj.parent in objGroup:
-                    newGroup[objGroup.index(obj)].parent = newGroup[objGroup.index(obj.parent)]
+                    newGroup[objGroup.index(obj)].parent = \
+                        newGroup[objGroup.index(obj.parent)]
             # Position root object
             if len(newGroup) > 0:
-                Map_Import_Operator.apply_trasnformation_to_object(newGroup[0], inst)
+                Map_Import_Operator.apply_transformation_to_object(
+                    newGroup[0], inst
+                )
             print(str(inst.id) + ' loaded from cache')
         else:
 
             # Import dff from a file
             importer = dff_importer.import_dff(
                 {
-                    'file_name'      : self.settings.dff_folder + '\\' + model + '.dff',
+                    'file_name'      : "%s/%s.dff" % (
+                        self.settings.dff_folder, model
+                    ),
                     'image_ext'      : 'PNG',
                     'connect_bones'  : False,
                     'use_mat_split'  : False,
@@ -89,7 +94,9 @@ class Map_Import_Operator(bpy.types.Operator):
             )
 
             if len(importer.objects) > 0:
-                Map_Import_Operator.apply_trasnformation_to_object(importer.objects[0], inst)
+                Map_Import_Operator.apply_transformation_to_object(
+                    importer.objects[0], inst
+                )
 
             # Save into buffer
             self._model_cache[inst.id] = importer.objects
@@ -131,13 +138,20 @@ class Map_Import_Operator(bpy.types.Operator):
         self._model_cache = {}
 
         # Get all the necessary IDE and IPL data
-        map_data = map_utilites.MapDataUtility.getMapData(self.settings.engine_version, self.settings.game_root, self.settings.map_sections)
+        map_data = map_utilites.MapDataUtility.getMapData(
+            self.settings.engine_version,
+            self.settings.game_root,
+            self.settings.map_sections)
+        
         self._object_instances = map_data['object_instances']
         self._object_data = map_data['object_data']
 
         wm = context.window_manager
         wm.progress_begin(0, 100.0)
-        self._timer = wm.event_timer_add(0.1, window=context.window)    # Call the "modal" function every 0.1s
+        
+         # Call the "modal" function every 0.1s
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        
         wm.modal_handler_add(self)
 
         return {'RUNNING_MODAL'}
@@ -149,7 +163,7 @@ class Map_Import_Operator(bpy.types.Operator):
         wm.event_timer_remove(self._timer)
 
     #######################################################
-    def apply_trasnformation_to_object(obj, inst):
+    def apply_transformation_to_object(obj, inst):
         obj.location.x = float(inst.posX)
         obj.location.y = float(inst.posY)
         obj.location.z = float(inst.posZ)

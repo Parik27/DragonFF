@@ -737,7 +737,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         (
         name = 'Dff folder',
         default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\dff',
-        description = "Define a folder where all of the dff models are stored. Dff files can be extracted from IMG archives with IMGTool.",
+        description = "Define a folder where all of the dff models are stored.",
         subtype = 'DIR_PATH'
         )
 
@@ -745,7 +745,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     #     (
     #     name = 'Txd folder',
     #     default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\txd',
-    #     description = "Define a folder where all of the txd models are stored. Txd files can be extracted from IMG archives with IMGTool.",
+    #     description = "Define a folder where all of the txd models are stored.",
     #     subtype = 'DIR_PATH'
     #     )
 
@@ -766,11 +766,13 @@ class MapImportPanel(bpy.types.Panel):
     #######################################################
     def draw(self, context):
         layout = self.layout
-
-        scene = context.scene
         settings = context.scene.dff
 
-        flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=True)
+        flow = layout.grid_flow(row_major=True,
+                                columns=0,
+                                even_columns=True,
+                                even_rows=False,
+                                align=True)
 
         col = flow.column()
         col.prop(settings, "engine_version", text="Game")

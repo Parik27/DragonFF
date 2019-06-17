@@ -42,7 +42,7 @@ class GenericSectionUtility:
             dataStructure = self.getDataStructure(lineParams)
 
             # Validate data structure
-            if(dataStructure == None):
+            if(dataStructure is None):
                 print(type(self).__name__+" error: No appropriate data structure found")
                 print("    Section name: " + self.sectionName)
                 print("    Line parameters: " + str(lineParams))
@@ -143,14 +143,22 @@ class MapDataUtility:
 
                 if line in specialSections:
                     # Section requires some special reading / writing procedures
-                    sectionUtility = specialSections[sectionName](sectionName, dataStructures)
+                    sectionUtility = specialSections[sectionName](
+                        sectionName, dataStructures
+                    )
                 elif line in dataStructures:
-                    # Section is generic, can be read / written to with the default utility
-                    sectionUtility = GenericSectionUtility(sectionName, dataStructures)
+                    # Section is generic,
+                    # can be read / written to with the default utility
+                    sectionUtility = GenericSectionUtility(
+                        sectionName, dataStructures
+                    )
 
                 if sectionUtility is not None:
                     sections[sectionName] = sectionUtility.read(fileStream)
-                    print(sectionName + ': ' + str(len(sections[sectionName])) + ' entries')
+                    print("%s: %d entries" % (
+                        sectionName, len(sections[sectionName]
+                        )
+                    ))
 
                 # Get next section
                 line = fileStream.readline().strip()
@@ -166,12 +174,15 @@ class MapDataUtility:
         ide = {}
 
         for file in map_data.III_IDE:
-            sections = MapDataUtility.readFile(gameRoot + '\\' + file['path'], map_data.III_structures)
+            sections = MapDataUtility.readFile("%s/%s" % (gameRoot, file['path']))
             ide = MapDataUtility.merge_dols(ide, sections)
 
         ipl = {}
 
-        sections = MapDataUtility.readFile(gameRoot + '\\' + iplSection, map_data.III_structures)
+        sections = MapDataUtility.readFile(
+            "%s/%s" % (gameRoot, iplSection),
+            map_data.III_structures
+        )
         ipl = MapDataUtility.merge_dols(ipl, sections)
 
         # Extract relevant sections
@@ -190,12 +201,14 @@ class MapDataUtility:
         # Get all objs and tobjs into flat ID keyed dictionaries
         if 'objs' in ide:
             for entry in ide['objs']:
-                if entry.id in object_data: print('OJBS ERROR!! a duplicate ID!!')
+                if entry.id in object_data:
+                    print('OJBS ERROR!! a duplicate ID!!')
                 object_data[entry.id] = entry
 
         if 'tobj' in ide:
             for entry in ide['tobj']:
-                if entry.id in object_data: print('TOBJ ERROR!! a duplicate ID!!')
+                if entry.id in object_data:
+                    print('TOBJ ERROR!! a duplicate ID!!')
                 object_data[entry.id] = entry
 
         return {
@@ -210,4 +223,3 @@ class MapDataUtility:
         result.update((k, dol1[k] + dol2[k])
                         for k in set(dol1).intersection(dol2))
         return result
-
