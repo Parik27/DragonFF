@@ -174,7 +174,10 @@ class MapDataUtility:
         ide = {}
 
         for file in map_data.III_IDE:
-            sections = MapDataUtility.readFile("%s/%s" % (gameRoot, file['path']))
+            sections = MapDataUtility.readFile(
+                "%s/%s" % (gameRoot, file['path']),
+                map_data.III_structures
+            )
             ide = MapDataUtility.merge_dols(ide, sections)
 
         ipl = {}
