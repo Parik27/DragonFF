@@ -128,6 +128,7 @@ class Map_Import_Operator(bpy.types.Operator):
 
         if self._calcs_done:
             self.cancel(context)
+            return {'FINISHED'}
 
         return {'PASS_THROUGH'}
 
