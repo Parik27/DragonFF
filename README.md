@@ -16,6 +16,8 @@ The following is a list of supported features by the addon
   - [X] Import
   - [ ] Export
 - [ ] Map files (.ipl, .ide)
+  - [X] Import *(Partial, experimental)*
+  - [ ] Export
 - [ ] Animation files
 
 #### Model Features
@@ -46,5 +48,12 @@ The python scripts have been designed with reusability in mind. As of now, the d
 * [X] - DFF - `dff.py`
 * [ ] - TXD - `txd.py`
 * [X] - COL - `col.py`
-* [ ] - IPL/IDE - `map.py`
+* [X] - IPL/IDE - `map.py` (partial, experimental)
 * [ ] - IFP - `ifp.py`
+
+#### Contributors
+
+The following have contributed significantly to the project:
+
+* [swift502](https://github.com/swift502) - For the map importer.
+
