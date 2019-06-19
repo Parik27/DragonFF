@@ -38,7 +38,7 @@ class Map_Import_Operator(bpy.types.Operator):
     def import_object(self, context):
 
         # Are there any IPL entries left to import?
-        if self._inst_index >= len(self._object_instances) - 1:
+        if self._inst_index > len(self._object_instances) - 1:
             self._calcs_done = True
             return
 
@@ -128,6 +128,7 @@ class Map_Import_Operator(bpy.types.Operator):
 
         if self._calcs_done:
             self.cancel(context)
+            return {'FINISHED'}
 
         return {'PASS_THROUGH'}
 
