@@ -1335,11 +1335,10 @@ class dff:
         header = _Header._make(unpack_from("<III", self.data, self._read(12)))
 
         # calculate if the indices are stored in 32 bit or 16 bit
-        opengl = 12 + header.mesh_count * 8 \
-        + (header.total_indices * 4) > parent_chunk.size
-
-        is_tri_strip = header.flags == 1
+        calculated_size = 12 + header.mesh_count * 8 + (header.total_indices * 2)
+        opengl = calculated_size >= parent_chunk.size
         
+        is_tri_strip = header.flags == 1
         for i in range(header.mesh_count):
             
             # Read header
@@ -1354,7 +1353,7 @@ class dff:
             if not is_tri_strip: 
                 unpack_format = "<" + (unpack_format[1:] * 3)
                 total_iterations //= 3
-                
+
             previous_vertices = []
             for j in range(total_iterations):
 
