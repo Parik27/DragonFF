@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
-from . import gui
+from . import gui, map_importer
 
 from bpy.utils import register_class, unregister_class
 
@@ -39,7 +39,8 @@ _classes = [
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
     gui.MapImportPanel,
-    gui.DFFSceneProps
+    gui.DFFSceneProps,
+    map_importer.Map_Import_Operator
 ]
 #######################################################
 def register():
