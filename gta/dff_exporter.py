@@ -446,12 +446,9 @@ class dff_exporter:
             mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
         else:
             
-            try:
-                depsgraph = bpy.context.depsgraph #Blender 2.8 Beta
-                mesh = obj.to_mesh(depsgraph, True)
-                
-            except AttributeError:
-                mesh = obj.to_mesh()
+            depsgraph   = bpy.context.evaluated_depsgraph_get()
+            object_eval = obj.evaluated_get(depsgraph)
+            mesh        = object_eval.to_mesh()
             
         # Re enable disabled modifiers
         for modifier in disabled_modifiers:
@@ -483,7 +480,9 @@ class dff_exporter:
                         break
                     
         for loop in duplicate_loops:
-            bmesh.utils.loop_separate(loop)
+            new_vert = bmesh.utils.loop_separate(loop)
+            new_vert.copy_from(loop.vert)
+            
 
     #######################################################
     def post_process_mesh(mesh):
