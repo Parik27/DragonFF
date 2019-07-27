@@ -460,6 +460,7 @@ class dff_exporter:
     def split_shared_verts(bm, layers_list, conds):
 
         duplicate_loops = {}
+        new_verts = {}
         
         for vertex in bm.verts:
             
@@ -481,7 +482,12 @@ class dff_exporter:
                     
         for loop in duplicate_loops:
             new_vert = bmesh.utils.loop_separate(loop)
-            new_vert.copy_from(loop.vert)
+            if(loop.vert.index not in new_verts):
+                new_verts[loop.vert.index] = []
+                
+            new_verts[loop.vert.index].append(new_vert.index)
+
+        return new_verts
             
 
     #######################################################
@@ -499,7 +505,7 @@ class dff_exporter:
         bm.verts.index_update()
 
         # Split the verticces
-        self.split_shared_verts(
+        new_verts = self.split_shared_verts(
             bm,
             [
                 bm.loops.layers.uv.values(),
@@ -512,7 +518,7 @@ class dff_exporter:
         )
 
         bm.to_mesh(mesh)
-        return mesh
+        return new_verts
             
     #######################################################
     def new_populate_atomic(obj):
@@ -521,7 +527,7 @@ class dff_exporter:
         geometry = dff.Geometry()
 
         mesh = self.convert_to_mesh(obj)
-        self.post_process_mesh(mesh)
+        new_verts = self.post_process_mesh(mesh)
 
         mesh.calc_normals_split()
 
@@ -605,6 +611,13 @@ class dff_exporter:
                         break
             
             geometry.normals[loop.vertex_index] = loop.normal
+
+        for vert in new_verts:
+            vertex = mesh.vertices[vert]
+            for new_vert in new_verts[vert]:
+                print(geometry.normals[new_vert], vertex.normal) 
+                geometry.normals[new_vert] = vertex.normal
+            
 
         self.create_frame(obj)
         geometry.bounding_sphere = self.calculate_bounding_sphere(obj)
