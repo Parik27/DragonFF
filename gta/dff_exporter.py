@@ -450,192 +450,189 @@ class dff_exporter:
             object_eval = obj.evaluated_get(depsgraph)
             mesh        = object_eval.to_mesh()
             
+
         # Re enable disabled modifiers
         for modifier in disabled_modifiers:
             modifier.show_viewport = True
 
         return mesh
-
+    
     #######################################################
-    def split_shared_verts(bm, layers_list, conds):
-
-        duplicate_loops = {}
-        new_verts = {}
-        
-        for vertex in bm.verts:
-            
-            for loop in vertex.link_loops:
-                start_loop = vertex.link_loops[0]
-                
-                shared = False
-                for i, layers in enumerate(layers_list):
-                    
-                    for layer in layers:
-                        
-                        if conds[i](start_loop[layer], loop[layer]):
-                            shared = True
-                            break
-
-                    if shared:
-                        duplicate_loops[loop] = True
-                        break
-                    
-        for loop in duplicate_loops:
-            new_vert = bmesh.utils.loop_separate(loop)
-            if(loop.vert.index not in new_verts):
-                new_verts[loop.vert.index] = []
-                
-            new_verts[loop.vert.index].append(new_vert.index)
-
-        return new_verts
-            
-
-    #######################################################
-    def post_process_mesh(mesh):
+    def populate_atomic(obj):
         self = dff_exporter
-        bm   = bmesh.new()
 
-        # This is to triangulate and duplicate shared vertices and prepare for
-        # export.
+        # Create geometry
+        geometry = dff.Geometry()
+
+        mesh = self.convert_to_mesh(obj)
+        bm   = bmesh.new()
         
         bm.from_mesh(mesh)
+
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
 
         bm.verts.ensure_lookup_table()
         bm.verts.index_update()
 
-        # Split the verticces
-        new_verts = self.split_shared_verts(
-            bm,
-            [
-                bm.loops.layers.uv.values(),
-                bm.loops.layers.color.values()
-            ],
-            [
-                lambda a, b: a.uv != b.uv,
-                lambda a, b: a != b
-            ]
-        )
+        # Set SkinPLG
+        skin = self.init_skin_plg(obj, mesh)
 
-        bm.to_mesh(mesh)
-        return new_verts
+        has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
+        has_night_colors  = len(mesh.vertex_colors) > 1 and obj.dff.night_cols
+
+        # These are used to set the vertex indices for new vertices
+        # created in the next loop to get rid of shared vertices.
+        override_faces = {}
+        
+        # Vertices and Normals
+        i = 0
+        length = len(bm.verts)
+        while i < len(bm.verts):
+            vertex = bm.verts[i]
             
-    #######################################################
-    def new_populate_atomic(obj):
-        self = dff_exporter
-
-        geometry = dff.Geometry()
-
-        mesh = self.convert_to_mesh(obj)
-        new_verts = self.post_process_mesh(mesh)
-
-        mesh.calc_normals_split()
-
-        # Vertices
-        for vertex in mesh.vertices:
             geometry.vertices.append(dff.Vector._make(vertex.co))
             geometry.normals.append(dff.Vector._make(vertex.normal))
 
-        # Faces
-        for face in mesh.polygons:
+            # These are already filtered vertices, no need to check them again
+            if i >= length:
+                i += 1
+                continue
             
-            geometry.triangles.append(
-                dff.Triangle._make((
-                    face.vertices[1], #b
-                    face.vertices[0], #a
-                    face.material_index, #material
-                    face.vertices[2] #c
-                ))
+            shared_loops = self.get_vertex_shared_loops(
+                vertex,
+                [
+                    bm.loops.layers.uv.values(),
+                    bm.loops.layers.color.values()
+                ],
+                [
+                    lambda a, b: a.uv != b.uv,
+                    lambda a, b: a != b
+                ]
             )
+            
+            # create a fork
+            for loop in shared_loops:
+                face = loop.face
+                face.loops.index_update()
 
-        # UV Maps and Prelighting
-        has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
-        has_night_colors  = len(mesh.vertex_colors) > 1 and obj.dff.night_cols
+                if face.index not in override_faces:
+                    override_faces[face.index] = [
+                        vert.index for vert in face.verts
+                    ]
+                
+                override_faces[face.index][loop.index] = len(bm.verts)
+                
+                # Update the SkinPLG to include the duplicated vertex
+                if skin is not None:
+                    bone_indices = skin.vertex_bone_indices
+                    bone_weights = skin.vertex_bone_weights
+                    
+                    bone_indices.append(bone_indices[vertex.index])
+                    bone_weights.append(bone_weights[vertex.index])
+                    
+                bm.verts.new(vertex.co, vertex)
+                bm.verts.ensure_lookup_table()
+            
+            i += 1
+
+        # Allocate uv layers/vertex colors array
 
         # This number denotes what the maximum number of uv maps exported will be.
         # If obj.dff.uv_map2 is set (i.e second UV map WILL be exported), the
         # maximum will be 2. If obj.dff.uv_map1 is NOT set, the maximum cannot
         # be greater than 0.
         max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
-
-        # Initialise coordinates to default values
-        uv_layers_count = min(len(mesh.uv_layers), max_uv_layers)
-        geometry.uv_layers = [[dff.TexCoords(0,0)] * len(mesh.vertices)
+        
+        uv_layers_count = min(len(bm.loops.layers.uv), max_uv_layers)
+        geometry.uv_layers = [[dff.TexCoords(0,0)] * len(bm.verts)
                               for i in range(uv_layers_count)]
-
-        night_cols = None # Temporary storage for usage in Geometry extension
-        
+        extra_vert = None
         if has_prelit_colors:
-            geometry.prelit_colors = [
-                dff.RGBA(255,255,255,255)] * len(mesh.vertices)
+            geometry.prelit_colors = [dff.RGBA(255,255,255,255)] * len(bm.verts)
+
+        if has_night_colors:
+            extra_vert = dff.ExtraVertColorExtension(
+                [dff.RGBA(255,255,255,255)] * len(bm.verts)
+            )
             
-            if has_night_colors:
-                night_cols = dff.ExtraVertColorExtension(
-                    [dff.RGBA(255,255,255,255)] * len(mesh.vertices)
-                )
-        
-        for loop in mesh.loops:
+        # Faces
+        for face in bm.faces:
 
-            # UV Map
-            for index, layer in enumerate(mesh.uv_layers):
-
-                if index >= max_uv_layers:
-                    break
+            verts = [vert.index for vert in face.verts]
+            if face.index in override_faces:
+                verts = override_faces[face.index]
                 
-                uv = layer.data[loop.index].uv
+            geometry.triangles.append(                
+                dff.Triangle._make((
+                    verts[1], #b
+                    verts[0], #a
+                    face.material_index, #material
+                    verts[2] #c
+                ))
+            )
+
+            face.loops.index_update()
+            for loop in face.loops:
                 
-                geometry.uv_layers[index][loop.vertex_index] = dff.TexCoords(
-                    uv[0],
-                    1 - uv[1] # UV Coordinates are flipped in the Y Axis
-                )
+                # Set UV Coordinates for this face
+                for index, layer in enumerate(bm.loops.layers.uv.values()):
 
-            # Set prelighting colours for this face
-            if has_prelit_colors:
-                for index, layer in enumerate(mesh.vertex_colors):
+                    if index >= max_uv_layers:
+                        break
+                    
+                    uv = loop[layer].uv
+                    geometry.uv_layers[index][verts[loop.index]] = dff.TexCoords(
+                        uv.x, 1 - uv.y #UV Coordinates are flipped in the Y Axis
+                    )
 
-                    color = layer.data[loop.index].color
+                # Set prelit faces for this face
+                for index, layer in enumerate(bm.loops.layers.color.values()):
+                    
+                    color = list(loop[layer])
                     if len(color) < 4:
                         color.append(1)
-
+                        
                     prelit_color = dff.RGBA._make(
                         int(c * 255) for c in color
                     )
-
-                    # Day vertex color
-                    if index == 0:
-                        geometry.prelit_colors[loop.vertex_index] = prelit_color
-
-                    # Night vertex color
-                    elif index == 1:
-                        night_cols.colors[loop.vertex_index] = prelit_color
-                        break
-            
-            geometry.normals[loop.vertex_index] = loop.normal
-
-        for vert in new_verts:
-            vertex = mesh.vertices[vert]
-            for new_vert in new_verts[vert]:
-                print(geometry.normals[new_vert], vertex.normal) 
-                geometry.normals[new_vert] = vertex.normal
-            
-
+                        
+                    if index == 0 and has_prelit_colors:
+                        geometry.prelit_colors[verts[loop.index]] = prelit_color
+                            
+                    elif index == 1 and has_night_colors:
+                        extra_vert.colors[verts[loop.index]] = prelit_color
+                
         self.create_frame(obj)
-        geometry.bounding_sphere = self.calculate_bounding_sphere(obj)
+
+        # Custom Split Normals
+        mesh.calc_normals_split()
+
+        for loop in mesh.loops:
+            geometry.normals[loop.vertex_index] = loop.normal
+        
+        # Bounding sphere
+        sphere_center = 0.125 * sum(
+            (mathutils.Vector(b) for b in obj.bound_box),
+            mathutils.Vector()
+        )
+        sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
+        sphere_radius = 1.414 * max(*obj.dimensions) # sqrt(2) * side = diagonal
+
+        geometry.bounding_sphere = dff.Sphere._make(
+            list(sphere_center) + [sphere_radius]
+        )
 
         geometry.surface_properties = (0,0,0)
         geometry.materials = self.generate_material_list(obj)
 
-        # Extensions
-
         geometry.export_flags['export_normals'] = obj.dff.export_normals
         geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
         
-        skin = self.init_skin_plg(obj, mesh)
         if skin is not None:
             geometry.extensions['skin'] = skin
-        if night_cols:
-            geometry.extensions['extra_vert_color'] = night_cols
-            
+        if extra_vert:
+            geometry.extensions['extra_vert_color'] = extra_vert
+
         try:
             if obj.dff.pipeline != 'NONE':
                 if obj.dff.pipeline == 'CUSTOM':
@@ -658,20 +655,8 @@ class dff_exporter:
                                            0
         ))
         self.dff.atomic_list.append(atomic)
-        
-    #######################################################
-    def calculate_bounding_sphere(obj):
-        self = dff_exporter
-        
-        sphere_center = 0.125 * sum(
-            (mathutils.Vector(b) for b in obj.bound_box),
-            mathutils.Vector()
-        )
-        sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
-        sphere_radius = 1.414 * max(*obj.dimensions) # sqrt(2) * side = diagonal
+        bm.free()
 
-        return dff.Sphere._make(list(sphere_center) + [sphere_radius])
-        
     #######################################################
     def calculate_parent_depth(obj):
         parent = obj.parent
@@ -757,7 +742,7 @@ class dff_exporter:
 
             # create atomic in this case
             if obj.type == "MESH":
-                self.new_populate_atomic(obj)
+                self.populate_atomic(obj)
 
             # create an empty frame
             elif obj.type == "EMPTY":
