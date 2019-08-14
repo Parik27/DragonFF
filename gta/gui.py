@@ -275,6 +275,9 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     }
                 )
 
+                if importer.warning != "":
+                    self.report({'WARNING'}, importer.warning)
+
                 version = importer.version
 
                 # Set imported version to scene settings for use later in export.

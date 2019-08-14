@@ -394,7 +394,6 @@ class dff_exporter:
             skin.vertex_bone_indices.append([0,0,0,0])
             skin.vertex_bone_weights.append([0,0,0,0])
             for index, group in enumerate(vertex.groups):
-
                 # Only upto 4 vertices per group are supported
                 if index >= 4:
                     break
@@ -448,7 +447,7 @@ class dff_exporter:
             
             depsgraph   = bpy.context.evaluated_depsgraph_get()
             object_eval = obj.evaluated_get(depsgraph)
-            mesh        = object_eval.to_mesh()
+            mesh        = object_eval.to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
             
 
         # Re enable disabled modifiers
@@ -473,7 +472,7 @@ class dff_exporter:
 
         bm.verts.ensure_lookup_table()
         bm.verts.index_update()
-
+        
         # Set SkinPLG
         skin = self.init_skin_plg(obj, mesh)
 

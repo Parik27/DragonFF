@@ -69,6 +69,7 @@ class dff_importer:
     remove_doubles     = False
     group_materials    = False
     version            = ""
+    warning            = ""
 
     __slots__ = [
         'dff',
@@ -98,6 +99,7 @@ class dff_importer:
         self.skin_data = {}
         self.bones = {}
         self.materials = {}
+        self.warning = ""
 
     #######################################################
     # TODO: Cyclomatic Complexity too high
@@ -130,7 +132,17 @@ class dff_importer:
 
             # Will use this later when creating frames to construct an armature
             if 'skin' in geom.extensions:
-                self.skin_data[atomic.frame] = geom.extensions['skin']
+
+                if atomic.frame in self.skin_data:
+                    skin = geom.extensions['skin']
+                    self.skin_data[atomic.frame].vertex_bone_indices += \
+                        skin.vertex_bone_indices
+                    self.skin_data[atomic.frame].vertex_bone_weights += \
+                        skin.vertex_bone_weights
+                    
+                else:
+                    self.skin_data[atomic.frame] = geom.extensions['skin']
+                    
             
             # Add UV Layers
             for layer in geom.uv_layers:
@@ -218,9 +230,26 @@ class dff_importer:
 
             # Import materials and add the mesh to the meshes list
             self.import_materials(geom, frame, mesh)
-            self.meshes[atomic.frame] = mesh
+            if atomic.frame in self.meshes:
+                self.merge_meshes(self.meshes[atomic.frame], mesh)
 
-               
+                self.warning = \
+                "Multiple Meshes with same Atomic index. Export will be invalid."
+                
+                pass
+            else:
+                self.meshes[atomic.frame] = mesh
+
+
+    #######################################################
+    def merge_meshes(mesha, meshb):
+        bm = bmesh.new()
+
+        bm.from_mesh(mesha)
+        bm.from_mesh(meshb)
+
+        bm.to_mesh(mesha)
+                
     #######################################################
     def set_empty_draw_properties(empty):
         if (2, 80, 0) > bpy.app.version:
@@ -492,7 +521,7 @@ class dff_importer:
 
                 bone = skin_data.vertex_bone_indices[i][j]
                 weight = skin_data.vertex_bone_weights[i][j]
-
+                
                 obj.vertex_groups[bone].add([i], weight, 'ADD')
 
     #######################################################
