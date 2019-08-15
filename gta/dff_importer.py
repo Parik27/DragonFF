@@ -265,7 +265,60 @@ class dff_importer:
         
         for effect in effects.entries:
             pass
-    
+
+    ##################################################################
+    def generate_material_name(material, fallback):
+
+        name = None
+        
+        patterns = {
+            "vehiclegeneric": "generic",
+            "interior": "interior",
+            "vehiclesteering": "steering"
+        }
+
+        if material.is_textured:
+            texture = material.textures[0].name
+
+            for pattern in patterns:
+                if pattern in texture:
+                    name = patterns[pattern]
+
+        mat_color = material.color
+        if mat_color.a < 200:
+            name = "glass"
+
+        colors = {
+            "[255, 60, 0, 255]": "right rear light",
+            "[185, 255, 0, 255]": "left rear light",
+            "[0, 255, 200, 255]": "right front light",
+            "[255, 175, 0, 255]": "left front light",
+            "[255, 0, 175, 255]": "secondary",
+            "[60, 255, 0, 255]": "primary",
+            "[184, 255, 0, 255]": "breaklight l",
+            "[255, 59, 0, 255]": "breaklight r",
+            "[255, 173, 0, 255]": "revlight L",
+            "[0, 255, 198, 255]": "revlight r",
+            "[255, 174, 0, 255]": "foglight l",
+            "[0, 255, 199, 255]": "foglight r",
+            "[183, 255, 0, 255]": "indicator lf",
+            "[255, 58, 0, 255]": "indicator rf",
+            "[182, 255, 0, 255]": "indicator lm",
+            "[255, 57, 0, 255]": "indicator rm",
+            "[181, 255, 0, 255]": "indicator lr",
+            "[255, 56, 0, 255]": "indicator rr",
+            "[0, 16, 255, 255]": "light night",
+            "[0, 17, 255, 255]": "light all-day",
+            "[0, 18, 255, 255]": "default day"
+        }
+
+        for color in colors:
+            print(eval(color), list(mat_color))
+            if eval(color) == list(mat_color):
+                name = colors[color]
+                
+        return name if name else fallback
+        
     ##################################################################
     # TODO: MatFX: Dual Textures
     def import_materials(geometry, frame, mesh):
@@ -283,7 +336,8 @@ class dff_importer:
             
             # Generate a nice name with index and frame
             name = "%s.%d" % (frame.name, index)
-
+            name = self.generate_material_name(material, name)
+            
             mat = bpy.data.materials.new(name)
             helper = material_helper(mat)
             
@@ -710,4 +764,5 @@ def import_dff(options):
 
     dff_importer.import_dff(options['file_name'])
 
+    return dff_importer
     return dff_importer
