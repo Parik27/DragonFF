@@ -17,6 +17,8 @@
 import bpy
 import os
 from . import dff_importer, dff_exporter, col_importer
+from .importer_common import game_version
+from . import map_data
 
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
@@ -701,48 +703,39 @@ compatibiility with DFF Viewers"
 #######################################################
 class DFFSceneProps(bpy.types.PropertyGroup):
 
-    engine_version = bpy.props.EnumProperty(
+    #######################################################    
+    def update_map_sections(self, context):
+        return map_data.data[self.game_version_dropdown]['IPL_paths']
+        
+    game_version_dropdown = bpy.props.EnumProperty(
+        name = 'Game',
         items = (
-            ('III', 'GTA III', 'IPL and IDE data structures used in GTA III'),
-            # ('VC', 'GTA VC', 'IPL and IDE data structures used in GTA VC'),
-            # ('SA', "GTA SA", 'IPL and IDE data structures used in GTA SA')
+            (game_version.III, 'GTA III', 'GTA III map segments'),
+            (game_version.VC, 'GTA VC', 'GTA VC map segments'),
+            (game_version.SA, 'GTA SA', 'GTA SA map segments'),
+            (game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
+            (game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
         )
     )
 
-    # TODO: load appropriate list for each game
     map_sections = bpy.props.EnumProperty(
-        items = (
-            ('DATA\\MAPS\\INDUSTNE\\INDUSTNE.IPL', 'industne' , ''),
-            ('DATA\\MAPS\\INDUSTNW\\INDUSTNW.IPL', 'industnw' , ''),
-            ('DATA\\MAPS\\INDUSTSE\\INDUSTSE.IPL', 'industse' , ''),
-            ('DATA\\MAPS\\INDUSTSW\\INDUSTSW.IPL', 'industsw' , ''),
-            ('DATA\\MAPS\\COMNtop\\COMNtop.IPL',   'comntop'  , ''),
-            ('DATA\\MAPS\\COMNbtm\\COMNbtm.IPL',   'comnbtm'  , ''),
-            ('DATA\\MAPS\\COMSE\\COMSE.IPL',       'comse'    , ''),
-            ('DATA\\MAPS\\COMSW\\COMSW.IPL',       'comsw'    , ''),
-            ('DATA\\MAPS\\LANDne\\LANDne.IPL',     'landne'   , ''),
-            ('DATA\\MAPS\\LANDsw\\LANDsw.IPL',     'landsw'   , ''),
-            ('DATA\\MAPS\\overview.IPL',           'overview' , ''),
-            ('DATA\\MAPS\\props.IPL',              'props'    , ''),
-            ('DATA\\MAPS\\CULL.IPL',               'cull'     , '')
-        )
+        name = 'Map segment',
+        items = update_map_sections
     )
 
-    game_root = bpy.props.StringProperty \
-        (
+    game_root = bpy.props.StringProperty(
         name = 'Game root',
-        default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto 3',
+        default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\',
         description = "Folder with the game's executable",
         subtype = 'DIR_PATH'
-        )
+    )
 
-    dff_folder = bpy.props.StringProperty \
-        (
+    dff_folder = bpy.props.StringProperty(
         name = 'Dff folder',
         default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\dff',
         description = "Define a folder where all of the dff models are stored.",
         subtype = 'DIR_PATH'
-        )
+    )
 
     # txd_folder = bpy.props.StringProperty \
     #     (
@@ -752,7 +745,6 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     #     subtype = 'DIR_PATH'
     #     )
 
-            
     #######################################################    
     def register():
         bpy.types.Scene.dff = bpy.props.PointerProperty(type=DFFSceneProps)
@@ -778,8 +770,8 @@ class MapImportPanel(bpy.types.Panel):
                                 align=True)
 
         col = flow.column()
-        col.prop(settings, "engine_version", text="Game")
-        col.prop(settings, "map_sections", text="Map section")
+        col.prop(settings, "game_version_dropdown", text="Game")
+        col.prop(settings, "map_sections", text="Map segment")
 
         layout.separator()
 

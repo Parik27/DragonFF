@@ -140,7 +140,7 @@ class Map_Import_Operator(bpy.types.Operator):
 
         # Get all the necessary IDE and IPL data
         map_data = map_utilites.MapDataUtility.getMapData(
-            self.settings.engine_version,
+            self.settings.game_version_dropdown,
             self.settings.game_root,
             self.settings.map_sections)
         

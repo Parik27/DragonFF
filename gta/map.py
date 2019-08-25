@@ -166,17 +166,17 @@ class MapDataUtility:
         return sections
 
     ########################################################################
-    def getMapData(gameEnum, gameRoot, iplSection):
+    def getMapData(gameID, gameRoot, iplSection):
         
         # TODO: choose correct IDE/IPL files dict
-        # if(gameEnum == EngineVersion.GTA_III)
+        data = map_data.data[gameID]
 
         ide = {}
 
-        for file in map_data.III_IDE:
+        for file in data['IDE_paths']:
             sections = MapDataUtility.readFile(
-                "%s/%s" % (gameRoot, file['path']),
-                map_data.III_structures
+                "%s/%s" % (gameRoot, file),
+                data['structures']
             )
             ide = MapDataUtility.merge_dols(ide, sections)
 
@@ -184,12 +184,11 @@ class MapDataUtility:
 
         sections = MapDataUtility.readFile(
             "%s/%s" % (gameRoot, iplSection),
-            map_data.III_structures
+            data['structures']
         )
         ipl = MapDataUtility.merge_dols(ipl, sections)
 
         # Extract relevant sections
-        # Maybe there's more in VC / SA, for now, only testing III
         object_instances = []
         object_data = {}
 
