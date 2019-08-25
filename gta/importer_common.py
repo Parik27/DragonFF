@@ -16,6 +16,14 @@
 
 import bpy
 from . import dff
+from collections import namedtuple
+
+game_version = namedtuple("game_version", "III VC SA LCS VCS")
+game_version.III = 'III'
+game_version.VC = 'VC'
+game_version.SA = 'SA'
+game_version.LCS = 'LCS'
+game_version.VCS = 'VCS'
 
 #######################################################            
 def set_object_mode(obj, mode):
