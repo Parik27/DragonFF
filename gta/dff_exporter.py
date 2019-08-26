@@ -615,8 +615,11 @@ class dff_exporter:
             mathutils.Vector()
         )
         sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
-        sphere_radius = 1.414 * max(*obj.dimensions) # sqrt(2) * side = diagonal
+        sphere_radius = 1.732 * max(*obj.dimensions) / 2
+        print(sphere_radius)
 
+        
+        
         geometry.bounding_sphere = dff.Sphere._make(
             list(sphere_center) + [sphere_radius]
         )

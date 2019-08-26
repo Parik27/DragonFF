@@ -567,7 +567,7 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 #######################################################
 class DFFMaterialProps(bpy.types.PropertyGroup):
 
-    ambient           = bpy.props.FloatProperty  (name="Ambient Shading")
+    ambient           = bpy.props.FloatProperty  (name="Ambient Shading", default=1)
     
     # Environment Map
     export_env_map    = bpy.props.BoolProperty   (name="Environment Map")
@@ -635,6 +635,17 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     def register():
         bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
 
+#######################################################
+class DFFColObjectProps(bpy.types.PropertyGroup):
+
+    type = (
+        ('SPH', 'Sphere', 'A Collision Sphere'),
+        ('BOX', 'Box', 'A Collision Box'),
+        ('MESH', 'Mesh', 'A Collision Mesh (for only meshes)')
+    )
+
+    #
+        
 #######################################################
 class DFFObjectProps(bpy.types.PropertyGroup):
 
