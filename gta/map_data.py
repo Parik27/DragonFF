@@ -20,10 +20,6 @@
 # complex or not useful enough to even bother with. Or they're not sufficiently
 # documented.
 
-# Most of these haven't been tested at all. Some of these have a variable number
-# of parameters, which needs to be accounted for when reading into these
-# structures. They're marked with suffixes _1, _2, _3, etc.
-
 from collections import namedtuple
 from .importer_common import game_version
 
