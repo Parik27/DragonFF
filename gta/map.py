@@ -58,8 +58,9 @@ class GenericSectionUtility:
             else:
                 # Add entry
                 entries.append(dataStructure(*lineParams))
-                # Read next line
-                line = fileStream.readline().strip()
+
+            # Read next line
+            line = fileStream.readline().strip()
 
         return entries
 
@@ -133,7 +134,7 @@ class MapDataUtility:
 
         sections = {}
 
-        with open(filename) as fileStream:
+        with open(filename, 'r', encoding='latin-1') as fileStream:
             line = fileStream.readline().strip()
             while line:
 
@@ -175,7 +176,7 @@ class MapDataUtility:
 
         for file in data['IDE_paths']:
             sections = MapDataUtility.readFile(
-                "%s/%s" % (gameRoot, file),
+                "%s%s" % (gameRoot, file),
                 data['structures']
             )
             ide = MapDataUtility.merge_dols(ide, sections)
@@ -183,7 +184,7 @@ class MapDataUtility:
         ipl = {}
 
         sections = MapDataUtility.readFile(
-            "%s/%s" % (gameRoot, iplSection),
+            "%s%s" % (gameRoot, iplSection),
             data['structures']
         )
         ipl = MapDataUtility.merge_dols(ipl, sections)

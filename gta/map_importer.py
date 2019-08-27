@@ -175,6 +175,6 @@ class Map_Import_Operator(bpy.types.Operator):
         obj.rotation_quaternion.y = float(inst.rotY)
         obj.rotation_quaternion.z = float(inst.rotZ)
 
-        obj.scale.x = float(inst.scaleX)
-        obj.scale.y = float(inst.scaleY)
-        obj.scale.z = float(inst.scaleZ)
+        if hasattr(inst, 'scaleX'): obj.scale.x = float(inst.scaleX)
+        if hasattr(inst, 'scaleY'): obj.scale.y = float(inst.scaleY)
+        if hasattr(inst, 'scaleZ'): obj.scale.z = float(inst.scaleZ)
