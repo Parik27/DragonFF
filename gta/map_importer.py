@@ -42,16 +42,16 @@ class Map_Import_Operator(bpy.types.Operator):
             self._calcs_done = True
             return
 
-        # Deleted objects that Rockstar forgot to remove?
-        if self._inst_index in self._object_instances:
-            return
-
         # Fetch next inst
         inst = self._object_instances[self._inst_index]
         self._inst_index += 1
 
         # Skip LODs if user selects this
         if hasattr(inst, 'lod') and int(inst.lod) == -1 and self.settings.skip_lod:
+            return
+
+        # Deleted objects that Rockstar forgot to remove?
+        if inst.id not in self._object_data:
             return
 
         model = self._object_data[inst.id].modelName
