@@ -56,10 +56,10 @@ class Sections:
 
         global TSurface, TVertex, TBox, TBounds, TSphere, TFace, TFaceGroup
         
-        TSurface = namedtuple("TSurface" , "material flag brightness light")
+        TSurface = namedtuple("TSurface" , "material flags brightness light")
         TVertex  = namedtuple("TVertex"  , "x y z")
         TBox     = namedtuple("TBox"     , "min max surface")
-        
+
         if version == 1:
             
             TBounds = namedtuple("TBounds", "radius center min max")
@@ -222,7 +222,7 @@ class coll:
         model.mesh_faces += self.__read_block(TFace)
 
     #######################################################
-    def __read_new_col(self, model):
+    def __read_new_col(self, model, pos):
         sphere_count, box_count, face_count, line_count, flags, \
             spheres_offset, box_offset, lines_offset, verts_offset, \
             faces_offset, triangles_offset = \
@@ -238,31 +238,26 @@ class coll:
             self.__incr(4)
 
         # Spheres
-        self._pos = spheres_offset + 4
+        self._pos = pos + spheres_offset + 4
         model.spheres += self.__read_block(TSphere, sphere_count)
 
         # Boxes
-        self._pos = box_offset + 4
+        self._pos = pos + box_offset + 4
         model.cubes += self.__read_block(TBox, box_count)
         
         # Faces
-        self._pos = faces_offset + 4
+        self._pos = pos + faces_offset + 4
         model.mesh_faces += self.__read_block(TFace, face_count)
-
-        # Vertices
-        # Calculate the count first
-        self._pos = faces_offset + 4
-
-        if flags & 8: #has face groups
-            self._pos -= 4
-            face_group_count = unpack_from("<I", self._data, self._pos)
-
-            self._pos -= 28 * face_group_count
-
-        verts_count = (self._pos - verts_offset) // 6
-        self._pos = verts_offset + 4
+        
+        verts_count = 0
+        # Calculate Verts count
+        for i in model.mesh_faces:
+            verts_count = max(verts_count, i.a, i.b, i.c) + 1
+            
+        # Vertices        
+        self._pos = pos + verts_offset + 4
         model.mesh_verts += self.__read_block(TVertex, verts_count)
-
+        
         # Calculate the actual vertices
         for i, vertex in enumerate(model.mesh_verts):
             model.mesh_verts[i] = (
@@ -275,7 +270,7 @@ class coll:
         if model.version >= 3 and flags & 16:
 
             # Vertices
-            self._pos = shadow_verts_offset + 4
+            self._pos = pos + shadow_verts_offset + 4
             verts_count = (shadow_faces_offset - shadow_verts_offset) // 6
             model.shadow_verts += self.__read_block(TVertex, verts_count)
 
@@ -287,7 +282,7 @@ class coll:
                 )
             
             # Faces
-            self._pos = shadow_faces_offset + 4
+            self._pos = pos + shadow_faces_offset + 4
             model.shadow_faces += self.__read_block(TFace, shadow_mesh_face_count)
         
     #######################################################
@@ -336,7 +331,7 @@ class coll:
         if model.version == 1:
             self.__read_legacy_col(model)
         else:
-            self.__read_new_col(model)
+            self.__read_new_col(model, pos)
 
         self._pos = pos + header.file_size + 8 # set to next model
         return model
@@ -347,7 +342,10 @@ class coll:
         self._pos = 0
 
         while self._pos < len(self._data):
-            self.models.append(self.__read_col())
+            try:
+                self.models.append(self.__read_col())
+            except RuntimeError:
+                return
     
     #######################################################
     def load_file(self, filename):
