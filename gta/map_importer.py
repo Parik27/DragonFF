@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
+import os
 from . import map as map_utilites, dff_importer
 
 #######################################################
@@ -90,7 +91,9 @@ class Map_Import_Operator(bpy.types.Operator):
             print(str(inst.id) + ' loaded from cache')
         else:
 
-            # Import dff from a file
+            # Import dff from a file if file exists
+            if not os.path.isfile("%s/%s.dff" % (self.settings.dff_folder, model)):
+                return
             importer = dff_importer.import_dff(
                 {
                     'file_name'      : "%s/%s.dff" % (
