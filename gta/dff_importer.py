@@ -352,9 +352,9 @@ class dff_importer:
                 # name.None shouldn't exist, lol / Share loaded images among imported materials
                 if (image_name in bpy.data.images and
                         path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                    image = bpy.data.images["%s.%s" % (texture.name, self.image_ext)]
+                    image = bpy.data.images[image_name]
                 else:
-                    image = load_image("%s.%s" % (texture.name, self.image_ext),
+                    image = load_image(image_name,
                                        path,
                                        recursive=False,
                                        place_holder=True,
@@ -384,10 +384,9 @@ class dff_importer:
                         # see name.None note above / Share loaded images among imported materials
                         if (image_name in bpy.data.images and
                                 path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                            image = bpy.data.images["%s.%s" % (texture.name, self.image_ext)]
+                            image = bpy.data.images[image_name]
                         else:
-                            image = load_image("%s.%s" % (texture.name,
-                                                          self.image_ext),
+                            image = load_image(image_name,
                                                path,
                                                recursive=False,
                                                place_holder=True,
