@@ -86,6 +86,8 @@ class material_helper:
         if self.principled:
             self.principled.base_color_texture.node_image.label = label
             self.principled.base_color_texture.image            = image
+            self.material.node_tree.links.new(self.principled.base_color_texture.node_image.outputs['Alpha'],
+                                              self.principled.node_principled_bsdf.inputs['Alpha'])
             
         else:
             slot               = self.material.texture_slots.add()

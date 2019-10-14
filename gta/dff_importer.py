@@ -339,6 +339,7 @@ class dff_importer:
             name = self.generate_material_name(material, name)
             
             mat = bpy.data.materials.new(name)
+            mat.blend_method = 'CLIP'
             helper = material_helper(mat)
             
             helper.set_base_color(material.color)
