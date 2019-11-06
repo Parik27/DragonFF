@@ -621,7 +621,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     specular_texture : bpy.props.StringProperty ()
 
     # Collision Data
-    is_col_material : bpy.props.BoolProperty()
+    col_flags       : bpy.props.IntProperty()
     col_brightness  : bpy.props.IntProperty()
     col_light       : bpy.props.IntProperty()
     col_mat_index   : bpy.props.IntProperty()

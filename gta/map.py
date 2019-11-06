@@ -43,7 +43,8 @@ class GenericSectionUtility:
 
             # Validate data structure
             if(dataStructure is None):
-                print(type(self).__name__+" error: No appropriate data structure found")
+                print(type(self).__name__+
+                      " error: No appropriate data structure found")
                 print("    Section name: " + self.sectionName)
                 print("    Line parameters: " + str(lineParams))
             elif(len(dataStructure._fields) != len(lineParams)):

@@ -74,7 +74,9 @@ class Map_Import_Operator(bpy.types.Operator):
                     modifier.use_edge_angle = False
 
                 if '{}.dff'.format(model) in bpy.data.collections:
-                    bpy.data.collections['{}.dff'.format(model)].objects.link(new_obj)
+                    bpy.data.collections['{}.dff'.format(model)].objects.link(
+                        new_obj
+                    )
                 else:
                     context.collection.objects.link(new_obj)
                 newGroup.append(new_obj)
@@ -130,7 +132,9 @@ class Map_Import_Operator(bpy.types.Operator):
                 self.import_object(context)
 
             # Update cursor progress indicator if something needs to be loaded
-            num = (float(self._inst_index) / float(len(self._object_instances))) if self._object_instances else 0
+            num = (
+                float(self._inst_index) / float(len(self._object_instances)
+                )) if self._object_instances else 0
             bpy.context.window_manager.progress_update(num)
 
             # Update dependency graph
@@ -189,6 +193,9 @@ class Map_Import_Operator(bpy.types.Operator):
         obj.rotation_quaternion.y = float(inst.rotY)
         obj.rotation_quaternion.z = float(inst.rotZ)
 
-        if hasattr(inst, 'scaleX'): obj.scale.x = float(inst.scaleX)
-        if hasattr(inst, 'scaleY'): obj.scale.y = float(inst.scaleY)
-        if hasattr(inst, 'scaleZ'): obj.scale.z = float(inst.scaleZ)
+        if hasattr(inst, 'scaleX'):
+            obj.scale.x = float(inst.scaleX)
+        if hasattr(inst, 'scaleY'):
+            obj.scale.y = float(inst.scaleY)
+        if hasattr(inst, 'scaleZ'):
+            obj.scale.z = float(inst.scaleZ)
