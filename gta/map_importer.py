@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
+import os
 from . import map as map_utilites, dff_importer
 
 #######################################################
@@ -46,6 +47,14 @@ class Map_Import_Operator(bpy.types.Operator):
         inst = self._object_instances[self._inst_index]
         self._inst_index += 1
 
+        # Skip LODs if user selects this
+        if hasattr(inst, 'lod') and int(inst.lod) == -1 and self.settings.skip_lod:
+            return
+
+        # Deleted objects that Rockstar forgot to remove?
+        if inst.id not in self._object_data:
+            return
+
         model = self._object_data[inst.id].modelName
 
         if inst.id in self._model_cache:
@@ -54,7 +63,7 @@ class Map_Import_Operator(bpy.types.Operator):
             objGroup = self._model_cache[inst.id]
             newGroup = []
             for obj in objGroup:
-                new_obj = bpy.data.objects.new("test", obj.data)
+                new_obj = bpy.data.objects.new(model, obj.data)
                 new_obj.location = obj.location
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.scale = obj.scale
@@ -64,7 +73,10 @@ class Map_Import_Operator(bpy.types.Operator):
                 if(modifier is not None):
                     modifier.use_edge_angle = False
 
-                context.collection.objects.link(new_obj)
+                if '{}.dff'.format(model) in bpy.data.collections:
+                    bpy.data.collections['{}.dff'.format(model)].objects.link(new_obj)
+                else:
+                    context.collection.objects.link(new_obj)
                 newGroup.append(new_obj)
             # Parenting
             for obj in objGroup:
@@ -79,7 +91,9 @@ class Map_Import_Operator(bpy.types.Operator):
             print(str(inst.id) + ' loaded from cache')
         else:
 
-            # Import dff from a file
+            # Import dff from a file if file exists
+            if not os.path.isfile("%s/%s.dff" % (self.settings.dff_folder, model)):
+                return
             importer = dff_importer.import_dff(
                 {
                     'file_name'      : "%s/%s.dff" % (
@@ -115,8 +129,8 @@ class Map_Import_Operator(bpy.types.Operator):
             for x in range(10):
                 self.import_object(context)
 
-            # Update cursor progress indicator
-            num = (float(self._inst_index ) / float(len(self._object_instances)))
+            # Update cursor progress indicator if something needs to be loaded
+            num = (float(self._inst_index) / float(len(self._object_instances))) if self._object_instances else 0
             bpy.context.window_manager.progress_update(num)
 
             # Update dependency graph
@@ -140,7 +154,7 @@ class Map_Import_Operator(bpy.types.Operator):
 
         # Get all the necessary IDE and IPL data
         map_data = map_utilites.MapDataUtility.getMapData(
-            self.settings.engine_version,
+            self.settings.game_version_dropdown,
             self.settings.game_root,
             self.settings.map_sections)
         
@@ -175,6 +189,6 @@ class Map_Import_Operator(bpy.types.Operator):
         obj.rotation_quaternion.y = float(inst.rotY)
         obj.rotation_quaternion.z = float(inst.rotZ)
 
-        obj.scale.x = float(inst.scaleX)
-        obj.scale.y = float(inst.scaleY)
-        obj.scale.z = float(inst.scaleZ)
+        if hasattr(inst, 'scaleX'): obj.scale.x = float(inst.scaleX)
+        if hasattr(inst, 'scaleY'): obj.scale.y = float(inst.scaleY)
+        if hasattr(inst, 'scaleZ'): obj.scale.z = float(inst.scaleZ)

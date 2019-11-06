@@ -17,6 +17,8 @@
 import bpy
 import os
 from . import dff_importer, dff_exporter, col_importer
+from .importer_common import game_version
+from . import map_data
 
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
@@ -28,19 +30,19 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     bl_label       = "DragonFF DFF (.dff)"
     filename_ext   = ".dff"
 
-    filepath       = bpy.props.StringProperty(name="File path",
+    filepath       : bpy.props.StringProperty(name="File path",
                                               maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH')
     
-    filter_glob    = bpy.props.StringProperty(default="*.dff;*.col",
+    filter_glob    : bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
     
-    directory      = bpy.props.StringProperty(maxlen=1024,
+    directory      : bpy.props.StringProperty(maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH')
 
-    mass_export     =  bpy.props.BoolProperty(
+    mass_export     :  bpy.props.BoolProperty(
         name        = "Mass Export",
         default     = False
     )
@@ -50,16 +52,16 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         default     = True
     )
     
-    only_selected   =  bpy.props.BoolProperty(
+    only_selected   :  bpy.props.BoolProperty(
         name        = "Only Selected",
         default     = False
     )
-    reset_positions =  bpy.props.BoolProperty(
+    reset_positions :  bpy.props.BoolProperty(
         name        = "Preserve Positions",
         description = "Don't set object positions to (0,0,0)",
         default     = False
     )
-    export_version  = bpy.props.EnumProperty(
+    export_version  : bpy.props.EnumProperty(
         items =
         (
             ('0x33002', "GTA 3 (v3.3.0.2)", "Grand Theft Auto 3 PC (v3.3.0.2)"),
@@ -69,7 +71,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         ),
         name = "Version Export"
     )
-    custom_version      = bpy.props.StringProperty(
+    custom_version      : bpy.props.StringProperty(
         maxlen=7,
         default="",
         name = "Custom Version")
@@ -171,22 +173,22 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     bl_description = 'Import a Renderware DFF or COL File'
     bl_label       = "DragonFF DFF (.dff)"
 
-    filter_glob   = bpy.props.StringProperty(default="*.dff;*.col",
+    filter_glob   : bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
     
-    directory     = bpy.props.StringProperty(maxlen=1024,
+    directory     : bpy.props.StringProperty(maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH',
                                               options={'HIDDEN'})
     
     # Stores all the file names to read (not just the firsst)
-    files = bpy.props.CollectionProperty(
+    files : bpy.props.CollectionProperty(
         type    = bpy.types.OperatorFileListElement,
         options = {'HIDDEN'}
     )
 
     # Stores a single file path
-    filepath = bpy.props.StringProperty(
+    filepath : bpy.props.StringProperty(
          name        = "File Path",
          description = "Filepath used for importing the DFF/COL file",
          maxlen      = 1024,
@@ -195,39 +197,38 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
      )
 
     
-    load_txd =  bpy.props.BoolProperty(
+    load_txd :  bpy.props.BoolProperty(
         name        = "Load TXD file",
         default     = True
     )
 
-    connect_bones =  bpy.props.BoolProperty(
+    connect_bones :  bpy.props.BoolProperty(
         name        = "Connect Bones",
         description = "Whether to connect bones (not recommended for anim editing)",
         default     = False
     )
 
-    read_mat_split  =  bpy.props.BoolProperty(
+    read_mat_split  :  bpy.props.BoolProperty(
         name        = "Read Material Split",
         description = "Whether to read material split for loading triangles",
         default     = False
     )
 
-    load_images = bpy.props.BoolProperty(
+    load_images : bpy.props.BoolProperty(
         name    = "Scan for Images",
         default = True
     )
 
-    remove_doubles  =  bpy.props.BoolProperty(
+    remove_doubles  :  bpy.props.BoolProperty(
         name        = "Use Edge Split",
         default     = True
     )
-    
-    group_materials =  bpy.props.BoolProperty(
+    group_materials :  bpy.props.BoolProperty(
         name        = "Group Similar Materials",
         default     = True
     )
     
-    image_ext = bpy.props.EnumProperty(
+    image_ext : bpy.props.EnumProperty(
         items =
         (
             ("PNG", ".PNG", "Load a PNG image"),
@@ -313,7 +314,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
     bl_region_type = "WINDOW"
     bl_context     = "material"
 
-    ambient     =  bpy.props.BoolProperty(
+    ambient     :  bpy.props.BoolProperty(
         name        = "Export Material",
         default     = False
     )
@@ -594,43 +595,43 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 #######################################################
 class DFFMaterialProps(bpy.types.PropertyGroup):
 
-    ambient           = bpy.props.FloatProperty  (name="Ambient Shading", default=1)
+    ambient           : bpy.props.FloatProperty  (name="Ambient Shading", default=1)
     
     # Environment Map
-    export_env_map    = bpy.props.BoolProperty   (name="Environment Map")
-    env_map_tex       = bpy.props.StringProperty ()
-    env_map_coef      = bpy.props.FloatProperty  ()
-    env_map_fb_alpha  = bpy.props.BoolProperty   ()
+    export_env_map    : bpy.props.BoolProperty   (name="Environment Map")
+    env_map_tex       : bpy.props.StringProperty ()
+    env_map_coef      : bpy.props.FloatProperty  ()
+    env_map_fb_alpha  : bpy.props.BoolProperty   ()
 
     # Bump Map
-    export_bump_map   = bpy.props.BoolProperty   (name="Bump Map")
-    bump_map_tex      = bpy.props.StringProperty ()
+    export_bump_map   : bpy.props.BoolProperty   (name="Bump Map")
+    bump_map_tex      : bpy.props.StringProperty ()
 
     # Reflection
-    export_reflection    = bpy.props.BoolProperty  (name="Reflection Material")
-    reflection_scale_x   = bpy.props.FloatProperty ()
-    reflection_scale_y   = bpy.props.FloatProperty ()
-    reflection_offset_x  = bpy.props.FloatProperty ()
-    reflection_offset_y  = bpy.props.FloatProperty ()
-    reflection_intensity = bpy.props.FloatProperty ()
+    export_reflection    : bpy.props.BoolProperty  (name="Reflection Material")
+    reflection_scale_x   : bpy.props.FloatProperty ()
+    reflection_scale_y   : bpy.props.FloatProperty ()
+    reflection_offset_x  : bpy.props.FloatProperty ()
+    reflection_offset_y  : bpy.props.FloatProperty ()
+    reflection_intensity : bpy.props.FloatProperty ()
     
     # Specularity
-    export_specular  = bpy.props.BoolProperty(name="Specular Material")
-    specular_level   = bpy.props.FloatProperty  ()
-    specular_texture = bpy.props.StringProperty ()
+    export_specular  : bpy.props.BoolProperty(name="Specular Material")
+    specular_level   : bpy.props.FloatProperty  ()
+    specular_texture : bpy.props.StringProperty ()
 
     # Collision Data
-    col_brightness  = bpy.props.IntProperty()
-    col_light       = bpy.props.IntProperty()
-    col_mat_index   = bpy.props.IntProperty()
-    col_flags       = bpy.props.IntProperty()
+    is_col_material : bpy.props.BoolProperty()
+    col_brightness  : bpy.props.IntProperty()
+    col_light       : bpy.props.IntProperty()
+    col_mat_index   : bpy.props.IntProperty()
 
     # UV Animation
-    export_animation = bpy.props.BoolProperty   (name="UV Animation")
-    animation_name   = bpy.props.StringProperty ()
+    export_animation : bpy.props.BoolProperty   (name="UV Animation")
+    animation_name   : bpy.props.StringProperty ()
 
     # Pre-set Material Colours
-    preset_mat_cols = bpy.props.EnumProperty(
+    preset_mat_cols : bpy.props.EnumProperty(
         items =
         (
             ("[255, 60, 0, 255]", "Right Tail Light", ""),
@@ -666,7 +667,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
 class DFFObjectProps(bpy.types.PropertyGroup):
 
     # Atomic Properties
-    type = bpy.props.EnumProperty(
+    type : bpy.props.EnumProperty(
         items = (
             ('OBJ', 'Object', 'Object will be exported as a mesh or a dummy'),
             ('COL', 'Collision Object', 'Object is a collision object'),
@@ -676,7 +677,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
     )
 
     # Mesh properties
-    pipeline = bpy.props.EnumProperty(
+    pipeline : bpy.props.EnumProperty(
         items = (
             ('NONE', 'None', 'Export without setting a pipeline'),
             ('0x53F20098', 'Buildings', 'Refl. Building Pipleine (0x53F20098)'),
@@ -690,33 +691,33 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         name="Pipeline",
         description="Select the Engine rendering pipeline"
     )
-    custom_pipeline = bpy.props.StringProperty(name="Custom Pipeline")
+    custom_pipeline : bpy.props.StringProperty(name="Custom Pipeline")
     
-    export_normals = bpy.props.BoolProperty(
+    export_normals : bpy.props.BoolProperty(
         default=True,
         description="Whether Normals will be exported. (Disable for Map objects)"
     )
     
-    uv_map1 = bpy.props.BoolProperty(
+    uv_map1 : bpy.props.BoolProperty(
         default=True,
         description="First UV Map will be exported")
     
-    uv_map2 = bpy.props.BoolProperty(
+    uv_map2 : bpy.props.BoolProperty(
         default=True,
         description="Second UV Map will be exported"
     )
     
-    day_cols = bpy.props.BoolProperty(
+    day_cols : bpy.props.BoolProperty(
         default=True,
         description="Whether Day Vertex Prelighting Colours will be exported"
     )
     
-    night_cols = bpy.props.BoolProperty(
+    night_cols : bpy.props.BoolProperty(
         default=True,
         description="Extra prelighting colours. (Tip: Disable export normals)"
     )
     
-    export_binsplit = bpy.props.BoolProperty(
+    export_binsplit : bpy.props.BoolProperty(
         default=True,
         description="Enabling will increase file size, but will increase\
 compatibiility with DFF Viewers"
@@ -749,48 +750,44 @@ compatibiility with DFF Viewers"
 #######################################################
 class DFFSceneProps(bpy.types.PropertyGroup):
 
-    engine_version = bpy.props.EnumProperty(
+    #######################################################    
+    def update_map_sections(self, context):
+        return map_data.data[self.game_version_dropdown]['IPL_paths']
+        
+    game_version_dropdown : bpy.props.EnumProperty(
+        name = 'Game',
         items = (
-            ('III', 'GTA III', 'IPL and IDE data structures used in GTA III'),
-            # ('VC', 'GTA VC', 'IPL and IDE data structures used in GTA VC'),
-            # ('SA', "GTA SA", 'IPL and IDE data structures used in GTA SA')
+            (game_version.III, 'GTA III', 'GTA III map segments'),
+            (game_version.VC, 'GTA VC', 'GTA VC map segments'),
+            (game_version.SA, 'GTA SA', 'GTA SA map segments'),
+            (game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
+            (game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
         )
     )
 
-    # TODO: load appropriate list for each game
-    map_sections = bpy.props.EnumProperty(
-        items = (
-            ('DATA\\MAPS\\INDUSTNE\\INDUSTNE.IPL', 'industne' , ''),
-            ('DATA\\MAPS\\INDUSTNW\\INDUSTNW.IPL', 'industnw' , ''),
-            ('DATA\\MAPS\\INDUSTSE\\INDUSTSE.IPL', 'industse' , ''),
-            ('DATA\\MAPS\\INDUSTSW\\INDUSTSW.IPL', 'industsw' , ''),
-            ('DATA\\MAPS\\COMNtop\\COMNtop.IPL',   'comntop'  , ''),
-            ('DATA\\MAPS\\COMNbtm\\COMNbtm.IPL',   'comnbtm'  , ''),
-            ('DATA\\MAPS\\COMSE\\COMSE.IPL',       'comse'    , ''),
-            ('DATA\\MAPS\\COMSW\\COMSW.IPL',       'comsw'    , ''),
-            ('DATA\\MAPS\\LANDne\\LANDne.IPL',     'landne'   , ''),
-            ('DATA\\MAPS\\LANDsw\\LANDsw.IPL',     'landsw'   , ''),
-            ('DATA\\MAPS\\overview.IPL',           'overview' , ''),
-            ('DATA\\MAPS\\props.IPL',              'props'    , ''),
-            ('DATA\\MAPS\\CULL.IPL',               'cull'     , '')
-        )
+    map_sections : bpy.props.EnumProperty(
+        name = 'Map segment',
+        items = update_map_sections
     )
 
-    game_root = bpy.props.StringProperty \
-        (
+    skip_lod: bpy.props.BoolProperty(
+        name        = "Skip LOD Objects",
+        default     = False
+    )
+
+    game_root : bpy.props.StringProperty(
         name = 'Game root',
-        default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto 3',
+        default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\',
         description = "Folder with the game's executable",
         subtype = 'DIR_PATH'
-        )
+    )
 
-    dff_folder = bpy.props.StringProperty \
-        (
+    dff_folder : bpy.props.StringProperty(
         name = 'Dff folder',
         default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\dff',
         description = "Define a folder where all of the dff models are stored.",
         subtype = 'DIR_PATH'
-        )
+    )
 
     # txd_folder = bpy.props.StringProperty \
     #     (
@@ -800,7 +797,6 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     #     subtype = 'DIR_PATH'
     #     )
 
-            
     #######################################################    
     def register():
         bpy.types.Scene.dff = bpy.props.PointerProperty(type=DFFSceneProps)
@@ -826,8 +822,10 @@ class MapImportPanel(bpy.types.Panel):
                                 align=True)
 
         col = flow.column()
-        col.prop(settings, "engine_version", text="Game")
-        col.prop(settings, "map_sections", text="Map section")
+        col.prop(settings, "game_version_dropdown", text="Game")
+        col.prop(settings, "map_sections", text="Map segment")
+        col.separator()
+        col.prop(settings, "skip_lod", text="Skip LOD objects")
 
         layout.separator()
 

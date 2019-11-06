@@ -340,6 +340,7 @@ class dff_importer:
             name = self.generate_material_name(material, name)
             
             mat = bpy.data.materials.new(name)
+            mat.blend_method = 'CLIP'
             helper = material_helper(mat)
             
             helper.set_base_color(material.color)
@@ -348,14 +349,19 @@ class dff_importer:
             if material.is_textured == 1 and self.image_ext:
                 texture = material.textures[0]
                 path    = os.path.dirname(self.file_name)
+                image_name = "%s.%s" % (texture.name, self.image_ext)
 
-                # name.None shouldn't exist, lol
-                image = load_image("%s.%s" % (texture.name, self.image_ext),
-                                   path,
-                                   recursive=False,
-                                   place_holder=True,
-                                   check_existing=True
-                )
+                # name.None shouldn't exist, lol / Share loaded images among imported materials
+                if (image_name in bpy.data.images and
+                        path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
+                    image = bpy.data.images[image_name]
+                else:
+                    image = load_image(image_name,
+                                       path,
+                                       recursive=False,
+                                       place_holder=True,
+                                       check_existing=True
+                                       )
                 helper.set_texture(image, texture.name)
                 
             # Normal Map
@@ -375,15 +381,19 @@ class dff_importer:
 
                     if texture:
                         path = os.path.dirname(self.file_name)
+                        image_name = "%s.%s" % (texture.name, self.image_ext)
 
-                        # see name.None note above
-                        image = load_image("%s.%s" % (texture.name,
-                                                      self.image_ext),
-                                           path,
-                                           recursive=False,
-                                           place_holder=True,
-                                           check_existing=True
-                        )
+                        # see name.None note above / Share loaded images among imported materials
+                        if (image_name in bpy.data.images and
+                                path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
+                            image = bpy.data.images[image_name]
+                        else:
+                            image = load_image(image_name,
+                                               path,
+                                               recursive=False,
+                                               place_holder=True,
+                                               check_existing=True
+                                               )
 
                         helper.set_normal_map(image,
                                               texture.name,
