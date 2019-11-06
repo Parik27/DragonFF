@@ -18,6 +18,7 @@ import bpy
 import bmesh
 
 from . import col
+from . import col_materials as mats
 from .importer_common import (
     link_object, create_collection, hide_object, material_helper
 )
@@ -60,26 +61,55 @@ class col_importer:
             else:
                 obj.empty_display_type = 'SPHERE'
 
-            obj["col_surface"] = entity.surface
+            obj.dff.type = 'COL'
+            obj.dff.col_material = entity.surface.material
+            obj.dff.col_flags = entity.surface.flags
+            obj.dff.col_brightness = entity.surface.brightness
+            obj.dff.col_light = entity.surface.light
             
             link_object(obj, collection)
 
     #######################################################
     def __add_mesh_mats(self, object, materials):
 
-        # TODO: materials.ini integration needed
         for surface in materials:
-            mat = bpy.data.materials.new("")
+            
+            colour = mats.groups[mats.default['group']]
+            name = mats.groups[mats.default['group']]
+            
+            try:
+                # SA
+                if col.Sections.version == 3 or surface.material >= 34:
+                    mat = mats.sa_mats[surface.material]
+                    
+                # VC/III
+                else:
+                    mat = mats.vc_mats[surface.material]
 
-            mat.dff.is_col_material = True
+                
+                # Generate names
+                colour = mats.groups[mat[0]][1]
+                name = "%s - %s" % (mats.groups[mat[0]][0], mat[1])
+
+                # Convert hex to a value Blender understands
+                colour = [colour[0:2], colour[2: 4], colour[4: 6], "FF"]
+                colour = [int(x, 16) for x in colour]
+
+            except KeyError:
+                pass
+
+            mat = bpy.data.materials.new(name)
             mat.dff.col_mat_index   = surface.material
             mat.dff.col_brightness  = surface.brightness
             mat.dff.col_light       = surface.light
 
-            object.data.materials.append(mat)
+            helper = material_helper(mat)
+            helper.set_base_color(colour)
+            
+            object.data.materials.append(helper.material)
             
     #######################################################
-    def __add_mesh(self, collection, name, verts, faces):
+    def __add_mesh(self, collection, name, verts, faces, shadow=False):
 
         mesh      = bpy.data.meshes.new(name)
         materials = {}
@@ -116,6 +146,8 @@ class col_importer:
             bm.to_mesh(mesh)
         
         obj = bpy.data.objects.new(name, mesh)
+        obj.dff.type = 'SHA' if shadow else 'COL'
+        
         link_object(obj, collection)
 
         self.__add_mesh_mats(obj, materials)
@@ -130,7 +162,7 @@ class col_importer:
             collection = create_collection("%s.%s" % (collection_prefix,
                                                            model.model_name),
                                            link
-            )
+            )            
             self.__add_spheres(collection, model.spheres)
 
             if len(model.mesh_verts) > 0:
@@ -143,16 +175,10 @@ class col_importer:
                 self.__add_mesh(collection,
                                 collection.name + ".ShadowMesh",
                                 model.shadow_verts,
-                                model.shadow_faces)
+                                model.shadow_faces,
+                                True)
                         
             collection_list.append(collection)
-
-            # Hide objects
-            if (2, 80, 0) > bpy.app.version:
-                for obj in collection.objects:
-                    hide_object(obj)
-            else:
-               collection.hide_viewport = True     
 
         return collection_list
     
@@ -164,6 +190,6 @@ def import_col_file(filename, collection_prefix, link=True):
 
 #######################################################
 def import_col_mem(mem, collection_prefix, link=True):
-    
+
     col = col_importer.from_mem(mem)
     return col.add_to_scene(collection_prefix, link)

@@ -24,14 +24,14 @@ class ColModel:
         # initialise
         self.version       = None
         self.model_name    = None
-        self.model_id      = None
+        self.model_id      = 0
         self.bounds        = None
         self.spheres       = []
         self.cubes         = []
         self.mesh_verts    = []
         self.mesh_faces    = []
         self.lines         = []
-        self.flags         = None
+        self.flags         = 0
         self.shadow_verts  = []
         self.shadow_faces  = []
         self.col_mesh      = None
@@ -371,6 +371,7 @@ class coll:
     def __write_col_legacy(self, model):
         data = b''
 
+        print(model.spheres)
         data += self.__write_block(TSphere, model.spheres)
         data += pack('<I', 0)
         data += self.__write_block(TBox, model.cubes)
@@ -384,9 +385,9 @@ class coll:
         data = b''
 
         flags = 0
-        flags &= 2 if model.spheres or model.cubes or model.mesh_faces else 0
-        flags &= 16 if model.shadow_faces and model.version >= 3 else 0
-
+        flags |= 2 if model.spheres or model.cubes or model.mesh_faces else 0
+        flags |= 16 if model.shadow_faces and model.version >= 3 else 0
+        
         header_len = 104
         header_len += 12 if model.version >= 3 else 0
         header_len += 4 if model.version >= 4 else 0
@@ -421,11 +422,16 @@ class coll:
 
             # Shadow Vertices
             offsets.append(len(data) + header_len)
-            data += self.__write_block(TVertex, model.shadow_verts, False)
+            data += self.__write_block(TVertex,
+                                       Sections.compress_vertices(
+                                           model.shadow_verts),
+                                       False)
             
             # Shadow Vertices
             offsets.append(len(data) + header_len)
-            data += self.__write_block(TFace, model.shadow_faces, False)
+            data += self.__write_block(TFace,
+                                       model.shadow_faces,
+                                       False)
 
         # Write Header
         header_data = pack("<HHHBxIIIIIII",
@@ -484,7 +490,10 @@ class coll:
             file.write(content)
             
     #######################################################
-    def __init__(self):
+    def __init__(self, model = None):
         self.models = [ColModel()] * 0
         self._data = ""
         self._pos = 0
+
+        if model is not None:
+            self.models.append(model)

@@ -58,7 +58,7 @@ def hide_object(object, hide=True):
     if (2, 80, 0) > bpy.app.version:
         object.hide = hide
     else:
-        object.hide_viewport = hide
+        object.hide_set(hide)
 
 
 #######################################################
@@ -198,3 +198,23 @@ class material_helper:
             
             self.principled = PrincipledBSDFWrapper(self.material,
                                                     is_readonly=False)
+
+#######################################################
+class object_helper:
+
+    #######################################################
+    def __init__(self, name):
+
+        """
+        An object helper for importing different types of objects
+        """
+        
+        self.name = name
+        self.mesh = None
+        self.object = None
+
+    #######################################################
+    def get_object(self):
+        pass
+    
+    pass

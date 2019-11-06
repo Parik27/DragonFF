@@ -1,2 +1,2 @@
-tests/
 gta/__pycache__
+gta/GPUCache
