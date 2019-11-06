@@ -44,6 +44,11 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         name        = "Mass Export",
         default     = False
     )
+
+    export_coll     = bpy.props.BoolProperty(
+        name        = "Export Collision",
+        default     = True
+    )
     
     only_selected   =  bpy.props.BoolProperty(
         name        = "Only Selected",
@@ -97,6 +102,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             row.prop(self, "reset_positions")
 
         layout.prop(self, "only_selected")
+        layout.prop(self, "export_coll")
         layout.prop(self, "export_version")
 
         if self.export_version == 'custom':
@@ -135,7 +141,8 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 "directory"      : self.directory,
                 "selected"       : self.only_selected,
                 "mass_export"    : self.mass_export,
-                "version"        : self.get_selected_rw_version()
+                "version"        : self.get_selected_rw_version(),
+                "export_coll"    : self.export_coll
             }
         )
 
@@ -214,7 +221,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         name        = "Use Edge Split",
         default     = True
     )
-
+    
     group_materials =  bpy.props.BoolProperty(
         name        = "Group Similar Materials",
         default     = True
@@ -318,6 +325,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         settings = context.material.dff
 
         props = [["col_mat_index", "Material"],
+                 ["col_flags", "Flags"],
                  ["col_brightness", "Brightness"],
                  ["col_light", "Light"]]
         
@@ -461,7 +469,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         if not context.material or not context.material.dff:
             return
         
-        if context.material.dff.is_col_material:
+        if context.object.dff.type == 'COL':
             self.draw_col_menu(context)
             return
 
@@ -542,7 +550,22 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         # Second UV Map can only be disabled if the first UV map is enabled.
         if settings.uv_map1:
             box.prop(settings, "uv_map2", text="UV Map 2")
-    
+
+    #######################################################
+    def draw_col_menu(self, context):
+        layout = self.layout
+        settings = context.object.dff
+
+        box = layout.box()
+        box.label(text="Material Surface")
+        
+        box.prop(settings, "col_material", text="Material")
+        box.prop(settings, "col_flags", text="Flags")
+        box.prop(settings, "col_brightness", text="Brightness")
+        box.prop(settings, "col_light", text="Light")
+
+        pass
+            
     #######################################################
     def draw_obj_menu(self, context):
 
@@ -554,6 +577,10 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         if settings.type == 'OBJ':
             if context.object.type == 'MESH':
                 self.draw_mesh_menu(context)
+
+        elif settings.type == 'COL':
+            if context.object.type == 'EMPTY':
+                self.draw_col_menu(context)
     
     #######################################################
     def draw(self, context):
@@ -593,10 +620,10 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     specular_texture = bpy.props.StringProperty ()
 
     # Collision Data
-    is_col_material = bpy.props.BoolProperty()
     col_brightness  = bpy.props.IntProperty()
     col_light       = bpy.props.IntProperty()
     col_mat_index   = bpy.props.IntProperty()
+    col_flags       = bpy.props.IntProperty()
 
     # UV Animation
     export_animation = bpy.props.BoolProperty   (name="UV Animation")
@@ -634,17 +661,6 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     
     def register():
         bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
-
-#######################################################
-class DFFColObjectProps(bpy.types.PropertyGroup):
-
-    type = (
-        ('SPH', 'Sphere', 'A Collision Sphere'),
-        ('BOX', 'Box', 'A Collision Box'),
-        ('MESH', 'Mesh', 'A Collision Mesh (for only meshes)')
-    )
-
-    #
         
 #######################################################
 class DFFObjectProps(bpy.types.PropertyGroup):
@@ -654,6 +670,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         items = (
             ('OBJ', 'Object', 'Object will be exported as a mesh or a dummy'),
             ('COL', 'Collision Object', 'Object is a collision object'),
+            ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
@@ -703,6 +720,26 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         default=True,
         description="Enabling will increase file size, but will increase\
 compatibiility with DFF Viewers"
+    )
+
+    col_material = bpy.props.IntProperty(
+        default = 12,
+        description = "Material used for the Sphere/Cone"
+    )
+
+    col_flags = bpy.props.IntProperty(
+        default = 0,
+        description = "Flags for the Sphere/Cone"
+    )
+
+    col_brightness = bpy.props.IntProperty(
+        default = 0,
+        description = "Brightness used for the Sphere/Cone"
+    )
+    
+    col_light = bpy.props.IntProperty(
+        default = 0,
+        description = "Light used for the Sphere/Cone"
     )
     
     #######################################################    

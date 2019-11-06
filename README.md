@@ -12,9 +12,9 @@ The following is a list of supported features by the addon
 
 - [X] Model files
 - [ ] Texture Files
-- [ ] Collision files (including the ones packed in dff)
+- [X] Collision files (including the ones packed in dff)
   - [X] Import
-  - [ ] Export
+  - [X] Export *(Partial)*
 - [ ] Map files (.ipl, .ide)
   - [X] Import *(Partial, experimental)*
   - [ ] Export

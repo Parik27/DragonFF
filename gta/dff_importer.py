@@ -22,8 +22,9 @@ import mathutils
 
 from . import dff
 from .importer_common import (
-        link_object, create_collection,
-        material_helper, set_object_mode)
+    link_object, create_collection,
+    material_helper, set_object_mode,
+    hide_object)
 from .col_importer import import_col_mem
 
 #######################################################
@@ -751,6 +752,10 @@ class dff_importer:
             if (2, 80, 0) <= bpy.app.version:
                 for collection in col:
                     self.current_collection.children.link(collection)
+
+                    # Hide objects
+                    for object in collection.objects:
+                        hide_object(object)
 
 #######################################################
 def import_dff(options):

@@ -17,8 +17,12 @@
 import bpy
 import bmesh
 import mathutils
+import os
+import os.path
 
 from . import dff
+from .col_exporter import export_col
+from . import col
 from .importer_common import set_object_mode
 
 #######################################################
@@ -278,6 +282,8 @@ class dff_exporter:
     frames = {}
     bones = {}
     parent_queue = {}
+    collection = None
+    export_coll = False
 
     #######################################################
     def multiply_matrix(a, b):
@@ -332,6 +338,10 @@ class dff_exporter:
         self = dff_exporter
 
         for b_material in obj.data.materials:
+
+            if b_material is None:
+                continue
+            
             material = dff.Material()
             helper = material_helper(b_material)
 
@@ -751,13 +761,21 @@ class dff_exporter:
                 self.create_frame(obj)
 
             elif obj.type == "ARMATURE":
-                self.export_armature(obj)
+                self.export_armature(obj)                    
+        
+        # Collision
+        if self.export_coll:
+            mem = export_col({
+                'file_name'  : name if name is not None else
+                               os.path.basename(self.file_name),
+                'memory'     : True,
+                'version'    : 3,
+                'collection' : self.collection
+            })
 
-            # Set collision
-            if 'gta_coll' in obj:
-                if len(obj['gta_coll']) > 0:
-                    self.dff.collisions = obj['gta_coll']
-                
+            if len(mem) != 0:
+               self.dff.collisions = [mem] 
+
         if name is None:
             self.dff.write_file(self.file_name, self.version )
         else:
@@ -776,8 +794,6 @@ class dff_exporter:
         self.file_name = filename
         
         objects = {}
-
-        # TODO: 2.79 -> Support Mass Export
         
         # Export collections
         if bpy.app.version < (2, 80, 0):
@@ -800,6 +816,7 @@ class dff_exporter:
                 objects     = {}
                 self.frames = {}
                 self.bones  = {}
+                self.collection = collection
 
         if not self.mass_export:
                 
@@ -814,5 +831,6 @@ def export_dff(options):
     dff_exporter.mass_export = options['mass_export']
     dff_exporter.path        = options['directory']
     dff_exporter.version     = options['version']
+    dff_exporter.export_coll = options['export_coll']
 
     dff_exporter.export_dff(options['file_name'])
