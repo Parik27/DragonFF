@@ -766,11 +766,12 @@ class dff_exporter:
         # Collision
         if self.export_coll:
             mem = export_col({
-                'file_name'  : name if name is not None else
+                'file_name'     : name if name is not None else
                                os.path.basename(self.file_name),
-                'memory'     : True,
-                'version'    : 3,
-                'collection' : self.collection
+                'memory'        : True,
+                'version'       : 3,
+                'collection'    : self.collection,
+                'only_selected' : self.selected
             })
 
             if len(mem) != 0:

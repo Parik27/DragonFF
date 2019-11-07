@@ -29,7 +29,7 @@ class col_exporter:
     version = None
     collection = None
     memory = False # Whether it will return a bytes file (not write to a file)
-    comparison = None
+    only_selected = False
 
     #######################################################
     def _process_mesh(obj, verts, faces):
@@ -188,8 +188,9 @@ class col_exporter:
         total_objects = 0
         for obj in objects:
             if obj.dff.type == 'COL' or obj.dff.type == 'SHA':
-                self._process_obj(obj)
-                total_objects += 1
+                if not self.only_selected or obj.select_get():
+                    self._process_obj(obj)
+                    total_objects += 1
                 
         self._convert_bounds()
         
@@ -206,5 +207,6 @@ def export_col(options):
     col_exporter.memory = options['memory']
     col_exporter.version = options['version']
     col_exporter.collection = options['collection']
+    col_exporter.only_selected = options['only_selected']
 
     return col_exporter.export_col(options['file_name'])
