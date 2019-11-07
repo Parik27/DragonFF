@@ -723,22 +723,22 @@ class DFFObjectProps(bpy.types.PropertyGroup):
 compatibiility with DFF Viewers"
     )
 
-    col_material = bpy.props.IntProperty(
+    col_material : bpy.props.IntProperty(
         default = 12,
         description = "Material used for the Sphere/Cone"
     )
 
-    col_flags = bpy.props.IntProperty(
+    col_flags : bpy.props.IntProperty(
         default = 0,
         description = "Flags for the Sphere/Cone"
     )
 
-    col_brightness = bpy.props.IntProperty(
+    col_brightness : bpy.props.IntProperty(
         default = 0,
         description = "Brightness used for the Sphere/Cone"
     )
     
-    col_light = bpy.props.IntProperty(
+    col_light : bpy.props.IntProperty(
         default = 0,
         description = "Light used for the Sphere/Cone"
     )
