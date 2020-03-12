@@ -74,8 +74,8 @@ class col_importer:
 
         for surface in materials:
             
-            colour = mats.groups[mats.default['group']]
-            name = mats.groups[mats.default['group']]
+            colour = mats.groups[mats.default['group']][1]
+            name = mats.groups[mats.default['group']][0]
             
             try:
                 # SA
@@ -85,18 +85,17 @@ class col_importer:
                 # VC/III
                 else:
                     mat = mats.vc_mats[surface.material]
-
                 
                 # Generate names
                 colour = mats.groups[mat[0]][1]
                 name = "%s - %s" % (mats.groups[mat[0]][0], mat[1])
 
-                # Convert hex to a value Blender understands
-                colour = [colour[0:2], colour[2: 4], colour[4: 6], "FF"]
-                colour = [int(x, 16) for x in colour]
-
             except KeyError:
                 pass
+
+            # Convert hex to a value Blender understands
+            colour = [colour[0:2], colour[2: 4], colour[4: 6], "FF"]
+            colour = [int(x, 16) for x in colour]
 
             mat = bpy.data.materials.new(name)
             mat.dff.col_mat_index   = surface.material
