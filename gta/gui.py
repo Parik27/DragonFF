@@ -366,7 +366,7 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
 
     #######################################################
     def invoke(self, context, event):
-        if 'dragonff_imported_version' in context.scene:
+        if 'dragonff_imported_version_col' in context.scene:
             self.export_version = context.scene['dragonff_imported_version_col']
         
         context.window_manager.fileselect_add(self)
