@@ -209,4 +209,32 @@ def export_col(options):
     col_exporter.collection = options['collection']
     col_exporter.only_selected = options['only_selected']
 
+    if options['mass_export']:
+        output = b'';
+        
+        root_collection = bpy.context.scene.collection
+        collections = root_collection.children.values() + [root_collection]
+        col_exporter.memory = True
+
+        for collection in collections:
+            col_exporter.collection = collection
+            name = collection.name
+
+            # Strip stuff like vehicles.col. from the name so that
+            # for example vehicles.col.infernus changes to just infernus
+            try:
+                name = name[name.index(".col.") + 5:]
+                
+            except ValueError:
+                pass
+            
+            output += col_exporter.export_col(name)
+
+        if options['memory']:
+            return output
+
+        with open(options['file_name'], mode='wb') as file:
+            file.write(output)
+            return
+        
     return col_exporter.export_col(options['file_name'])
