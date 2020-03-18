@@ -252,7 +252,7 @@ class coll:
         verts_count = 0
         # Calculate Verts count
         for i in model.mesh_faces:
-            verts_count = max(verts_count, i.a, i.b, i.c) + 1
+            verts_count = max(verts_count, i.a + 1, i.b + 1, i.c + 1)
             
         # Vertices        
         self._pos = pos + verts_offset + 4
@@ -371,7 +371,6 @@ class coll:
     def __write_col_legacy(self, model):
         data = b''
 
-        print(model.spheres)
         data += self.__write_block(TSphere, model.spheres)
         data += pack('<I', 0)
         data += self.__write_block(TBox, model.cubes)
