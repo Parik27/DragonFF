@@ -34,12 +34,14 @@ bl_info = {
 _classes = [
     gui.IMPORT_OT_dff,
     gui.EXPORT_OT_dff,
+    gui.EXPORT_OT_col,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
     gui.MapImportPanel,
     gui.DFFSceneProps,
+    gui.DFF_MT_ExportChoice,
     map_importer.Map_Import_Operator
 ]
 #######################################################

@@ -171,7 +171,6 @@ class material_helper:
             mapping.vector_type = 'POINT'
 
             fps = bpy.context.scene.render.fps
-            print(uv_anim.node_to_uv)
             
             for frame in uv_anim.frames:
                 mapping.translation = frame.uv[-2:] + [0]
