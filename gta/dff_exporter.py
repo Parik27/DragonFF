@@ -768,7 +768,8 @@ class dff_exporter:
                 'memory'        : True,
                 'version'       : 3,
                 'collection'    : self.collection,
-                'only_selected' : self.selected
+                'only_selected' : self.selected,
+                'mass_export'   : False
             })
 
             if len(mem) != 0:
