@@ -129,7 +129,10 @@ class Map_Import_Operator(bpy.types.Operator):
             self._updating = True
 
             for x in range(10):
-                self.import_object(context)
+                try:
+                    self.import_object(context)
+                except:
+                    print("Can`t import model... skipping")
 
             # Update cursor progress indicator if something needs to be loaded
             num = (
