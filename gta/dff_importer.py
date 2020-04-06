@@ -449,7 +449,7 @@ class dff_importer:
         for index, frame in enumerate(self.dff.frame_list):
             if frame.bone_data:
                 bone_id = frame.bone_data.header.id
-                if bone_id != 4294967295: #-1
+                if bone_id != -1:
                     self.bones[bone_id] = {'frame': frame,
                                               'index': index}
                         
@@ -620,7 +620,7 @@ class dff_importer:
         #self.import_2dfx(self.dff.ext_2dfx)
         
         for index, frame in enumerate(self.dff.frame_list):
-            
+
             # Check if the mesh for the frame has been loaded
             mesh = None
             if index in self.meshes:
