@@ -1084,7 +1084,7 @@ class Geometry:
 
             # Read Texture Mapping coordinates
             if self.flags & (rpGEOMETRYTEXTURED | rpGEOMETRYTEXTURED2):
-                texCount = self.flags & 0x00FF0000 % 65536
+                texCount = (self.flags & 0x00FF0000) >> 16
                 if texCount == 0:
                     texCount = 2 if (self.flags & rpGEOMETRYTEXTURED2) else \
                         1 if (self.flags & rpGEOMETRYTEXTURED) else 0
@@ -1169,7 +1169,7 @@ class Geometry:
         
         for mesh in meshes:
             data += pack("<II", len(meshes[mesh]), mesh)
-            data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
+            data += pack("<%dI" % (len(meshes[mesh])), *(meshes[mesh][::-1]))
 
         return Sections.write_chunk(data, types["Bin Mesh PLG"])
     
@@ -1208,6 +1208,8 @@ class Geometry:
         flags |= rpGEOMETRYMODULATEMATERIALCOLOR * \
             self.export_flags["modulate_color"]
 
+        flags |= (len(self.uv_layers) & 0xff) << 16
+        
         data = b''
         data += pack("<IIII", flags, len(self.triangles), len(self.vertices), 1)
 
@@ -1224,7 +1226,6 @@ class Geometry:
         for uv_layer in self.uv_layers:
             for tex_coord in uv_layer:
                 data += Sections.write(TexCoords, tex_coord)
-
 
         # Write Triangles
         for triangle in self.triangles:
