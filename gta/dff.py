@@ -1169,7 +1169,7 @@ class Geometry:
         
         for mesh in meshes:
             data += pack("<II", len(meshes[mesh]), mesh)
-            data += pack("<%dI" % (len(meshes[mesh])), *(meshes[mesh][::-1]))
+            data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
 
         return Sections.write_chunk(data, types["Bin Mesh PLG"])
     
