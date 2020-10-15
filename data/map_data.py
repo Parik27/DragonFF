@@ -21,7 +21,7 @@
 # documented.
 
 from collections import namedtuple
-from .importer_common import game_version
+from ..ops.importer_common import game_version
 
 III_structures = {}
 VC_structures = {}

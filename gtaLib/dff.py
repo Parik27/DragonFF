@@ -16,7 +16,7 @@
 
 from collections import namedtuple
 from struct import unpack_from, calcsize, pack
-from enum import Enum
+from enum import Enum, IntEnum
 
 # Data types
 Chunk       = namedtuple("Chunk"       , "type size version")
@@ -37,6 +37,8 @@ EnvMapFX    = namedtuple("EnvMapFX"    , "coefficient use_fb_alpha env_map")
 DualFX      = namedtuple("DualFX"      , "src_blend dst_blend texture")
 ReflMat     = namedtuple("ReflMat"     , "s_x s_y o_x o_y intensity")
 SpecularMat = namedtuple("SpecularMap" , "level texture")
+
+UserDataSection = namedtuple("UserDataSection", "name data")
 
 # geometry flags
 rpGEOMETRYTRISTRIP              = 0x00000001
@@ -65,6 +67,13 @@ class BlendMode(Enum):
     INVDESTCOLOR = 0x0A
     SRCALPHASAT  = 0x0B
 
+# User Data PLG Type
+class UserDataType(IntEnum):
+    USERDATANA = 0
+    USERDATAINT = 1
+    USERDATAFLOAT = 2
+    USERDATASTRING = 3
+    
 # Block types
 types = {
     "Struct"                  : 1,
@@ -83,6 +92,7 @@ types = {
     "UV Animation Dictionary" : 43,
     "Skin PLG"                : 278,
     "HAnim PLG"               : 286,
+    "User Data PLG"           : 287,
     "Material Effects PLG"    : 288,
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
@@ -386,6 +396,9 @@ class Material:
             _data = Sections.write_chunk(_data, types["Struct"])
             data += Sections.write_chunk(_data, types["UV Animation PLG"])
 
+        if 'udata' in self.plugins:
+            data += self.plugins['udata'][0].to_mem()
+            
         return data
     
     #######################################################
@@ -449,7 +462,93 @@ class Material:
     #######################################################
     def __hash__(self):
         return hash(self.to_mem())
-                
+
+#######################################################
+class UserData:
+
+    __slots__ = ['sections']
+    
+    #######################################################
+    def __init__(self):
+        self.sections = []
+
+    #######################################################
+    def from_mem(data):
+
+        self = UserData()
+        
+        num_sections = unpack_from("<I", data)[0]
+        offset = 4
+        
+        for i in range(num_sections):
+
+            # Section name
+            name_len = unpack_from("<I", data, offset)[0]
+            name = unpack_from("<%ds" % (name_len), data,
+                               offset + 4)[0].decode('ascii')
+
+            offset += name_len + 4
+
+            # Elements
+            element_type, num_elements = unpack_from("<II", data, offset)
+            offset += 8
+            
+            elements = []
+            if element_type == UserDataType.USERDATAINT:
+                elements = list(unpack_from("<%dI" % (num_elements), data, offset))
+                offset += 4 * num_elements
+
+            elif element_type == UserDataType.USERDATAFLOAT:
+                elements = list(unpack_from("<%df" % (num_elements), data, offset))
+                offset += 4 * num_elements
+
+            elif element_type == UserDataType.USERDATASTRING:
+                for j in range(num_elements):
+                    str_len = unpack_from("<I", data, offset)[0]
+                    string = unpack_from("<%ds" % (str_len), data, offset + 4)[0]
+                    elements.append(string.decode('ascii'))
+                    
+                    offset += 4 + str_len
+
+            self.sections.append (UserDataSection(name, elements))
+
+        return self
+
+    #######################################################
+    def to_mem (self):
+        data = b''
+
+        data += pack("<I", len(self.sections))
+        for section in self.sections:
+            section:UserDataSection
+
+            # Write name
+            data += pack("<I%ds" % (len(section.name)),
+                         len(section.name), section.name.encode("ascii"))
+
+            userTypes = {
+                int: UserDataType.USERDATAINT,
+                float: UserDataType.USERDATAFLOAT,
+                str: UserDataType.USERDATASTRING
+            }
+
+            data_type = UserDataType.USERDATANA
+            total_elements = len(section.data)
+            if total_elements > 0 and type(section.data[0]) in userTypes:
+                data_type = userTypes[type(section.data[0])]
+
+            # Write Elements
+            data += pack("<II", data_type, total_elements)
+            if data_type == UserDataType.USERDATAINT:
+                data += pack("<%dI" % (total_elements), *section.data)
+            elif data_type == UserDataType.USERDATAFLOAT:
+                data += pack("<%df" % (total_elements), *section.data)
+            elif data_type == UserDataType.USERDATASTRING:
+                for string in section.data:
+                    data += pack("<I%ds" % len(string), len(string), string.encode("ascii"))
+
+        return Sections.write_chunk(data, types["User Data PLG"])
+    
 #######################################################
 class Frame:
 
@@ -459,7 +558,8 @@ class Frame:
         'parent',
         'creation_flags',
         'name',
-        'bone_data'
+        'bone_data',
+        'user_data'
     ]
     
     ##################################################################
@@ -470,6 +570,7 @@ class Frame:
         self.creation_flags  = None
         self.name            = None
         self.bone_data       = None
+        self.user_data       = None
 
     ##################################################################
     def from_mem(data):
@@ -503,6 +604,9 @@ class Frame:
 
         if self.bone_data is not None:
             data += self.bone_data.to_mem()
+
+        if self.user_data is not None:
+            data += self.user_data.to_mem()
         
         return Sections.write_chunk(data, types["Extension"])
 
@@ -1307,6 +1411,7 @@ class dff:
 
                 name = None
                 bone_data = None
+                user_data = None
 
                 if chunk.type == types["Frame"]:
                     name = self.raw(strlen(self.data,self.pos)).decode("utf-8")
@@ -1314,11 +1419,16 @@ class dff:
                 elif chunk.type == types["HAnim PLG"]:
                     bone_data = HAnimPLG.from_mem(self.raw(chunk.size))
 
+                elif chunk.type == types["User Data PLG"]:
+                    user_data = UserData.from_mem(self.raw(chunk.size))
+
                 self._read(chunk.size)
                 if name is not None:
                     self.frame_list[i].name = name
                 if bone_data is not None:
                     self.frame_list[i].bone_data = bone_data
+                if user_data is not None:
+                    self.frame_list[i].user_data = user_data
 
             if self.frame_list[i].name is None:
                 self.frame_list[i].name = "unnamed"
@@ -1617,6 +1727,11 @@ class dff:
                                                           self.data,
                                                           self.pos)
                                         )
+
+                                    if chunk.type == types["User Data PLG"]:
+                                        material.add_plugin (
+                                            "udata",
+                                            UserData.from_mem(self.data[self.pos:]))
                                         
                                     if chunk.type == types["UV Animation PLG"]:
 
@@ -1696,6 +1811,10 @@ class dff:
                                 ExtraVertColorExtension.from_mem (
                                     self.data, self._read(chunk.size), geometry
                                 )
+
+                        elif chunk.type == types["User Data PLG"]:
+                            geometry.extensions['user_data'] = \
+                                UserData.from_mem(self.data[self.pos:])
 
                         # 2dfx (usually at the last geometry index)
                         elif chunk.type == types["2d Effect"]:

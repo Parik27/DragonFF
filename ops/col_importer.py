@@ -17,10 +17,10 @@
 import bpy
 import bmesh
 
-from . import col
-from . import col_materials as mats
+from ..gtaLib import col
+from ..data import col_materials as mats
 from .importer_common import (
-    link_object, create_collection, hide_object, material_helper
+    link_object, create_collection, material_helper
 )
 
 #######################################################        

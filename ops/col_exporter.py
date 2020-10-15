@@ -20,7 +20,7 @@ import os
 import math
 import mathutils
 
-from . import col
+from ..gtaLib import col
 
 class col_exporter:
 

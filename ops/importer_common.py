@@ -182,6 +182,10 @@ class material_helper:
 
         self.material.dff.animation_name   = uv_anim.name
         self.material.dff.export_animation = True
+
+    #######################################################
+    def set_user_data(self, user_data):
+        self.material['dff_user_data'] = user_data.to_mem()[12:]
         
     #######################################################
     def __init__(self, material):

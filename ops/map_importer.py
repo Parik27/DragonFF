@@ -16,7 +16,8 @@
 
 import bpy
 import os
-from . import map as map_utilites, dff_importer
+from ..gtaLib import map as map_utilites
+from ..ops import dff_importer
 
 #######################################################
 class Map_Import_Operator(bpy.types.Operator):

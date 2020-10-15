@@ -20,7 +20,7 @@ import bmesh
 import math
 import mathutils
 
-from . import dff
+from ..gtaLib import dff
 from .importer_common import (
     link_object, create_collection,
     material_helper, set_object_mode,
@@ -144,6 +144,8 @@ class dff_importer:
                 else:
                     self.skin_data[atomic.frame] = geom.extensions['skin']
                     
+            if 'user_data' in geom.extensions:
+                mesh['dff_user_data'] = geom.extensions['user_data'].to_mem()[12:]
             
             # Add UV Layers
             for layer in geom.uv_layers:
@@ -314,7 +316,6 @@ class dff_importer:
         }
 
         for color in colors:
-            print(eval(color), list(mat_color))
             if eval(color) == list(mat_color):
                 name = colors[color]
                 
@@ -425,6 +426,10 @@ class dff_importer:
                 plugin = material.plugins['refl'][0]
                 helper.set_reflection_material(plugin)
 
+            if 'udata' in material.plugins:
+                plugin = material.plugins['udata'][0]
+                helper.set_user_data(plugin)
+                
             # UV Animation
             # TODO: Figure out ways to add multiple uv animations
             if 'uv_anim' in material.plugins:
@@ -527,6 +532,9 @@ class dff_importer:
             e_bone['bone_id'] = bone.id
             e_bone['type'] = bone.type
 
+            if bone_frame.user_data is not None:
+                e_bone['dff_user_data'] = bone_frame.user_data.to_mem()[12:]
+            
             matrix = skinned_obj_data.bone_matrices[bone.index]
             matrix = mathutils.Matrix(matrix).transposed()
             matrix = matrix.inverted()
@@ -696,6 +704,8 @@ class dff_importer:
 
             # Set a collision model used for export
             obj["gta_coll"] = self.dff.collisions
+            if frame.user_data is not None:
+                obj["dff_user_data"] = frame.user_data.to_mem()[12:]
 
         if self.remove_doubles:
             self.remove_object_doubles()
