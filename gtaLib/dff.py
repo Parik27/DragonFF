@@ -243,7 +243,7 @@ class Texture:
     ]
     
     def __init__(self):
-        self.filters            = None
+        self.filters            = 0
         self.name               = ""
         self.mask               = ""
     

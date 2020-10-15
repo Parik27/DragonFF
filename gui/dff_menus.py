@@ -58,7 +58,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box.row().prop(settings, "export_bump_map")
         
         if settings.export_bump_map:
-            box.row().prop(settings, "bump_map_tex", text="Diffuse Texture")
+            box.row().prop(settings, "bump_map_tex", text="Height Map Texture")
 
     #######################################################
     def draw_uv_anim_box(self, context, box):
@@ -134,8 +134,8 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
                      icon_only=True
             )
             
-        except Exception as e:
-            print(e)
+        except Exception:
+            pass
                 
         
         self.draw_env_map_box  (context, layout.box())

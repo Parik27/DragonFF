@@ -65,7 +65,7 @@ class material_helper:
                 
                 texture.name = clear_extension(
                     node_label
-                    if node_label in image_name and node_label is not ""
+                    if node_label in image_name and node_label != ""
                     else image_name
                 )
                 return texture
@@ -101,9 +101,7 @@ class material_helper:
     def get_normal_map(self):
 
         bump_texture = None
-        diffuse_texture = dff.Texture()
-        
-        diffuse_texture.filters = 0
+        height_texture = dff.Texture()
 
         if not self.material.dff.export_bump_map:
             return None
@@ -120,27 +118,17 @@ class material_helper:
 
                 bump_texture.name = clear_extension(
                     node_label
-                    if node_label in image_name and node_label is not ""
+                    if node_label in image_name and node_label != ""
                     else image_name
                 )
                 intensity = self.principled.normalmap_strength
 
-        # 2.79
-        for slot in self.material.texture_slots:
-
-            bump_texture = dff.Texture()
-            
-            if slot.texture.use_normal_map:
-                bump_texture.name = clear_extension(slot.texture.image.name)
-                intensity = slot.normal_factor
-                return (bump_texture, slot.normal_factor)
-
-        diffuse_texture.name = self.material["bump_map_tex"]
-        if diffuse_texture.name == "":
-            diffuse_texture = None
+        height_texture.name = self.material.dff.bump_map_tex
+        if height_texture.name == "":
+            height_texture = None
 
         if bump_texture is not None:
-            return dff.BumpMapFX(intensity, diffuse_texture, bump_texture)
+            return dff.BumpMapFX(intensity, height_texture, bump_texture)
 
         return None
 
