@@ -173,12 +173,14 @@ class material_helper:
             fps = bpy.context.scene.render.fps
             
             for frame in uv_anim.frames:
-                mapping.translation = frame.uv[-2:] + [0]
-                mapping.scale = frame.uv[1:3] + [0]
+                mapping.inputs['Location'].default_value = frame.uv[-2:] + [0]
+                mapping.inputs['Scale'].default_value = frame.uv[1:3] + [0]
 
                 # Could also use round here perhaps. I don't know what's better
-                mapping.keyframe_insert("translation", -1, frame.time * fps)
-                mapping.keyframe_insert("scale", -1, frame.time * fps)
+                mapping.inputs['Location'].keyframe_insert("default_value",
+                                                           -1, frame.time * fps)
+                mapping.inputs['Scale'].keyframe_insert("default_value",
+                                                        -1, frame.time * fps)
 
         self.material.dff.animation_name   = uv_anim.name
         self.material.dff.export_animation = True

@@ -210,9 +210,13 @@ class material_helper:
 
                         # Offset in the UV array
                         uv_offset = {
-                            'nodes["Mapping"].translation': 4,
-                            'nodes["Mapping"].scale': 1,
+                            'nodes["Mapping"].inputs[1].default_value': 4,
+                            'nodes["Mapping"].inputs[3].default_value': 1,
                         }
+
+                        if curve.data_path not in uv_offset:
+                            continue
+                        
                         off = uv_offset[curve.data_path]
                         
                         for i, frame in enumerate(curve.keyframe_points):
