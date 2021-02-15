@@ -669,6 +669,7 @@ class dff_importer:
                 obj.rotation_mode       = 'QUATERNION'
                 obj.rotation_quaternion = matrix.to_quaternion()
                 obj.location            = frame.position
+                obj.scale               = matrix.to_scale()
 
 
                 # Set empty display properties to something decent
