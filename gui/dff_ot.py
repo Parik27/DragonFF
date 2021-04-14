@@ -242,7 +242,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     #######################################################
     def execute(self, context):
         
-        for file in [os.path.join(self.directory,file.name) for file in self.files]:
+        for file in [os.path.join(self.directory,file.name) for file in self.files] if self.files else [self.filepath]:
             if file.endswith(".col"):
                 col_importer.import_col_file(file, os.path.basename(file))
                             
