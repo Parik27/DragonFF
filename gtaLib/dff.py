@@ -1281,6 +1281,11 @@ class Geometry:
     def extensions_to_mem(self, extra_extensions = []):
 
         data = b''
+
+        # Write Bin Mesh PLG
+        if self.export_flags['write_mesh_plg']:
+            data += self.write_bin_split()
+        
         for extension in self.extensions:
             if self.extensions[extension] is not None:
                 data += self.extensions[extension].to_mem()
@@ -1288,10 +1293,6 @@ class Geometry:
         # Write extra extensions
         for extra_extension in extra_extensions:
             data += extra_extension.to_mem()
-
-        # Write Bin Mesh PLG
-        if self.export_flags['write_mesh_plg']:
-            data += self.write_bin_split()
             
         return Sections.write_chunk(data, types["Extension"])
         
