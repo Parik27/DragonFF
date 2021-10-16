@@ -84,10 +84,13 @@ class material_helper:
         
         if self.principled:
             self.principled.base_color_texture.node_image.label = label
-            self.principled.base_color_texture.image            = image
-            self.principled.alpha_texture.image                 = image
+            self.principled.base_color_texture.image  = image
 
-            self.principled.alpha_texture.node_image.label = label+".alphatexture"
+            # Set alpha texture only if the image has alpha channel
+            # (otherwise the wrapper uses the color channel as alpha
+            if not (image.channels < 4 or image.depth in {24, 8}):
+                self.principled.alpha_texture.image            = image
+                self.principled.alpha_texture.node_image.label = label+".alphatexture"
             
         else:
             slot               = self.material.texture_slots.add()
