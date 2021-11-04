@@ -638,6 +638,8 @@ class dff_exporter:
 
         geometry.export_flags['export_normals'] = obj.dff.export_normals
         geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
+        geometry.export_flags['light'] = obj.dff.light
+        geometry.export_flags['modulate_color'] = obj.dff.modulate_color
         
         if skin is not None:
             geometry.extensions['skin'] = skin

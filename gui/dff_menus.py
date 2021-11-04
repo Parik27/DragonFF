@@ -234,9 +234,11 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
             icon = "ERROR" if col.alert else "NONE"
 
             col.prop(settings, "custom_pipeline", icon=icon, text="Custom Pipeline")
+        
         box.prop(settings, "export_normals", text="Export Normals")
         box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
-
+        box.prop(settings, "light", text="Enable Lighting")
+        box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
             
         properties = [         
             ["day_cols", "Day Vertex Colours"],
@@ -402,6 +404,16 @@ class DFFObjectProps(bpy.types.PropertyGroup):
     export_normals : bpy.props.BoolProperty(
         default=True,
         description="Whether Normals will be exported. (Disable for Map objects)"
+    )
+
+    light : bpy.props.BoolProperty(
+        default=True,
+        description="Enable rpGEOMETRYLIGHT flag"
+    )
+
+    modulate_color : bpy.props.BoolProperty(
+        default=True,
+        description="Enable rpGEOMETRYMODULATEMATERIALCOLOR flag"
     )
     
     uv_map1 : bpy.props.BoolProperty(
