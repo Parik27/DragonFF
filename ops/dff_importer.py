@@ -542,7 +542,7 @@ class dff_importer:
             matrix = mathutils.Matrix(matrix).transposed()
             matrix = matrix.inverted()
 
-            e_bone.transform(matrix, True, False)
+            e_bone.transform(matrix, scale=True, roll=False)
             e_bone.roll = self.align_roll(e_bone.vector,
                                           e_bone.z_axis,
                                           self.multiply_matrix(
