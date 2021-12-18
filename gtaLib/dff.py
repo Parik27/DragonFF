@@ -717,30 +717,63 @@ class SkinPLG:
 
     __slots__ = [
         "num_bones",
-        "num_used_bones",
+        "_num_used_bones",
         "max_weights_per_vertex",
         "bones_used",
         "vertex_bone_indices",
         "vertex_bone_weights",
         "bone_matrices"
     ]
-
     ##################################################################
     def __init__(self):
         
         self.num_bones = None
-        self.num_used_bones = None
-        self.max_weights_per_vertex = None
+        self._num_used_bones = 0
+        self.max_weights_per_vertex = 0
         self.bones_used = []
         self.vertex_bone_indices = []
         self.vertex_bone_weights = []
         self.bone_matrices = []
 
     ##################################################################
+    def calc_max_weights_per_vertex (self):
+        for i, bone_indices in enumerate(self.vertex_bone_indices):
+            for j in range(len(bone_indices)):
+                if self.vertex_bone_weights[i][j] > 0:
+                    if self.max_weights_per_vertex >= 4:
+                        return
+                    self.max_weights_per_vertex += 1
+
+    ##################################################################
+    def calc_used_bones (self):
+        self.bones_used = []
+        tmp_used = {}
+
+        for i, bone_indices in enumerate(self.vertex_bone_indices):
+            for j, bone_index in enumerate(bone_indices):
+                if self.vertex_bone_weights[i][j] > 0:
+                    if bone_index not in tmp_used:
+                        self.bones_used.append(bone_index)
+                        tmp_used[bone_index] = True
+
+        self.bones_used.sort()
+
+    ##################################################################
     def to_mem(self):
 
+        oldver = Sections.get_rw_version() < 0x34000
+
+        self.calc_max_weights_per_vertex ()
+        self.calc_used_bones ()
+
         data = b''
-        data += pack("<B3x", self.num_bones)
+        print(self.num_bones, len(self.bones_used), self.max_weights_per_vertex)
+        data += pack("<3Bx", self.num_bones, len(self.bones_used),
+                     self.max_weights_per_vertex)
+
+        # Used Bones
+        data += pack(f"<{len(self.bones_used)}B", *self.bones_used)
+        print(self.bones_used, self.max_weights_per_vertex)
         
         # 4x Indices
         for indices in self.vertex_bone_indices:
@@ -752,25 +785,36 @@ class SkinPLG:
 
         # 4x4 Matrix
         for matrix in self.bone_matrices:
-            data += pack("<I", 0xDEADDEAD) # interesting value :eyes:
+            if oldver:
+                data += pack("<I", 0xDEADDEAD) # interesting value :eyes:
+
             for i in matrix:
                 data += pack("<4f", *i)
 
+        # Skin split, just write (0, 0, 0) for now.
+        # TODO: Support skin split?
+        if not oldver:
+            data += pack("<12x")
+
         return Sections.write_chunk(data, types["Skin PLG"])
-        
+
     ##################################################################
+    @staticmethod
     def from_mem(data, geometry):
 
         self = SkinPLG()
 
         _data = unpack_from("<3Bx", data)
-        self.num_bones, self.num_used_bones, self.max_weights_per_vertex = _data
+        self.num_bones, self._num_used_bones, self.max_weights_per_vertex = _data
+
+        # num used bones and max weights per vertex apparently didn't exist in old versions.
+        oldver = self._num_used_bones == 0
         
         # Used bones array starts at offset 4
-        for pos in range(4, self.num_used_bones + 4):
-            self.bones_used.append(unpack_from("<B", data, pos))
+        for pos in range(4, self._num_used_bones + 4):
+            self.bones_used.append(unpack_from("<B", data, pos)[0])
 
-        pos = 4 + self.num_used_bones
+        pos = 4 + self._num_used_bones
         vertices_count = len(geometry.vertices)
 
         # Read vertex bone indices
@@ -786,15 +830,13 @@ class SkinPLG:
             _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
         )
         pos += vertices_count * 4 * 4 #floats have size 4 bytes
-       
-        # According to gtamods, there is an extra unknown integer here
-        # if the weights per vertex is zero.
+
+        # Old version has additional 4 bytes 0xdeaddead
         unpack_format = "<16f"
-        if self.num_used_bones == 0:
+        if oldver:
             unpack_format = "<4x16f"
 
         # Read bone matrices
-        
         for i in range(self.num_bones):
 
             _data = list(unpack_from(unpack_format, data, pos))
@@ -809,6 +851,10 @@ class SkinPLG:
             )
 
             pos += calcsize(unpack_format)
+
+        # TODO: (maybe) read skin split data for new version
+        # if not oldver:
+        #     readSkinSplit(...)
             
         return self
 
@@ -820,6 +866,7 @@ class ExtraVertColorExtension:
         self.colors = colors
 
     #######################################################
+    @staticmethod
     def from_mem(data, offset, geometry):
 
         magic = unpack_from("<I", data, offset)[0]
@@ -890,6 +937,7 @@ class Light2dfx:
         self.lookDirection = None
     
     #######################################################
+    @staticmethod
     def from_mem(loc, data, offset, size):
         self = Light2dfx(loc)
 
@@ -960,6 +1008,7 @@ class Particle2dfx:
         self.effect = ""
 
     #######################################################
+    @staticmethod
     def from_mem(loc, data, offset, size):
 
         self = Particle2dfx(loc)
@@ -1002,6 +1051,7 @@ class PedAttractor2dfx:
         self.ped_existing_probability = 0
 
     #######################################################
+    @staticmethod
     def from_mem(loc, data, offset, size):
         self = PedAttractor2dfx(loc)
 
@@ -1031,6 +1081,7 @@ class SunGlare2dfx:
         self.effect_id = 4
 
     #######################################################
+    @staticmethod
     def from_mem(loc, data, offset, size):
         return SunGlare2dfx(loc)
 
@@ -1050,6 +1101,7 @@ class Extension2dfx:
         self.entries.append(entry)
 
     #######################################################
+    @staticmethod
     def from_mem(data, offset):
 
         self = Extension2dfx()
@@ -1153,6 +1205,7 @@ class Geometry:
         self._hasMatFX = False
 
     #######################################################
+    @staticmethod
     def from_mem(data, parent_chunk):
 
         # Note: In the following function, I have used a loop

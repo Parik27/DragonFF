@@ -284,6 +284,7 @@ class dff_exporter:
     export_coll = False
 
     #######################################################
+    @staticmethod
     def multiply_matrix(a, b):
         # For compatibility with 2.79
         if bpy.app.version < (2, 80, 0):
@@ -291,6 +292,7 @@ class dff_exporter:
         return a @ b
     
     #######################################################
+    @staticmethod
     def create_frame(obj, append=True, set_parent=True):
         self = dff_exporter
         
@@ -334,6 +336,7 @@ class dff_exporter:
         return frame
 
     #######################################################
+    @staticmethod
     def generate_material_list(obj):
         materials = []
         self = dff_exporter
@@ -370,7 +373,8 @@ class dff_exporter:
         return materials
 
     #######################################################
-    def init_skin_plg(obj, mesh):
+    @staticmethod
+    def get_skin_plg_and_bone_groups(obj, mesh):
 
         # Returns a SkinPLG object if the object has an armature modifier
         armature = None
@@ -380,7 +384,7 @@ class dff_exporter:
                 break
             
         if armature is None:
-            return None
+            return (None, {})
         
         skin = dff.SkinPLG()
         
@@ -401,22 +405,10 @@ class dff_exporter:
             except KeyError:
                 pass
             
-        # Set vertex group weights
-        for vertex in mesh.vertices:
-            skin.vertex_bone_indices.append([0,0,0,0])
-            skin.vertex_bone_weights.append([0,0,0,0])
-            for index, group in enumerate(vertex.groups):
-                # Only upto 4 vertices per group are supported
-                if index >= 4:
-                    break
-                
-                if group.group in bone_groups:
-                    skin.vertex_bone_indices[-1][index] = bone_groups[group.group]
-                    skin.vertex_bone_weights[-1][index] = group.weight
-                    
-        return skin
+        return (skin, bone_groups)
 
     #######################################################
+    @staticmethod
     def get_vertex_shared_loops(vertex, layers_list, funcs):
         #temp = [[None] * len(layers) for layers in layers_list]
         shared_loops = {}
@@ -440,6 +432,190 @@ class dff_exporter:
         return shared_loops.keys()
 
     #######################################################
+    @staticmethod
+    def triangulate_mesh(mesh):
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bmesh.ops.triangulate(bm, faces=bm.faces)
+        bm.to_mesh(mesh)
+        bm.free()
+
+    #######################################################
+    @staticmethod
+    def find_vert_idx_by_tmp_idx(verts, idx):
+        for i, vert in enumerate(verts):
+            if vert['tmp_idx'] == idx:
+                return i
+        
+    #######################################################
+    @staticmethod
+    def cleanup_duplicate_verts(obj, verts, faces):
+        self = dff_exporter
+        removed_verts = {}
+        i = 0
+
+        # To disable check for different normals in case they aren't being exported anyway.
+        export_normals = obj.dff.export_normals
+
+        while i < len(verts):
+            vert = verts[i]
+
+            j = i+1
+            while j < len(verts):
+                vert2 = verts[j]
+
+                # We don't check all properties here because the other properties
+                # are vertex-based, so they're guaranteed to be equal if the idx
+                # property is equal.
+                if vert['idx'] == vert2['idx'] and \
+                   (vert['normal'] == vert2['normal'] or not export_normals) and \
+                   vert['uvs'] == vert2['uvs']:
+                    # Remove vertex and store the other in the map to change in face
+                    removed_verts[vert2['tmp_idx']] = vert['tmp_idx']
+                    del verts[j]
+                else:
+                    j += 1
+
+            i += 1
+
+        # update indices in faces
+        for face in faces:
+            for i, vert_idx in enumerate(face['verts']):
+                if vert_idx in removed_verts:
+                    face['verts'][i] = self.find_vert_idx_by_tmp_idx(
+                        verts, removed_verts[vert_idx])
+                else:
+                    face['verts'][i] = self.find_vert_idx_by_tmp_idx(verts, vert_idx)
+
+    #######################################################
+    @staticmethod
+    def populate_geometry_from_vertices_data(vertices_list, skin_plg, mesh, obj, geometry):
+
+        has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
+        has_night_colors  = len(mesh.vertex_colors) > 1 and obj.dff.night_cols
+
+        # This number denotes what the maximum number of uv maps exported will be.
+        # If obj.dff.uv_map2 is set (i.e second UV map WILL be exported), the
+        # maximum will be 2. If obj.dff.uv_map1 is NOT set, the maximum cannot
+        # be greater than 0.
+        max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
+        max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
+
+        extra_vert = None
+        if has_night_colors:
+            extra_vert = dff.ExtraVertColorExtension([])
+        
+        for vertex in vertices_list:
+            geometry.vertices.append(dff.Vector._make(vertex['co']))
+            geometry.normals.append(dff.Vector._make(vertex['normal']))
+
+            # vcols
+            #######################################################
+            if has_prelit_colors:
+                geometry.prelit_colors.append(dff.RGBA._make(
+                    int(col * 255) for col in vertex['vert_cols'][0]))
+            if has_night_colors:
+                extra_vert.colors.append(dff.RGBA._make(
+                    int(col * 255) for col in vertex['vert_cols'][1]))
+
+            # uv layers
+            #######################################################
+            for index, uv in enumerate(vertex['uvs']):
+                if index >= max_uv_layers:
+                    break
+
+                while index >= len(geometry.uv_layers):
+                    geometry.uv_layers.append([])
+
+                geometry.uv_layers[index].append(dff.TexCoords(uv.x, 1-uv.y))
+
+            # bones
+            #######################################################
+            if skin_plg is not None:
+                skin_plg.vertex_bone_indices.append([0,0,0,0])
+                skin_plg.vertex_bone_weights.append([0,0,0,0])
+
+                for index, bone in enumerate(vertex['bones']):
+                    skin_plg.vertex_bone_indices[-1][index] = bone[0]
+                    skin_plg.vertex_bone_weights[-1][index] = bone[1]
+
+        if skin_plg is not None:
+            geometry.extensions['skin'] = skin_plg
+        if extra_vert:
+            geometry.extensions['extra_vert_color'] = extra_vert
+
+    #######################################################
+    @staticmethod
+    def populate_geometry_from_faces_data(faces_list, geometry):
+        for face in faces_list:
+            verts = face['verts']
+            geometry.triangles.append(
+                dff.Triangle._make((
+                    verts[1], #b
+                    verts[0], #a
+                    face['mat_idx'], #material
+                    verts[2] #c
+                ))
+            )
+                    
+    #######################################################
+    @staticmethod
+    def populate_geometry_with_mesh_data(obj, geometry):
+        self = dff_exporter
+
+        mesh = self.convert_to_mesh(obj)
+        self.triangulate_mesh(mesh)
+        mesh.calc_normals_split()
+
+        vertices_list = []
+        faces_list = []
+
+        skin_plg, bone_groups = self.get_skin_plg_and_bone_groups(obj, mesh)
+
+        for idx, polygon in enumerate(mesh.polygons):
+            faces_list.append(
+                {"verts": [idx*3, idx*3+1, idx*3+2],
+                 "mat_idx": polygon.material_index})
+            
+            for loop_index in polygon.loop_indices:
+                loop = mesh.loops[loop_index]
+                vertex = mesh.vertices[loop.vertex_index]
+                uvs = []
+                vert_cols = []
+                bones = []
+
+                for uv_layer in mesh.uv_layers:
+                    uvs.append(uv_layer.data[loop_index].uv)
+
+                for vert_col in mesh.vertex_colors:
+                    vert_cols.append(vert_col.data[loop_index].color)
+
+                for group in vertex.groups:
+                    # Only upto 4 vertices per group are supported
+                    if len(bones) >= 4:
+                        break
+
+                    if group.group in bone_groups and group.weight > 0:
+                        bones.append((bone_groups[group.group], group.weight))
+                        
+                vertices_list.append({"idx": loop.vertex_index,
+                                      "tmp_idx": len(vertices_list), # for making cleanup convenient later 
+                                      "co": vertex.co,
+                                      "normal": loop.normal,
+                                      "uvs": uvs,
+                                      "vert_cols": vert_cols,
+                                      "bones": bones})
+
+        self.cleanup_duplicate_verts (obj, vertices_list, faces_list)
+
+        self.populate_geometry_from_vertices_data(
+            vertices_list, skin_plg, mesh, obj, geometry)
+
+        self.populate_geometry_from_faces_data(faces_list, geometry)
+        
+    
+    #######################################################
+    @staticmethod
     def convert_to_mesh(obj):
 
         """ 
@@ -469,158 +645,15 @@ class dff_exporter:
         return mesh
     
     #######################################################
+    @staticmethod
     def populate_atomic(obj):
         self = dff_exporter
 
         # Create geometry
         geometry = dff.Geometry()
-
-        mesh = self.convert_to_mesh(obj)
-        bm   = bmesh.new()
-        
-        bm.from_mesh(mesh)
-
-        bmesh.ops.triangulate(bm, faces=bm.faces[:])
-
-        bm.verts.ensure_lookup_table()
-        bm.verts.index_update()
-        
-        # Set SkinPLG
-        skin = self.init_skin_plg(obj, mesh)
-
-        has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
-        has_night_colors  = len(mesh.vertex_colors) > 1 and obj.dff.night_cols
-
-        # These are used to set the vertex indices for new vertices
-        # created in the next loop to get rid of shared vertices.
-        override_faces = {}
-        
-        # Vertices and Normals
-        i = 0
-        length = len(bm.verts)
-        while i < len(bm.verts):
-            vertex = bm.verts[i]
-            
-            geometry.vertices.append(dff.Vector._make(vertex.co))
-            geometry.normals.append(dff.Vector._make(vertex.normal))
-
-            # These are already filtered vertices, no need to check them again
-            if i >= length:
-                i += 1
-                continue
-            
-            shared_loops = self.get_vertex_shared_loops(
-                vertex,
-                [
-                    bm.loops.layers.uv.values(),
-                    bm.loops.layers.color.values()
-                ],
-                [
-                    lambda a, b: a.uv != b.uv,
-                    lambda a, b: a != b
-                ]
-            )
-            
-            # create a fork
-            for loop in shared_loops:
-                face = loop.face
-                face.loops.index_update()
-
-                if face.index not in override_faces:
-                    override_faces[face.index] = [
-                        vert.index for vert in face.verts
-                    ]
-                
-                override_faces[face.index][loop.index] = len(bm.verts)
-                
-                # Update the SkinPLG to include the duplicated vertex
-                if skin is not None:
-                    bone_indices = skin.vertex_bone_indices
-                    bone_weights = skin.vertex_bone_weights
-                    
-                    bone_indices.append(bone_indices[vertex.index])
-                    bone_weights.append(bone_weights[vertex.index])
-                    
-                bm.verts.new(vertex.co, vertex)
-                bm.verts.ensure_lookup_table()
-            
-            i += 1
-
-        # Allocate uv layers/vertex colors array
-
-        # This number denotes what the maximum number of uv maps exported will be.
-        # If obj.dff.uv_map2 is set (i.e second UV map WILL be exported), the
-        # maximum will be 2. If obj.dff.uv_map1 is NOT set, the maximum cannot
-        # be greater than 0.
-        max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
-        
-        uv_layers_count = min(len(bm.loops.layers.uv), max_uv_layers)
-        geometry.uv_layers = [[dff.TexCoords(0,0)] * len(bm.verts)
-                              for i in range(uv_layers_count)]
-        extra_vert = None
-        if has_prelit_colors:
-            geometry.prelit_colors = [dff.RGBA(255,255,255,255)] * len(bm.verts)
-
-        if has_night_colors:
-            extra_vert = dff.ExtraVertColorExtension(
-                [dff.RGBA(255,255,255,255)] * len(bm.verts)
-            )
-            
-        # Faces
-        for face in bm.faces:
-
-            verts = [vert.index for vert in face.verts]
-            if face.index in override_faces:
-                verts = override_faces[face.index]
-                
-            geometry.triangles.append(                
-                dff.Triangle._make((
-                    verts[1], #b
-                    verts[0], #a
-                    face.material_index, #material
-                    verts[2] #c
-                ))
-            )
-
-            face.loops.index_update()
-            for loop in face.loops:
-                
-                # Set UV Coordinates for this face
-                for index, layer in enumerate(bm.loops.layers.uv.values()):
-
-                    if index >= max_uv_layers:
-                        break
-                    
-                    uv = loop[layer].uv
-                    geometry.uv_layers[index][verts[loop.index]] = dff.TexCoords(
-                        uv.x, 1 - uv.y #UV Coordinates are flipped in the Y Axis
-                    )
-
-                # Set prelit faces for this face
-                for index, layer in enumerate(bm.loops.layers.color.values()):
-                    
-                    color = list(loop[layer])
-                    if len(color) < 4:
-                        color.append(1)
-                        
-                    prelit_color = dff.RGBA._make(
-                        int(c * 255) for c in color
-                    )
-                        
-                    if index == 0 and has_prelit_colors:
-                        geometry.prelit_colors[verts[loop.index]] = prelit_color
-                            
-                    elif index == 1 and has_night_colors:
-                        extra_vert.colors[verts[loop.index]] = prelit_color
-                
+        self.populate_geometry_with_mesh_data (obj, geometry)
         self.create_frame(obj)
 
-        # Custom Split Normals
-        mesh.calc_normals_split()
-
-        for loop in mesh.loops:
-            geometry.normals[loop.vertex_index] = loop.normal
-        
         # Bounding sphere
         sphere_center = 0.125 * sum(
             (mathutils.Vector(b) for b in obj.bound_box),
@@ -641,10 +674,6 @@ class dff_exporter:
         geometry.export_flags['light'] = obj.dff.light
         geometry.export_flags['modulate_color'] = obj.dff.modulate_color
         
-        if skin is not None:
-            geometry.extensions['skin'] = skin
-        if extra_vert:
-            geometry.extensions['extra_vert_color'] = extra_vert
         if "dff_user_data" in obj.data:
             geometry.extensions['user_data'] = dff.UserData.from_mem(
                 obj.data['dff_user_data'])
@@ -671,9 +700,9 @@ class dff_exporter:
                                            0
         ))
         self.dff.atomic_list.append(atomic)
-        bm.free()
 
     #######################################################
+    @staticmethod
     def calculate_parent_depth(obj):
         parent = obj.parent
         depth = 0
@@ -685,6 +714,7 @@ class dff_exporter:
         return depth        
 
     #######################################################
+    @staticmethod
     def check_armature_parent(obj):
 
         # This function iterates through all modifiers of the parent's modifier,
@@ -698,6 +728,7 @@ class dff_exporter:
         return False
     
     #######################################################
+    @staticmethod
     def export_armature(obj):
         self = dff_exporter
         
@@ -745,6 +776,7 @@ class dff_exporter:
             self.dff.frame_list.append(frame)
         
     #######################################################
+    @staticmethod
     def export_objects(objects, name=None):
         self = dff_exporter
         
@@ -759,6 +791,7 @@ class dff_exporter:
             # create atomic in this case
             if obj.type == "MESH":
                 self.populate_atomic(obj)
+                #self.populate_atomic(obj)
 
             # create an empty frame
             elif obj.type == "EMPTY":
@@ -788,12 +821,14 @@ class dff_exporter:
             self.dff.write_file("%s/%s" % (self.path, name), self.version)
 
     #######################################################
+    @staticmethod
     def is_selected(obj):
         if bpy.app.version < (2, 80, 0):
             return obj.select
         return obj.select_get()
             
     #######################################################
+    @staticmethod
     def export_dff(filename):
         self = dff_exporter
 
