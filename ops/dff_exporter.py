@@ -453,10 +453,7 @@ class dff_exporter:
         self = dff_exporter
         removed_verts = {}
         i = 0
-
-        # To disable check for different normals in case they aren't being exported anyway.
-        export_normals = obj.dff.export_normals
-
+        
         while i < len(verts):
             vert = verts[i]
 
@@ -468,7 +465,7 @@ class dff_exporter:
                 # are vertex-based, so they're guaranteed to be equal if the idx
                 # property is equal.
                 if vert['idx'] == vert2['idx'] and \
-                   (vert['normal'] == vert2['normal'] or not export_normals) and \
+                   vert['normal'] == vert2['normal'] and \
                    vert['uvs'] == vert2['uvs']:
                     # Remove vertex and store the other in the map to change in face
                     removed_verts[vert2['tmp_idx']] = vert['tmp_idx']
@@ -791,7 +788,6 @@ class dff_exporter:
             # create atomic in this case
             if obj.type == "MESH":
                 self.populate_atomic(obj)
-                #self.populate_atomic(obj)
 
             # create an empty frame
             elif obj.type == "EMPTY":

@@ -767,13 +767,11 @@ class SkinPLG:
         self.calc_used_bones ()
 
         data = b''
-        print(self.num_bones, len(self.bones_used), self.max_weights_per_vertex)
         data += pack("<3Bx", self.num_bones, len(self.bones_used),
                      self.max_weights_per_vertex)
 
         # Used Bones
         data += pack(f"<{len(self.bones_used)}B", *self.bones_used)
-        print(self.bones_used, self.max_weights_per_vertex)
         
         # 4x Indices
         for indices in self.vertex_bone_indices:
