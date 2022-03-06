@@ -113,7 +113,11 @@ class dff_importer:
             frame = self.dff.frame_list[atomic.frame]
             geom = self.dff.geometry_list[atomic.geometry]
             
-            mesh = bpy.data.meshes.new(frame.name)
+            if frame.name == "unnamed":
+                mesh = bpy.data.meshes.new(os.path.splitext(bpy.path.basename(self.file_name))[0])
+            else:
+                mesh = bpy.data.meshes.new(frame.name)
+                
             bm   = bmesh.new()
 
             # Temporary Custom Properties that'll be used to set Object properties
@@ -340,8 +344,11 @@ class dff_importer:
                 continue
             
             # Generate a nice name with index and frame
-            name = "%s.%d" % (frame.name, index)
-            name = self.generate_material_name(material, name)
+            if frame.name == "unnamed":
+                name = os.path.splitext(bpy.path.basename(self.file_name))[0]
+            else:
+                name = "%s.%d" % (frame.name, index)
+                name = self.generate_material_name(material, name)
             
             mat = bpy.data.materials.new(name)
             mat.blend_method = 'CLIP'
@@ -504,8 +511,15 @@ class dff_importer:
 
         self = dff_importer
         
-        armature = bpy.data.armatures.new(frame.name)
-        obj = bpy.data.objects.new(frame.name, armature)
+        if frame.name == "unnamed":
+            dff_name = os.path.splitext(bpy.path.basename(self.file_name))[0]
+
+            armature = bpy.data.armatures.new(dff_name)
+            obj = bpy.data.objects.new(dff_name, armature)
+        else:
+            armature = bpy.data.armatures.new(frame.name)
+            obj = bpy.data.objects.new(frame.name, armature)
+
         link_object(obj, dff_importer.current_collection)
 
         try:
@@ -666,7 +680,11 @@ class dff_importer:
                     
             # Create and link the object to the scene
             if obj is None:
-                obj = bpy.data.objects.new(frame.name, mesh)
+                if frame.name == "unnamed":
+                    obj = bpy.data.objects.new(os.path.splitext(bpy.path.basename(self.file_name))[0], mesh)
+                else:
+                    obj = bpy.data.objects.new(frame.name, mesh)
+
                 link_object(obj, dff_importer.current_collection)
 
                 obj.rotation_mode       = 'QUATERNION'
