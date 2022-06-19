@@ -19,6 +19,7 @@ import bmesh
 import mathutils
 import os
 import os.path
+from collections import defaultdict
 
 from ..gtaLib import dff
 from .col_exporter import export_col
@@ -469,6 +470,27 @@ class dff_exporter:
         return mesh
     
     #######################################################
+    def transfer_color_attributes_to_vertex_colors(mesh):
+        if bpy.app.version < (3, 2, 0):
+            return
+
+        vertex_map = defaultdict(list)
+        for poly in mesh.polygons:
+            for v_ix, l_ix in zip(poly.vertices, poly.loop_indices):
+                vertex_map[v_ix].append(l_ix)
+
+        range_end = len(mesh.color_attributes) > 1 and 1 or len(mesh.color_attributes)
+        for index in range( range_end ):
+            color_attr = mesh.color_attributes[index]
+            if len(mesh.vertex_colors) < (index + 1):
+                mesh.vertex_colors.new()
+            color_layer = mesh.vertex_colors[index]
+            for vert_idx, loop_indices in vertex_map.items():
+                the_color = [float(v) for v in color_attr.data[vert_idx].color]
+                for loop in loop_indices:
+                    setattr(color_layer.data[loop], "color", the_color)
+    
+    #######################################################
     def populate_atomic(obj):
         self = dff_exporter
 
@@ -476,6 +498,8 @@ class dff_exporter:
         geometry = dff.Geometry()
 
         mesh = self.convert_to_mesh(obj)
+        self.transfer_color_attributes_to_vertex_colors(mesh)
+
         bm   = bmesh.new()
         
         bm.from_mesh(mesh)
