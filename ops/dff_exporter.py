@@ -479,7 +479,8 @@ class dff_exporter:
             for v_ix, l_ix in zip(poly.vertices, poly.loop_indices):
                 vertex_map[v_ix].append(l_ix)
 
-        range_end = len(mesh.color_attributes) > 1 and 1 or len(mesh.color_attributes)
+        range_end = len(mesh.color_attributes)
+        range_end = range_end > 2 and 2 or range_end
         for index in range( range_end ):
             color_attr = mesh.color_attributes[index]
             if len(mesh.vertex_colors) < (index + 1):
