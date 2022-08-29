@@ -34,7 +34,7 @@ The following is a list of supported features by the addon
 
 ## Installation
 
-1. Get a release from the *Releases* for a stable release, or the bleeding-edge script by cloning the repository
+1. [Download](https://github.com/Parik27/DragonFF/archive/refs/heads/master.zip) the addon zip file from the latest master branch
 2. Import the downloaded .zip file by selecting it from *(User) Preferences/Addons/Install from File*
 3. Set the addon "GTA DragonFF" to enabled
 4. Import dff from Import tab or an IPL/IFP from the panel in *Scene Settings*

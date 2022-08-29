@@ -68,6 +68,7 @@ class dff_importer:
     current_collection = None
     use_mat_split      = False
     remove_doubles     = False
+    import_normals     = False
     group_materials    = False
     version            = ""
     warning            = ""
@@ -212,14 +213,15 @@ class dff_importer:
             bm.to_mesh(mesh)
 
             # Set loop normals
-            if geom.has_normals:
+            if geom.has_normals and self.import_normals:
                 normals = []
                 for loop in mesh.loops:
                     normals.append(geom.normals[loop.vertex_index])
 
                 mesh.normals_split_custom_set(normals)
                 mesh.use_auto_smooth = True
-                mesh['dragon_normals'] = True
+
+            mesh['dragon_normals'] = geom.has_normals
 
             # Set pipeline
             if geom.pipeline is not None:
@@ -794,6 +796,7 @@ def import_dff(options):
     dff_importer.use_mat_split    = options['use_mat_split']
     dff_importer.remove_doubles   = options['remove_doubles']
     dff_importer.group_materials  = options['group_materials']
+    dff_importer.import_normals   = options['import_normals']
 
     dff_importer.import_dff(options['file_name'])
 
