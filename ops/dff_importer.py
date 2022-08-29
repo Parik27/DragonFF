@@ -72,6 +72,7 @@ class dff_importer:
     group_materials    = False
     version            = ""
     warning            = ""
+    current_clump      = 0
 
     __slots__ = [
         'dff',
@@ -105,14 +106,14 @@ class dff_importer:
 
     #######################################################
     # TODO: Cyclomatic Complexity too high
-    def import_atomics():
+    def import_atomics(clump):
         self = dff_importer
 
         # Import atomics (meshes)
-        for atomic in self.dff.atomic_list:
+        for atomic in self.dff.clumps[clump].atomic_list:
 
-            frame = self.dff.frame_list[atomic.frame]
-            geom = self.dff.geometry_list[atomic.geometry]
+            frame = self.dff.clumps[clump].frame_list[atomic.frame]
+            geom = self.dff.clumps[clump].geometry_list[atomic.geometry]
             
             mesh = bpy.data.meshes.new(frame.name)
             bm   = bmesh.new()
@@ -453,10 +454,10 @@ class dff_importer:
                 self.materials[hash(material)] = helper.material
 
     #######################################################
-    def construct_bone_dict():
+    def construct_bone_dict(clump):
         self = dff_importer
         
-        for index, frame in enumerate(self.dff.frame_list):
+        for index, frame in enumerate(self.dff.clumps[clump].frame_list):
             if frame.bone_data:
                 bone_id = frame.bone_data.header.id
                 if bone_id != -1:
@@ -625,14 +626,14 @@ class dff_importer:
             bm.to_mesh(self.meshes[frame])
                 
     #######################################################
-    def import_frames():
+    def import_frames(clump):
         self = dff_importer
 
         # Initialise bone indices for use in armature construction
-        self.construct_bone_dict()
+        self.construct_bone_dict(clump)
         #self.import_2dfx(self.dff.ext_2dfx)
         
-        for index, frame in enumerate(self.dff.frame_list):
+        for index, frame in enumerate(self.dff.clumps[clump].frame_list):
 
             # Check if the mesh for the frame has been loaded
             mesh = None
@@ -675,7 +676,7 @@ class dff_importer:
                 obj.rotation_quaternion = matrix.to_quaternion()
                 obj.location            = frame.position
                 obj.scale               = matrix.to_scale()
-
+                obj.dff.clump           = clump
 
                 # Set empty display properties to something decent
                 if mesh is None:
@@ -713,7 +714,6 @@ class dff_importer:
             self.objects.append(obj)
 
             # Set a collision model used for export
-            obj["gta_coll"] = self.dff.collisions
             if frame.user_data is not None:
                 obj["dff_user_data"] = frame.user_data.to_mem()[12:]
 
@@ -721,15 +721,15 @@ class dff_importer:
             self.remove_object_doubles()
 
     #######################################################
-    def preprocess_atomics():
+    def preprocess_atomics(clump):
         self = dff_importer
 
         atomic_frames = []
         to_be_preprocessed = [] #these will be assigned a new frame
         
-        for index, atomic in enumerate(self.dff.atomic_list):
+        for index, atomic in enumerate(self.dff.clumps[clump].atomic_list):
 
-            frame = self.dff.frame_list[atomic.frame]
+            frame = self.dff.clumps[clump].frame_list[atomic.frame]
 
             # For GTA SA bones, which have the frame of the pedestrian
             # (incorrectly?) set in the atomic to a bone
@@ -741,17 +741,32 @@ class dff_importer:
         # Assign every atomic in the list a new (possibly valid) frame
         for atomic in to_be_preprocessed:
             
-            for index, frame in enumerate(self.dff.frame_list):
+            for index, frame in enumerate(self.dff.clumps[clump].frame_list):
 
                 # Find an empty frame
                 if (frame.bone_data is None or frame.bone_data.header.id == -1) \
                    and index not in atomic_frames:
-                    _atomic = list(self.dff.atomic_list[atomic])
+                    _atomic = list(self.dff.clumps[clump].atomic_list[atomic])
                     _atomic[0] = index # _atomic.frame = index
-                    self.dff.atomic_list[atomic] = dff.Atomic(*_atomic)
+                    self.dff.clumps[clump].atomic_list[atomic] = dff.Atomic(*_atomic)
                     break
                     
-            
+
+    #######################################################
+    def import_collisions(clump):
+        self = dff_importer
+
+        for collision in self.dff.clumps[clump].collisions:
+            col = import_col_mem(collision, os.path.basename(self.file_name), False)
+
+            if (2, 80, 0) <= bpy.app.version:
+                for collection in col:
+                    self.current_collection.children.link(collection)
+
+                    # Hide objects
+                    for object in collection.objects:
+                        hide_object(object)
+
     #######################################################
     def import_dff(file_name):
         self = dff_importer
@@ -762,30 +777,41 @@ class dff_importer:
         self.dff.load_file(file_name)
         self.file_name = file_name
 
-        self.preprocess_atomics()
-        
-        # Create a new group/collection
-        self.current_collection = create_collection(
-            os.path.basename(file_name)
-        )
-        
-        self.import_atomics()
-        self.import_frames()
+        create_subcollections = len(self.dff.clumps) > 1
 
-        # Set imported version
-        self.version = "0x%05x" % self.dff.rw_version
-        
-        # Add collisions
-        for collision in self.dff.collisions:
-            col = import_col_mem(collision, os.path.basename(file_name), False)
-            
-            if (2, 80, 0) <= bpy.app.version:
-                for collection in col:
-                    self.current_collection.children.link(collection)
+        base_collection = create_collection(
+            os.path.basename(file_name))
 
-                    # Hide objects
-                    for object in collection.objects:
-                        hide_object(object)
+        for clump_idx in range(len(self.dff.clumps)):
+
+            self.meshes = {}
+            self.objects = []
+            self.skin_data = {}
+            self.bones = {}
+            self.materials = {}
+
+            self.preprocess_atomics(clump_idx)
+
+            # Create a new group/collection
+            if create_subcollections:
+                self.current_collection = create_collection(
+                    os.path.basename(file_name) + "_clump_" + str(clump_idx), False
+                )
+            else:
+                self.current_collection = base_collection
+
+            self.import_atomics(clump_idx)
+            self.import_frames(clump_idx)
+
+            # Set imported version
+            self.version = "0x%05x" % self.dff.rw_version
+
+            # Add collisions
+            self.import_collisions(clump_idx)
+
+            # Add clump sub-collection as child
+            if create_subcollections:
+                base_collection.children.link(self.current_collection)
 
 #######################################################
 def import_dff(options):
@@ -800,5 +826,4 @@ def import_dff(options):
 
     dff_importer.import_dff(options['file_name'])
 
-    return dff_importer
     return dff_importer

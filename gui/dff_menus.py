@@ -284,6 +284,8 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         layout.prop(settings, "type", text="Type")
 
         if settings.type == 'OBJ':
+            self.draw_labelled_prop(layout.row(), settings, ["clump"], "Clump")
+
             if context.object.type == 'MESH':
                 self.draw_mesh_menu(context)
 
@@ -382,6 +384,14 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
+    )
+
+    clump : bpy.props.IntProperty(
+        default = 0,
+        description = "Index of the clump in which the object will be exported (used for eg. player models and GTA 3 peds)",
+        name = "Clump Index",
+        min = 0,
+        max = 5
     )
 
     # Mesh properties

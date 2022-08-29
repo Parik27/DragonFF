@@ -278,6 +278,8 @@ class dff_exporter:
     file_name = ""
     dff = None
     version = None
+    current_clump = None
+    clumps = {}
     frames = {}
     bones = {}
     parent_queue = {}
@@ -298,7 +300,7 @@ class dff_exporter:
         self = dff_exporter
         
         frame       = dff.Frame()
-        frame_index = len(self.dff.frame_list)
+        frame_index = len(self.current_clump.frame_list)
         
         # Get rid of everything before the last period
         frame.name = clear_extension(obj.name)
@@ -310,7 +312,7 @@ class dff_exporter:
         for name in self.parent_queue:
             if name == obj.name:
                 index = self.parent_queue[name]
-                self.dff.frame_list[index].parent = frame_index
+                self.current_clump.frame_list[index].parent = frame_index
         
         matrix                = obj.matrix_local
         frame.creation_flags  =  0
@@ -332,7 +334,7 @@ class dff_exporter:
         id_array[obj.name] = frame_index
 
         if append:
-            self.dff.frame_list.append(frame)
+            self.current_clump.frame_list.append(frame)
 
         return frame
 
@@ -711,17 +713,17 @@ class dff_exporter:
             print("Invalid (Custom) Pipeline")
             
         # Add Geometry to list
-        self.dff.geometry_list.append(geometry)
+        self.current_clump.geometry_list.append(geometry)
         
         # Create Atomic from geometry and frame
-        geometry_index = len(self.dff.geometry_list) - 1
-        frame_index    = len(self.dff.frame_list) - 1
+        geometry_index = len(self.current_clump.geometry_list) - 1
+        frame_index    = len(self.current_clump.frame_list) - 1
         atomic         = dff.Atomic._make((frame_index,
                                            geometry_index,
                                            0x4,
                                            0
         ))
-        self.dff.atomic_list.append(atomic)
+        self.current_clump.atomic_list.append(atomic)
 
     #######################################################
     @staticmethod
@@ -781,7 +783,7 @@ class dff_exporter:
                     )
 
                 frame.bone_data = bone_data
-                self.dff.frame_list.append(frame)
+                self.current_clump.frame_list.append(frame)
                 continue
 
             # Create a regular Bone
@@ -795,7 +797,7 @@ class dff_exporter:
                 0
             )
             frame.bone_data = bone_data
-            self.dff.frame_list.append(frame)
+            self.current_clump.frame_list.append(frame)
         
     #######################################################
     @staticmethod
@@ -810,6 +812,11 @@ class dff_exporter:
         
         for obj in objects:
 
+            if obj.dff.clump not in self.clumps:
+                self.clumps[obj.dff.clump] = dff.Clump()
+
+            self.current_clump = self.clumps[obj.dff.clump]
+
             # create atomic in this case
             if obj.type == "MESH":
                 self.populate_atomic(obj)
@@ -820,7 +827,12 @@ class dff_exporter:
 
             elif obj.type == "ARMATURE":
                 self.export_armature(obj)                    
-        
+
+        # Append all exported clumps
+        for clump_idx in sorted(self.clumps.keys()):
+            print(len(self.clumps[clump_idx].frame_list))
+            self.dff.clumps.append(self.clumps[clump_idx])
+
         # Collision
         if self.export_coll:
             mem = export_col({
@@ -834,7 +846,7 @@ class dff_exporter:
             })
 
             if len(mem) != 0:
-               self.dff.collisions = [mem] 
+               self.dff.clumps[0].collisions = [mem]
 
         if name is None:
             self.dff.write_file(self.file_name, self.version )
@@ -854,7 +866,8 @@ class dff_exporter:
         self = dff_exporter
 
         self.file_name = filename
-        
+        self.clumps = {}
+
         objects = {}
         
         # Export collections
@@ -878,6 +891,7 @@ class dff_exporter:
                 objects     = {}
                 self.frames = {}
                 self.bones  = {}
+                self.clumps = {}
                 self.collection = collection
 
         if not self.mass_export:

@@ -20,7 +20,7 @@ from enum import Enum, IntEnum
 
 # Data types
 Chunk       = namedtuple("Chunk"       , "type size version")
-Clump       = namedtuple("Clump"       , "atomics lights cameras")
+ClumpStruct = namedtuple("ClumpStruct" , "atomics lights cameras")
 Vector      = namedtuple("Vector"      , "x y z")
 Matrix      = namedtuple("Matrix"      , "right up at")
 HAnimHeader = namedtuple("HAnimHeader" , "version id bone_count")
@@ -84,7 +84,7 @@ types = {
     "Material List"           : 8,
     "Frame List"              : 14,
     "Geometry"                : 15,
-    "Clump"                   : 16,
+    "ClumpStruct"             : 16,
     "Atomic"                  : 20,
     "Geometry List"           : 26,
     "Animation Anim"          : 27,
@@ -127,7 +127,7 @@ class Sections:
     # Unpack/pack format for above data types
     formats =  {
         Chunk       : "<3I",
-        Clump       : "<3I",
+        ClumpStruct : "<3I",
         Vector      : "<3f",
         HAnimHeader : "<3i",
         Bone        : "<3i",
@@ -1337,9 +1337,9 @@ class Geometry:
         if self.export_flags['write_mesh_plg']:
             data += self.write_bin_split()
         
-        for extension in self.extensions:
-            if self.extensions[extension] is not None:
-                data += self.extensions[extension].to_mem()
+        # for extension in self.extensions:
+        #     if self.extensions[extension] is not None:
+        #         data += self.extensions[extension].to_mem()
 
         # Write extra extensions
         for extra_extension in extra_extensions:
@@ -1410,9 +1410,18 @@ class Geometry:
         return Sections.write_chunk(data, types["Geometry"])
 
 #######################################################
+class Clump:
 
+    frame_list    = []
+    geometry_list = []
+    collisions    = []
+    atomic_list   = []
 
-class dff:
+    light_list    = []
+    ext_2dfx      = Extension2dfx()
+    pos           = 0
+    data          = ""
+    rw_version    = ""
 
     #######################################################
     def _read(self, size):
@@ -1916,8 +1925,7 @@ class dff:
         root_end = self.pos + root_chunk.size
 
         # STRUCT
-        if chunk.type == types["Struct"]:  
-
+        if chunk.type == types["Struct"]:
             # read clump data
             self._read(12)
             if Sections.get_rw_version(chunk.version) < 0x33000:
@@ -1953,39 +1961,6 @@ class dff:
                     self.pos += chunk.size
 
     #######################################################
-    def read_uv_anim_dict(self):
-        chunk = self.read_chunk()
-        
-        if chunk.type == types["Struct"]:
-            num_anims = unpack_from("<I", self.data, self._read(4))[0]
-
-        for i in range(num_anims):
-            
-            chunk = self.read_chunk()
-
-            if chunk.type == types["Animation Anim"]:
-                self.uvanim_dict.append(
-                    UVAnim.from_mem(self.data[self.pos:])
-                )
-
-            self._read(chunk.size)
-            
-    #######################################################
-    def load_memory(self, data):
-
-        self.data = data
-        while self.pos < len(data) - 12:
-            chunk = self.read_chunk()
-
-            if chunk.type == types["Clump"]:
-                self.read_clump(chunk)
-                self.rw_version = Sections.get_rw_version(chunk.version)
-
-            elif chunk.type == types["UV Animation Dictionary"]:
-                self.read_uv_anim_dict()
-                
-
-    #######################################################
     def clear(self):
         self.frame_list    = []
         self.geometry_list = []
@@ -1997,14 +1972,7 @@ class dff:
         self.pos           = 0
         self.data          = ""
         self.rw_version    = ""
-            
-    #######################################################
-    def load_file(self, filename):
-
-        with open(filename, mode='rb') as file:
-            content = file.read()
-            self.load_memory(content)
-           
+                       
     #######################################################
     def write_frame_list(self):
 
@@ -2069,6 +2037,147 @@ class dff:
         return Sections.write_chunk(data, types["Atomic"])
 
     #######################################################
+    def write_memory(self):
+        data = Sections.write(ClumpStruct, (len(self.atomic_list), 0,0), types["Struct"])
+
+        # Old RW versions didn't have cameras and lights in their clump structure
+        if Sections.get_rw_version() < 0x33000:
+            data = Sections.write_chunk(ClumpStruct,
+                                        pack("<I",
+                                             len(self.atomic_list)),
+                                        types["ClumpStruct"])
+
+        data += self.write_frame_list()
+        data += self.write_geometry_list()
+
+        for atomic in self.atomic_list:
+            data += self.write_atomic(atomic)
+
+        for coll_data in self.collisions:
+            _data = Sections.write_chunk(coll_data, types["Collision Model"])
+            data += Sections.write_chunk(_data, types["Extension"])
+            
+        data += Sections.write_chunk(b'', types["Extension"])
+            
+        return Sections.write_chunk(data, types["ClumpStruct"])
+
+    #######################################################
+    # Populate the clump from memory
+    # Returns the bytes read
+    def load_memory(self, root_chunk, data, pos = 0):
+        self.data = data
+        self.pos = pos
+
+        self.read_clump (root_chunk)
+        return self.pos - pos
+
+    #######################################################
+    def __init__(self):
+        self.clear()
+
+#######################################################
+class dff:
+
+    clumps        = []
+    ext_2dfx      = Extension2dfx()
+    pos           = 0
+    data          = ""
+    rw_version    = ""
+    uvanim_dict   = []
+
+    #######################################################
+    def __init__(self):
+        self.clumps        = []
+        self.ext_2dfx      = Extension2dfx()
+        self.pos           = 0
+        self.data          = ""
+        self.rw_version    = ""
+        self.uvanim_dict   = []
+
+    #######################################################
+    def read_uv_anim_dict(self):
+        chunk = self.read_chunk()
+        
+        if chunk.type == types["Struct"]:
+            num_anims = unpack_from("<I", self.data, self._read(4))[0]
+
+        for i in range(num_anims):
+            
+            chunk = self.read_chunk()
+
+            if chunk.type == types["Animation Anim"]:
+                self.uvanim_dict.append(
+                    UVAnim.from_mem(self.data[self.pos:])
+                )
+
+            self._read(chunk.size)
+    
+    #######################################################
+    def load_file(self, filename):
+
+        with open(filename, mode='rb') as file:
+            content = file.read()
+            self.load_memory(content)
+
+    
+    #######################################################
+    def _read(self, size):
+        current_pos = self.pos
+        self.pos += size
+        
+        return current_pos
+
+    #######################################################
+    def raw(self, size, offset=None):
+
+        if offset is None:
+            offset = self.pos
+
+        return self.data[offset:offset+size]
+
+    #######################################################
+    def load_memory(self, data):
+        self.data = data
+        while self.pos < len(data) - 12:
+            chunk = self.read_chunk()
+
+            if chunk.type == types["ClumpStruct"]:
+                clump = Clump()
+                self.pos += clump.load_memory (chunk, self.data, self.pos)
+
+                self.clumps.append(clump)
+                self.rw_version = Sections.get_rw_version(chunk.version)
+
+            elif chunk.type == types["UV Animation Dictionary"]:
+                self.read_uv_anim_dict()
+    
+    #######################################################
+    def read_chunk(self):
+        chunk = Sections.read(Chunk, self.data, self._read(12))
+        return chunk
+    
+    
+    #######################################################
+    def write_memory(self, version):
+
+        data = b''
+        Sections.set_library_id(version, 0xFFFF)
+
+        data += self.write_uv_dict()
+        for clump in self.clumps:
+            data += clump.write_memory ()
+
+        return data
+            
+    #######################################################
+    def write_file(self, filename, version):
+
+        with open(filename, mode='wb') as file:
+            content = self.write_memory(version)
+            file.write(content)
+
+            
+    #######################################################
     def write_uv_dict(self):
 
         if len(self.uvanim_dict) < 1:
@@ -2082,50 +2191,3 @@ class dff:
 
         return Sections.write_chunk(data, types["UV Animation Dictionary"])
 
-    #######################################################
-    def write_clump(self):
-
-        data = Sections.write(Clump, (len(self.atomic_list), 0,0), types["Struct"])
-
-        # Old RW versions didn't have cameras and lights in their clump structure
-        if Sections.get_rw_version() < 0x33000:
-            data = Sections.write_chunk(Clump,
-                                        pack("<I",
-                                             len(self.atomic_list)),
-                                        types["Clump"])
-            
-        data += self.write_frame_list()
-        data += self.write_geometry_list()
-
-        for atomic in self.atomic_list:
-            data += self.write_atomic(atomic)
-
-        for coll_data in self.collisions:
-            _data = Sections.write_chunk(coll_data, types["Collision Model"])
-            data += Sections.write_chunk(_data, types["Extension"])
-            
-        data += Sections.write_chunk(b'', types["Extension"])
-            
-        return Sections.write_chunk(data, types["Clump"])
-    
-    #######################################################
-    def write_memory(self, version):
-
-        data = b''
-        Sections.set_library_id(version, 0xFFFF)
-
-        data += self.write_uv_dict()
-        data += self.write_clump()
-
-        return data
-            
-    #######################################################
-    def write_file(self, filename, version):
-
-        with open(filename, mode='wb') as file:
-            content = self.write_memory(version)
-            file.write(content)
-            
-    #######################################################
-    def __init__(self):
-        self.clear()
