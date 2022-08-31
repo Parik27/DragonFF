@@ -278,10 +278,17 @@ class dff_exporter:
     file_name = ""
     dff = None
     version = None
-    current_clump = None
+
+    # Export data
     clumps = {}
     frames = {}
     bones = {}
+
+    # Current clump specific data (references to export data)
+    current_clump = None
+    clump_frames = {}
+    clump_bones = {}
+
     parent_queue = {}
     collection = None
     export_coll = False
@@ -325,7 +332,7 @@ class dff_exporter:
         if "dff_user_data" in obj:
             frame.user_data = dff.UserData.from_mem(obj["dff_user_data"])
 
-        id_array = self.bones if is_bone else self.frames
+        id_array = self.clump_bones if is_bone else self.clump_frames
         
         if set_parent and obj.parent is not None:
             frame.parent = id_array[obj.parent.name]            
@@ -755,16 +762,21 @@ class dff_exporter:
     @staticmethod
     def export_armature(obj):
         self = dff_exporter
-        
-        for index, bone in enumerate(obj.data.bones):
 
+        for index, bone in enumerate(obj.data.bones):
             # Create a special bone (contains information for all subsequent bones)
             if index == 0:
                 frame = self.create_frame(bone, False)
 
                 # set the first bone's parent to armature's parent
                 if obj.parent is not None:
-                    frame.parent = self.frames[obj.parent.name]
+                    frame.parent = self.clump_frames[obj.parent.name]
+
+                    # Set armature object atomic index to the armature itself as GTA expects
+                    for i, atomic in enumerate(self.current_clump.atomic_list):
+                        if atomic[0] == frame.parent:
+                            self.current_clump.atomic_list[i] = dff.Atomic(
+                                len(self.current_clump.atomic_list), *atomic[1:])
 
                 bone_data = dff.HAnimPLG()
                 bone_data.header = dff.HAnimHeader(
@@ -814,8 +826,12 @@ class dff_exporter:
 
             if obj.dff.clump not in self.clumps:
                 self.clumps[obj.dff.clump] = dff.Clump()
+                self.frames[obj.dff.clump] = {}
+                self.bones[obj.dff.clump] = {}
 
             self.current_clump = self.clumps[obj.dff.clump]
+            self.clump_bones = self.bones[obj.dff.clump]
+            self.clump_frames = self.frames[obj.dff.clump]
 
             # create atomic in this case
             if obj.type == "MESH":
@@ -879,7 +895,7 @@ class dff_exporter:
             collections = root_collection.children.values() + [root_collection]
             
         for collection in collections:
-            for obj in collection.objects:
+            for obj in collection.all_objects:
                     
                 if not self.selected or obj.select_get():
                     objects[obj] = self.calculate_parent_depth(obj)

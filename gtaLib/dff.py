@@ -1337,9 +1337,9 @@ class Geometry:
         if self.export_flags['write_mesh_plg']:
             data += self.write_bin_split()
         
-        # for extension in self.extensions:
-        #     if self.extensions[extension] is not None:
-        #         data += self.extensions[extension].to_mem()
+        for extension in self.extensions:
+            if self.extensions[extension] is not None:
+                data += self.extensions[extension].to_mem()
 
         # Write extra extensions
         for extra_extension in extra_extensions:

@@ -676,7 +676,6 @@ class dff_importer:
                 obj.rotation_quaternion = matrix.to_quaternion()
                 obj.location            = frame.position
                 obj.scale               = matrix.to_scale()
-                obj.dff.clump           = clump
 
                 # Set empty display properties to something decent
                 if mesh is None:
@@ -710,6 +709,8 @@ class dff_importer:
 
             if  frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
+
+            obj.dff.clump = clump
                 
             self.objects.append(obj)
 
@@ -797,6 +798,7 @@ class dff_importer:
                 self.current_collection = create_collection(
                     os.path.basename(file_name) + "_clump_" + str(clump_idx), False
                 )
+                base_collection.children.link(self.current_collection)
             else:
                 self.current_collection = base_collection
 
@@ -809,9 +811,6 @@ class dff_importer:
             # Add collisions
             self.import_collisions(clump_idx)
 
-            # Add clump sub-collection as child
-            if create_subcollections:
-                base_collection.children.link(self.current_collection)
 
 #######################################################
 def import_dff(options):
