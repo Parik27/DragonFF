@@ -165,9 +165,9 @@ class dff_importer:
                 extra_vertex_color = bm.loops.layers.color.new()
 
             if dff_importer.use_mat_split and 'mat_split' in geom.extensions:
-                faces = geom.extensions['mat_split']
+                faces = sorted(geom.extensions['mat_split'])
             else:
-                faces = geom.triangles
+                faces = sorted(geom.triangles)
                  
             
             for f in faces:
