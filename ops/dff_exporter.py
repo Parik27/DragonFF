@@ -186,8 +186,6 @@ class material_helper:
     #######################################################
     def get_uv_animation(self):
 
-        #TODO: Add Blender Internal Support
-
         anim = dff.UVAnim()
 
         # See if export_animation checkbox is checked
@@ -269,7 +267,10 @@ def edit_bone_matrix(edit_bone):
 
     edit_bone.tail = original_tail
     return matrix
-            
+
+class DffExportException(Exception):
+    pass
+
 #######################################################
 class dff_exporter:
 
@@ -326,8 +327,13 @@ class dff_exporter:
         id_array = self.bones if is_bone else self.frames
         
         if set_parent and obj.parent is not None:
-            frame.parent = id_array[obj.parent.name]            
+
+            if obj.parent.name not in id_array:
+                raise DffExportException(f"Failed to set parent for {obj.name} "
+                                         f"to {obj.parent.name}.")
             
+            parent_frame_idx = id_array[obj.parent.name]
+            frame.parent = parent_frame_idx
 
         id_array[obj.name] = frame_index
 
@@ -572,11 +578,15 @@ class dff_exporter:
 
         skin_plg, bone_groups = self.get_skin_plg_and_bone_groups(obj, mesh)
 
+        # Check for vertices once before exporting to report instanstly
+        if len(mesh.vertices) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
+
         for idx, polygon in enumerate(mesh.polygons):
             faces_list.append(
                 {"verts": [idx*3, idx*3+1, idx*3+2],
                  "mat_idx": polygon.material_index})
-            
+
             for loop_index in polygon.loop_indices:
                 loop = mesh.loops[loop_index]
                 vertex = mesh.vertices[loop.vertex_index]
@@ -607,6 +617,11 @@ class dff_exporter:
                                       "bones": bones})
 
         self.cleanup_duplicate_verts (obj, vertices_list, faces_list)
+
+        # Check vertices count again since duplicate vertices may have increased
+        # vertices count above the limit
+        if len(vertices_list) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
 
         self.populate_geometry_from_vertices_data(
             vertices_list, skin_plg, mesh, obj, geometry)
@@ -671,10 +686,16 @@ class dff_exporter:
     def populate_atomic(obj):
         self = dff_exporter
 
+        # Get armature
+        armature = None
+        for modifier in obj.modifiers:
+            if modifier.type == 'ARMATURE':
+                armature = modifier.object
+
         # Create geometry
         geometry = dff.Geometry()
         self.populate_geometry_with_mesh_data (obj, geometry)
-        self.create_frame(obj)
+        self.create_frame(obj, True, obj.parent != armature)
 
         # Bounding sphere
         sphere_center = 0.125 * sum(
@@ -723,6 +744,11 @@ class dff_exporter:
         ))
         self.dff.atomic_list.append(atomic)
 
+        # Export armature
+        if armature is not None:
+            self.export_armature(armature, obj)
+
+
     #######################################################
     @staticmethod
     def calculate_parent_depth(obj):
@@ -748,21 +774,31 @@ class dff_exporter:
                     return True
 
         return False
-    
+
     #######################################################
     @staticmethod
-    def export_armature(obj):
+    def validate_bone_for_export (obj, bone):
+        if "bone_id" not in bone or "type" not in bone:
+            raise DffExportException(f"Bone ID/Type not found in bone ({bone.name}) "
+                                     f"in armature ({obj.name}). Please ensure "
+                                     "you're using an armature imported from an "
+                                     "existing DFF file")
+
+    #######################################################
+    @staticmethod
+    def export_armature(obj, parent):
         self = dff_exporter
         
         for index, bone in enumerate(obj.data.bones):
+
+            self.validate_bone_for_export (obj, bone)
 
             # Create a special bone (contains information for all subsequent bones)
             if index == 0:
                 frame = self.create_frame(bone, False)
 
                 # set the first bone's parent to armature's parent
-                if obj.parent is not None:
-                    frame.parent = self.frames[obj.parent.name]
+                frame.parent = self.frames[parent.name]
 
                 bone_data = dff.HAnimPLG()
                 bone_data.header = dff.HAnimHeader(
@@ -773,6 +809,8 @@ class dff_exporter:
                 
                 # Make bone array in the root bone
                 for _index, _bone in enumerate(obj.data.bones):
+                    self.validate_bone_for_export (obj, _bone)
+
                     bone_data.bones.append(
                         dff.Bone(
                                 _bone["bone_id"],
@@ -796,7 +834,7 @@ class dff_exporter:
             )
             frame.bone_data = bone_data
             self.dff.frame_list.append(frame)
-        
+
     #######################################################
     @staticmethod
     def export_objects(objects, name=None):
@@ -817,9 +855,6 @@ class dff_exporter:
             # create an empty frame
             elif obj.type == "EMPTY":
                 self.create_frame(obj)
-
-            elif obj.type == "ARMATURE":
-                self.export_armature(obj)                    
         
         # Collision
         if self.export_coll:

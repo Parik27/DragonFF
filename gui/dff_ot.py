@@ -119,16 +119,19 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
                 return {'FINISHED'}
         
-        dff_exporter.export_dff(
-            {
-                "file_name"      : self.filepath,
-                "directory"      : self.directory,
-                "selected"       : self.only_selected,
-                "mass_export"    : self.mass_export,
-                "version"        : self.get_selected_rw_version(),
-                "export_coll"    : self.export_coll
-            }
-        )
+        try:
+            dff_exporter.export_dff(
+                {
+                    "file_name"      : self.filepath,
+                    "directory"      : self.directory,
+                    "selected"       : self.only_selected,
+                    "mass_export"    : self.mass_export,
+                    "version"        : self.get_selected_rw_version(),
+                    "export_coll"    : self.export_coll
+                }
+            )
+        except dff_exporter.DffExportException as e:
+            self.report({"ERROR"}, str(e))
 
         # Save settings of the export in scene custom properties for later
         context.scene['dragonff_imported_version'] = self.export_version
