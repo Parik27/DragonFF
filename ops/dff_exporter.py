@@ -186,8 +186,6 @@ class material_helper:
     #######################################################
     def get_uv_animation(self):
 
-        #TODO: Add Blender Internal Support
-
         anim = dff.UVAnim()
 
         # See if export_animation checkbox is checked
@@ -269,7 +267,10 @@ def edit_bone_matrix(edit_bone):
 
     edit_bone.tail = original_tail
     return matrix
-            
+
+class DffExportException(Exception):
+    pass
+
 #######################################################
 class dff_exporter:
 
@@ -335,8 +336,13 @@ class dff_exporter:
         id_array = self.clump_bones if is_bone else self.clump_frames
         
         if set_parent and obj.parent is not None:
-            frame.parent = id_array[obj.parent.name]            
+
+            if obj.parent.name not in id_array:
+                raise DffExportException(f"Failed to set parent for {obj.name} "
+                                         f"to {obj.parent.name}.")
             
+            parent_frame_idx = id_array[obj.parent.name]
+            frame.parent = parent_frame_idx
 
         id_array[obj.name] = frame_index
 
@@ -459,43 +465,6 @@ class dff_exporter:
         
     #######################################################
     @staticmethod
-    def cleanup_duplicate_verts(obj, verts, faces):
-        self = dff_exporter
-        removed_verts = {}
-        i = 0
-        
-        while i < len(verts):
-            vert = verts[i]
-
-            j = i+1
-            while j < len(verts):
-                vert2 = verts[j]
-
-                # We don't check all properties here because the other properties
-                # are vertex-based, so they're guaranteed to be equal if the idx
-                # property is equal.
-                if vert['idx'] == vert2['idx'] and \
-                   vert['normal'] == vert2['normal'] and \
-                   vert['uvs'] == vert2['uvs']:
-                    # Remove vertex and store the other in the map to change in face
-                    removed_verts[vert2['tmp_idx']] = vert['tmp_idx']
-                    del verts[j]
-                else:
-                    j += 1
-
-            i += 1
-
-        # update indices in faces
-        for face in faces:
-            for i, vert_idx in enumerate(face['verts']):
-                if vert_idx in removed_verts:
-                    face['verts'][i] = self.find_vert_idx_by_tmp_idx(
-                        verts, removed_verts[vert_idx])
-                else:
-                    face['verts'][i] = self.find_vert_idx_by_tmp_idx(verts, vert_idx)
-
-    #######################################################
-    @staticmethod
     def populate_geometry_from_vertices_data(vertices_list, skin_plg, mesh, obj, geometry):
 
         has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
@@ -576,15 +545,18 @@ class dff_exporter:
         self.triangulate_mesh(mesh)
         mesh.calc_normals_split()
 
+        verts_indices = {}
         vertices_list = []
         faces_list = []
 
         skin_plg, bone_groups = self.get_skin_plg_and_bone_groups(obj, mesh)
 
-        for idx, polygon in enumerate(mesh.polygons):
-            faces_list.append(
-                {"verts": [idx*3, idx*3+1, idx*3+2],
-                 "mat_idx": polygon.material_index})
+        # Check for vertices once before exporting to report instanstly
+        if len(mesh.vertices) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
+
+        for polygon in mesh.polygons:
+            face = {"verts": [], "mat_idx": polygon.material_index}
             
             for loop_index in polygon.loop_indices:
                 loop = mesh.loops[loop_index]
@@ -606,16 +578,29 @@ class dff_exporter:
 
                     if group.group in bone_groups and group.weight > 0:
                         bones.append((bone_groups[group.group], group.weight))
-                        
-                vertices_list.append({"idx": loop.vertex_index,
-                                      "tmp_idx": len(vertices_list), # for making cleanup convenient later 
-                                      "co": vertex.co,
-                                      "normal": loop.normal,
-                                      "uvs": uvs,
-                                      "vert_cols": vert_cols,
-                                      "bones": bones})
 
-        self.cleanup_duplicate_verts (obj, vertices_list, faces_list)
+                key = (loop.vertex_index,
+                       tuple(loop.normal),
+                       tuple(tuple(uv) for uv in uvs))
+
+                if key not in verts_indices:
+                    face['verts'].append (len(vertices_list))
+                    verts_indices[key] = len(vertices_list)
+                    vertices_list.append({"idx": loop.vertex_index,
+                                          "co": vertex.co,
+                                          "normal": loop.normal,
+                                          "uvs": uvs,
+                                          "vert_cols": vert_cols,
+                                          "bones": bones})
+                else:
+                    face['verts'].append (verts_indices[key])
+
+            faces_list.append(face)
+
+        # Check vertices count again since duplicate vertices may have increased
+        # vertices count above the limit
+        if len(vertices_list) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
 
         self.populate_geometry_from_vertices_data(
             vertices_list, skin_plg, mesh, obj, geometry)
@@ -680,10 +665,16 @@ class dff_exporter:
     def populate_atomic(obj):
         self = dff_exporter
 
+        # Get armature
+        armature = None
+        for modifier in obj.modifiers:
+            if modifier.type == 'ARMATURE':
+                armature = modifier.object
+
         # Create geometry
         geometry = dff.Geometry()
         self.populate_geometry_with_mesh_data (obj, geometry)
-        self.create_frame(obj)
+        self.create_frame(obj, True, obj.parent != armature)
 
         # Bounding sphere
         sphere_center = 0.125 * sum(
@@ -732,6 +723,11 @@ class dff_exporter:
         ))
         self.current_clump.atomic_list.append(atomic)
 
+        # Export armature
+        if armature is not None:
+            self.export_armature(armature, obj)
+
+
     #######################################################
     @staticmethod
     def calculate_parent_depth(obj):
@@ -757,26 +753,29 @@ class dff_exporter:
                     return True
 
         return False
-    
+
     #######################################################
     @staticmethod
-    def export_armature(obj):
+    def validate_bone_for_export (obj, bone):
+        if "bone_id" not in bone or "type" not in bone:
+            raise DffExportException(f"Bone ID/Type not found in bone ({bone.name}) "
+                                     f"in armature ({obj.name}). Please ensure "
+                                     "you're using an armature imported from an "
+                                     "existing DFF file")
+
+    #######################################################
+    @staticmethod
+    def export_armature(obj, parent):
         self = dff_exporter
 
         for index, bone in enumerate(obj.data.bones):
+            self.validate_bone_for_export (obj, bone)
             # Create a special bone (contains information for all subsequent bones)
             if index == 0:
                 frame = self.create_frame(bone, False)
 
                 # set the first bone's parent to armature's parent
-                if obj.parent is not None:
-                    frame.parent = self.clump_frames[obj.parent.name]
-
-                    # Set armature object atomic index to the armature itself as GTA expects
-                    for i, atomic in enumerate(self.current_clump.atomic_list):
-                        if atomic[0] == frame.parent:
-                            self.current_clump.atomic_list[i] = dff.Atomic(
-                                len(self.current_clump.atomic_list), *atomic[1:])
+                frame.parent = self.clump_frames[parent.name]
 
                 bone_data = dff.HAnimPLG()
                 bone_data.header = dff.HAnimHeader(
@@ -787,6 +786,8 @@ class dff_exporter:
                 
                 # Make bone array in the root bone
                 for _index, _bone in enumerate(obj.data.bones):
+                    self.validate_bone_for_export (obj, _bone)
+
                     bone_data.bones.append(
                         dff.Bone(
                                 _bone["bone_id"],
@@ -841,14 +842,10 @@ class dff_exporter:
             elif obj.type == "EMPTY":
                 self.create_frame(obj)
 
-            elif obj.type == "ARMATURE":
-                self.export_armature(obj)                    
-
         # Append all exported clumps
         for clump_idx in sorted(self.clumps.keys()):
             print(len(self.clumps[clump_idx].frame_list))
             self.dff.clumps.append(self.clumps[clump_idx])
-
         # Collision
         if self.export_coll:
             mem = export_col({

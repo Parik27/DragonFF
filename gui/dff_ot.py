@@ -1,6 +1,7 @@
 import bpy
 import os
 from bpy_extras.io_utils import ImportHelper, ExportHelper
+import time
 
 from ..ops import dff_exporter, dff_importer, col_importer
 
@@ -118,17 +119,23 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             if not self.verify_rw_version():
                 self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
                 return {'FINISHED'}
-        
-        dff_exporter.export_dff(
-            {
-                "file_name"      : self.filepath,
-                "directory"      : self.directory,
-                "selected"       : self.only_selected,
-                "mass_export"    : self.mass_export,
-                "version"        : self.get_selected_rw_version(),
-                "export_coll"    : self.export_coll
-            }
-        )
+
+        start = time.time ()
+        try:
+            dff_exporter.export_dff(
+                {
+                    "file_name"      : self.filepath,
+                    "directory"      : self.directory,
+                    "selected"       : self.only_selected,
+                    "mass_export"    : self.mass_export,
+                    "version"        : self.get_selected_rw_version(),
+                    "export_coll"    : self.export_coll
+                }
+            )
+        except dff_exporter.DffExportException as e:
+            self.report({"ERROR"}, str(e))
+
+        self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
 
         # Save settings of the export in scene custom properties for later
         context.scene['dragonff_imported_version'] = self.export_version

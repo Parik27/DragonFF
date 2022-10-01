@@ -86,11 +86,14 @@ class material_helper:
             self.principled.base_color_texture.node_image.label = label
             self.principled.base_color_texture.image  = image
 
-            # Set alpha texture only if the image has alpha channel
-            # (otherwise the wrapper uses the color channel as alpha
-            if not (image.channels < 4 or image.depth in {24, 8}):
-                self.principled.alpha_texture.image            = image
-                self.principled.alpha_texture.node_image.label = label+".alphatexture"
+
+            # Connect Alpha output to Principled BSDF
+            image_node      = self.principled.base_color_texture.node_image
+            principled_node = self.principled.node_principled_bsdf
+            node_tree       = self.principled.material.node_tree
+
+            node_tree.links.new(image_node.outputs["Alpha"],
+                                principled_node.inputs["Alpha"])
             
         else:
             slot               = self.material.texture_slots.add()
