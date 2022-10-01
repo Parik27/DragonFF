@@ -456,43 +456,6 @@ class dff_exporter:
         
     #######################################################
     @staticmethod
-    def cleanup_duplicate_verts(obj, verts, faces):
-        self = dff_exporter
-        removed_verts = {}
-        i = 0
-        
-        while i < len(verts):
-            vert = verts[i]
-
-            j = i+1
-            while j < len(verts):
-                vert2 = verts[j]
-
-                # We don't check all properties here because the other properties
-                # are vertex-based, so they're guaranteed to be equal if the idx
-                # property is equal.
-                if vert['idx'] == vert2['idx'] and \
-                   vert['normal'] == vert2['normal'] and \
-                   vert['uvs'] == vert2['uvs']:
-                    # Remove vertex and store the other in the map to change in face
-                    removed_verts[vert2['tmp_idx']] = vert['tmp_idx']
-                    del verts[j]
-                else:
-                    j += 1
-
-            i += 1
-
-        # update indices in faces
-        for face in faces:
-            for i, vert_idx in enumerate(face['verts']):
-                if vert_idx in removed_verts:
-                    face['verts'][i] = self.find_vert_idx_by_tmp_idx(
-                        verts, removed_verts[vert_idx])
-                else:
-                    face['verts'][i] = self.find_vert_idx_by_tmp_idx(verts, vert_idx)
-
-    #######################################################
-    @staticmethod
     def populate_geometry_from_vertices_data(vertices_list, skin_plg, mesh, obj, geometry):
 
         has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
@@ -573,6 +536,7 @@ class dff_exporter:
         self.triangulate_mesh(mesh)
         mesh.calc_normals_split()
 
+        verts_indices = {}
         vertices_list = []
         faces_list = []
 
@@ -582,11 +546,9 @@ class dff_exporter:
         if len(mesh.vertices) > 0xFFFF:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
 
-        for idx, polygon in enumerate(mesh.polygons):
-            faces_list.append(
-                {"verts": [idx*3, idx*3+1, idx*3+2],
-                 "mat_idx": polygon.material_index})
-
+        for polygon in mesh.polygons:
+            face = {"verts": [], "mat_idx": polygon.material_index}
+            
             for loop_index in polygon.loop_indices:
                 loop = mesh.loops[loop_index]
                 vertex = mesh.vertices[loop.vertex_index]
@@ -607,16 +569,24 @@ class dff_exporter:
 
                     if group.group in bone_groups and group.weight > 0:
                         bones.append((bone_groups[group.group], group.weight))
-                        
-                vertices_list.append({"idx": loop.vertex_index,
-                                      "tmp_idx": len(vertices_list), # for making cleanup convenient later 
-                                      "co": vertex.co,
-                                      "normal": loop.normal,
-                                      "uvs": uvs,
-                                      "vert_cols": vert_cols,
-                                      "bones": bones})
 
-        self.cleanup_duplicate_verts (obj, vertices_list, faces_list)
+                key = (loop.vertex_index,
+                       tuple(loop.normal),
+                       tuple(tuple(uv) for uv in uvs))
+
+                if key not in verts_indices:
+                    face['verts'].append (len(vertices_list))
+                    verts_indices[key] = len(vertices_list)
+                    vertices_list.append({"idx": loop.vertex_index,
+                                          "co": vertex.co,
+                                          "normal": loop.normal,
+                                          "uvs": uvs,
+                                          "vert_cols": vert_cols,
+                                          "bones": bones})
+                else:
+                    face['verts'].append (verts_indices[key])
+
+            faces_list.append(face)
 
         # Check vertices count again since duplicate vertices may have increased
         # vertices count above the limit
