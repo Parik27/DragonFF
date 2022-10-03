@@ -449,6 +449,32 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
+    def get_delta_morph_entries(obj, mesh):
+        dm_entries = []
+        self = dff_exporter
+
+        if mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 1:
+            for kb in mesh.shape_keys.key_blocks[1:]:
+                min_corner = mathutils.Vector(min(v.co[i] for v in kb.data) for i in range(3))
+                max_corner = mathutils.Vector(max(v.co[i] for v in kb.data) for i in range(3))
+                dimensions = mathutils.Vector(max_corner[i] - min_corner[i] for i in range(3))
+
+                sphere_center = 0.5 * (min_corner + max_corner)
+                sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
+                sphere_radius = 1.732 * max(*dimensions) / 2
+
+                entrie = dff.DeltaMorph()
+                entrie.name = kb.name
+                entrie.bounding_sphere = dff.Sphere._make(
+                    list(sphere_center) + [sphere_radius]
+                )
+
+                dm_entries.append(entrie)
+
+        return dm_entries
+
+    #######################################################
+    @staticmethod
     def triangulate_mesh(mesh):
         bm = bmesh.new()
         bm.from_mesh(mesh)
@@ -462,10 +488,10 @@ class dff_exporter:
         for i, vert in enumerate(verts):
             if vert['tmp_idx'] == idx:
                 return i
-        
+
     #######################################################
     @staticmethod
-    def populate_geometry_from_vertices_data(vertices_list, skin_plg, mesh, obj, geometry):
+    def populate_geometry_from_vertices_data(vertices_list, skin_plg, dm_entries, mesh, obj, geometry):
 
         has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
         has_night_colors  = len(mesh.vertex_colors) > 1 and obj.dff.night_cols
@@ -480,8 +506,14 @@ class dff_exporter:
         extra_vert = None
         if has_night_colors:
             extra_vert = dff.ExtraVertColorExtension([])
-        
-        for vertex in vertices_list:
+
+        delta_morph_plg = None
+        if dm_entries:
+            delta_morph_plg = dff.DeltaMorphPLG()
+            for entrie in dm_entries:
+                delta_morph_plg.append_entry(entrie)
+           
+        for idx, vertex in enumerate(vertices_list):
             geometry.vertices.append(dff.Vector._make(vertex['co']))
             geometry.normals.append(dff.Vector._make(vertex['normal']))
 
@@ -515,10 +547,25 @@ class dff_exporter:
                     skin_plg.vertex_bone_indices[-1][index] = bone[0]
                     skin_plg.vertex_bone_weights[-1][index] = bone[1]
 
+            # delta_morph
+            #######################################################
+            if delta_morph_plg is not None:
+                sk_cos = vertex['sk_cos']
+                for index, co in enumerate(sk_cos[1:]):
+                    pos = mathutils.Vector(co) - mathutils.Vector(sk_cos[0])
+                    if sum(pos) == 0.0:
+                        continue
+
+                    entrie = dm_entries[index]
+                    entrie.indices.append(idx)
+                    entrie.positions.append(pos)
+
         if skin_plg is not None:
             geometry.extensions['skin'] = skin_plg
         if extra_vert:
             geometry.extensions['extra_vert_color'] = extra_vert
+        if delta_morph_plg is not None:
+            geometry.extensions['delta_morph'] = delta_morph_plg
 
     #######################################################
     @staticmethod
@@ -550,6 +597,7 @@ class dff_exporter:
         faces_list = []
 
         skin_plg, bone_groups = self.get_skin_plg_and_bone_groups(obj, mesh)
+        dm_entries = self.get_delta_morph_entries(obj, mesh)
 
         # Check for vertices once before exporting to report instanstly
         if len(mesh.vertices) > 0xFFFF:
@@ -557,13 +605,14 @@ class dff_exporter:
 
         for polygon in mesh.polygons:
             face = {"verts": [], "mat_idx": polygon.material_index}
-            
+
             for loop_index in polygon.loop_indices:
                 loop = mesh.loops[loop_index]
                 vertex = mesh.vertices[loop.vertex_index]
                 uvs = []
                 vert_cols = []
                 bones = []
+                sk_cos = []
 
                 for uv_layer in mesh.uv_layers:
                     uvs.append(uv_layer.data[loop_index].uv)
@@ -579,6 +628,10 @@ class dff_exporter:
                     if group.group in bone_groups and group.weight > 0:
                         bones.append((bone_groups[group.group], group.weight))
 
+                if mesh.shape_keys:
+                    for kb in mesh.shape_keys.key_blocks:
+                        sk_cos.append(kb.data[loop.vertex_index].co)
+
                 key = (loop.vertex_index,
                        tuple(loop.normal),
                        tuple(tuple(uv) for uv in uvs))
@@ -591,7 +644,8 @@ class dff_exporter:
                                           "normal": loop.normal,
                                           "uvs": uvs,
                                           "vert_cols": vert_cols,
-                                          "bones": bones})
+                                          "bones": bones,
+                                          "sk_cos": sk_cos})
                 else:
                     face['verts'].append (verts_indices[key])
 
@@ -603,7 +657,7 @@ class dff_exporter:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
 
         self.populate_geometry_from_vertices_data(
-            vertices_list, skin_plg, mesh, obj, geometry)
+            vertices_list, skin_plg, dm_entries, mesh, obj, geometry)
 
         self.populate_geometry_from_faces_data(faces_list, geometry)
         
@@ -623,6 +677,13 @@ class dff_exporter:
                 modifier.show_viewport = False
                 disabled_modifiers.append(modifier)
 
+        # Temporarily reset key shape values
+        key_shape_values = {}
+        if obj.data.shape_keys:
+            for kb in obj.data.shape_keys.key_blocks:
+                key_shape_values[kb] = kb.value
+                kb.value = 0.0
+
         if bpy.app.version < (2, 80, 0):
             mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
         else:
@@ -635,6 +696,10 @@ class dff_exporter:
         # Re enable disabled modifiers
         for modifier in disabled_modifiers:
             modifier.show_viewport = True
+
+        # Restore key shape values
+        for kb, v in key_shape_values.items():
+            kb.value = v
 
         return mesh
     
