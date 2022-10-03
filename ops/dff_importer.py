@@ -719,7 +719,10 @@ class dff_importer:
             if mesh and delta_morph:
                 verts = mesh.vertices
 
-                sk_basis = obj.shape_key_add(name='Basis')
+                base_name = delta_morph.base_name
+                base_name = "Basis" if len(base_name) == 0 else base_name
+
+                sk_basis = obj.shape_key_add(name=base_name)
                 sk_basis.interpolation = 'KEY_LINEAR'
                 mesh.shape_keys.use_relative = True
 
@@ -790,6 +793,58 @@ class dff_importer:
                         hide_object(object)
 
     #######################################################
+    @staticmethod
+    def can_convert_clumps_to_delta_morph (dff):
+        if len(dff.clumps) < 2:
+            return False
+
+        verts_count = list(len(geometry.vertices)
+                           for geometry in dff.clumps[0].geometry_list)
+
+        for clump in dff.clumps[1:]:
+            if len(clump.geometry_list) != len(verts_count):
+                return False
+
+            for idx, geometry in enumerate(clump.geometry_list):
+                if len(geometry.vertices) != verts_count[idx]:
+                    return False
+
+        return True
+
+    #######################################################
+    @staticmethod
+    def convert_clumps_to_delta_morph ():
+        self = dff_importer
+
+        if not self.can_convert_clumps_to_delta_morph (self.dff):
+            return
+
+        for base_atomic in self.dff.clumps[0].atomic_list:
+            morph = dff.DeltaMorphPLG ()
+
+            base_clump = self.dff.clumps[0]
+            base_geometry = base_clump.geometry_list[base_atomic.geometry]
+            morph.base_name = base_clump.frame_list[base_atomic.frame].name
+
+            for clump in self.dff.clumps[1:]:
+                for atomic in clump.atomic_list:
+                    entry = dff.DeltaMorph ()
+                    geometry = clump.geometry_list[atomic.geometry]
+
+                    entry.name = clump.frame_list[atomic.frame].name
+                    entry.indices = list(range(len(geometry.vertices)))
+
+                    entry.positions = list(dff.Vector(a.x-b.x, a.y-b.y, a.z-b.z)
+                                           for a,b in zip(geometry.vertices,
+                                                          base_geometry.vertices))
+                    morph.append_entry (entry)
+
+            base_geometry.extensions["delta_morph"] = morph
+
+        del self.dff.clumps[1:]
+
+
+    #######################################################
     def import_dff(file_name):
         self = dff_importer
         self._init()
@@ -798,6 +853,8 @@ class dff_importer:
         self.dff = dff.dff()
         self.dff.load_file(file_name)
         self.file_name = file_name
+
+        self.convert_clumps_to_delta_morph ()
 
         create_subcollections = len(self.dff.clumps) > 1
 

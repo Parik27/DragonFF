@@ -19,6 +19,7 @@ import bmesh
 import mathutils
 import os
 import os.path
+import copy
 from collections import defaultdict
 
 from ..gtaLib import dff
@@ -510,6 +511,7 @@ class dff_exporter:
         delta_morph_plg = None
         if dm_entries:
             delta_morph_plg = dff.DeltaMorphPLG()
+            delta_morph_plg.base_name = mesh.shape_keys.key_blocks[0].name
             for entrie in dm_entries:
                 delta_morph_plg.append_entry(entrie)
            
@@ -876,7 +878,41 @@ class dff_exporter:
             )
             frame.bone_data = bone_data
             self.current_clump.frame_list.append(frame)
-        
+
+    #######################################################
+    @staticmethod
+    def convert_delta_morphs_to_clumps ():
+        self = dff_exporter
+
+        # Won't work as intended on already-multi-clump models
+        if len(self.dff.clumps) > 1:
+            return
+
+        clump = self.dff.clumps[0]
+        for atomic in clump.atomic_list:
+            geom = clump.geometry_list[atomic.geometry]
+            if "delta_morph" in geom.extensions:
+                delta_morph : dff.DeltaMorphPLG = geom.extensions.pop("delta_morph")
+
+                if len(delta_morph.base_name) > 0:
+                    print(delta_morph.base_name)
+                    clump.frame_list[atomic.frame].name = delta_morph.base_name
+
+                for i, dm in enumerate(delta_morph.entries, start=1):
+                    if i <= len(self.dff.clumps):
+                        self.dff.clumps.append(copy.deepcopy(clump))
+
+                    morph_clump = self.dff.clumps[i]
+                    morph_geom = morph_clump.geometry_list[atomic.geometry]
+
+                    morph_clump.frame_list[atomic.frame].name = dm.name
+
+                    for j, vi in enumerate(dm.indices):
+                        positions = dm.positions
+                        if positions:
+                            morph_geom.vertices[vi] = \
+                            dff.Vector(*map(sum,zip(geom.vertices[vi], positions[j])))
+
     #######################################################
     @staticmethod
     def export_objects(objects, name=None):
@@ -926,6 +962,7 @@ class dff_exporter:
             if len(mem) != 0:
                self.dff.clumps[0].collisions = [mem]
 
+        self.convert_delta_morphs_to_clumps ()
         if name is None:
             self.dff.write_file(self.file_name, self.version )
         else:

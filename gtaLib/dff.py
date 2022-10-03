@@ -1294,13 +1294,10 @@ class DeltaMorph:
 #######################################################
 class DeltaMorphPLG:
 
-    __slots__ = [
-        'entries'
-    ]
-
    #######################################################
     def __init__(self):
         self.entries = []
+        self.base_name = ""
 
     #######################################################
     def append_entry(self, entry):
