@@ -96,6 +96,7 @@ class dff_importer:
         # Variables
         self.dff = None
         self.meshes = {}
+        self.delta_morph = {}
         self.objects = []
         self.file_name = ""
         self.skin_data = {}
@@ -113,7 +114,7 @@ class dff_importer:
 
             frame = self.dff.frame_list[atomic.frame]
             geom = self.dff.geometry_list[atomic.geometry]
-            
+
             mesh = bpy.data.meshes.new(frame.name)
             bm   = bmesh.new()
 
@@ -233,7 +234,7 @@ class dff_importer:
                 else:
                     mesh['dragon_pipeline'] = "CUSTOM"
                     mesh['dragon_cust_pipeline'] = pipeline
-                
+                                
             mesh.update()
 
             # Import materials and add the mesh to the meshes list
@@ -247,6 +248,7 @@ class dff_importer:
                 pass
             else:
                 self.meshes[atomic.frame] = mesh
+                self.delta_morph[atomic.frame] = geom.extensions.get('delta_morph')
 
 
     #######################################################
@@ -709,7 +711,26 @@ class dff_importer:
 
             if  frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
-                
+
+            # Add shape keys by delta morph
+            delta_morph = self.delta_morph.get(index)
+            if mesh and delta_morph:
+                verts = mesh.vertices
+
+                sk_basis = obj.shape_key_add(name='Basis')
+                sk_basis.interpolation = 'KEY_LINEAR'
+                mesh.shape_keys.use_relative = True
+
+                for dm in delta_morph.entries:
+                    sk = obj.shape_key_add(name=dm.name)
+                    sk.interpolation = 'KEY_LINEAR'
+
+                    positions, normals, prelits, uvs = dm.positions, dm.normals, dm.prelits, dm.uvs
+                    for i, vi in enumerate(dm.indices):
+                        if positions:
+                            sk.data[vi].co = verts[vi].co + mathutils.Vector(positions[i])
+                        # TODO: normals, prelits and uvs
+
             self.objects.append(obj)
 
             # Set a collision model used for export
