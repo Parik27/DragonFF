@@ -90,10 +90,12 @@ types = {
     "Animation Anim"          : 27,
     "Right to Render"         : 31,
     "UV Animation Dictionary" : 43,
+    "Morph PLG"               : 261,
     "Skin PLG"                : 278,
     "HAnim PLG"               : 286,
     "User Data PLG"           : 287,
     "Material Effects PLG"    : 288,
+    "Delta Morph PLG"         : 290,
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
     "Pipeline Set"            : 39056115,
@@ -1154,7 +1156,187 @@ class Extension2dfx:
     def __add__(self, other):
         self.entries += other.entries # concatinate entries
         return self
-    
+
+#######################################################
+class DeltaMorph:
+
+    #######################################################
+    def __init__(self):
+
+        self.name = ''
+        self.lock_flags = 0
+        self.indices = []
+        self.positions = []
+        self.normals = []
+        self.prelits = []
+        self.uvs = []
+        self.bounding_sphere = None
+        self.size = 0
+
+    #######################################################
+    def _decode_indices_rle(self, data):
+        n = 0
+        for p, b in enumerate(data):
+            d = b & 0x7f
+            if b & 0x80:
+                self.indices += [n+i for i in range(d)]
+            n += d
+
+    #######################################################
+    def _encode_indices_rle(self):
+        def pack_filled():
+            nonlocal n, data
+            while n > 0x7f:
+                data += pack("<B", 0xff)
+                n -= 0x7f
+            if n > 0:
+                data += pack("<B", n | 0x80)
+
+        def pack_skipped():
+            nonlocal s, data
+            while s > 0x7f:
+                data += pack("<B", 0x7f)
+                s -= 0x7f
+            if s > 0:
+                data += pack("<B", s)
+
+        data = b''
+        n, li = 0, -1
+        for i in self.indices:
+            if i != li + 1:
+                s = i - (li + 1)
+                pack_filled()
+                pack_skipped()
+                n = 0
+            li = i
+            n += 1
+
+        pack_filled()
+        return data
+
+    #######################################################
+    def from_mem(data):
+        self = DeltaMorph()
+
+        str_len = unpack_from("<I", data)[0]
+        self.name = unpack_from("<%ds" % (str_len), data, 4)[0].decode('ascii')
+        pos = 4 + str_len
+
+        flags, lock_flags, rle_size, verts_num = unpack_from("<IIII", data, pos)
+        pos += 16
+
+        self._decode_indices_rle(data[pos:pos+rle_size])
+        pos += rle_size
+
+        if flags & rpGEOMETRYPOSITIONS:
+            self.positions = [Sections.read(Vector, data, pos + i * 12) for i in range(verts_num)]
+            pos += verts_num * 12
+
+        if flags & rpGEOMETRYNORMALS:
+            self.normals = [Sections.read(Vector, data, pos + i * 12) for i in range(verts_num)]
+            pos += verts_num * 12
+
+        if flags & rpGEOMETRYPRELIT:
+            self.prelits = [unpack_from("<I", data, pos + i * 4) for i in range(verts_num)]
+            pos += verts_num * 4
+
+        if flags & rpGEOMETRYTEXTURED:
+            self.uvs = [Sections.read(TexCoords, data, pos + i * 8) for i in range(verts_num)]
+            pos += verts_num * 8
+
+        self.bounding_sphere = Sections.read(Sphere, data, pos)
+        pos += 16
+
+        self.size = pos
+        return self
+
+    #######################################################
+    def to_mem(self):
+
+        str_len = len(self.name) + 1
+        data = pack("<I", str_len)
+        data += pack("%ds" % str_len, self.name.encode('ascii'))
+
+        flags = 0
+        if self.positions:
+            flags |= rpGEOMETRYPOSITIONS
+        if self.normals:
+            flags |= rpGEOMETRYNORMALS
+        if self.prelits:
+            flags |= rpGEOMETRYPRELIT
+        if self.uvs:
+            flags |= rpGEOMETRYTEXTURED
+
+        verts_num = len(self.indices)
+        indices_rle = self._encode_indices_rle()
+
+        # TODO: testing
+        lock_flags = flags # self.lock_flags
+
+        data += pack("<IIII", flags, lock_flags, len(indices_rle), verts_num)
+        data += indices_rle
+
+        for p in self.positions:
+            data += Sections.write(Vector, p)
+
+        for n in self.normals:
+            data += Sections.write(Vector, n)
+
+        for p in self.prelits:
+            data += pack("<I", p)
+
+        for uv in self.uvs:
+            data += Sections.write(TexCoords, uv)
+
+        data += Sections.write(Sphere, self.bounding_sphere)
+        return data
+
+#######################################################
+class DeltaMorphPLG:
+
+    __slots__ = [
+        'entries'
+    ]
+
+   #######################################################
+    def __init__(self):
+        self.entries = []
+
+    #######################################################
+    def append_entry(self, entry):
+        self.entries.append(entry)
+
+    #######################################################
+    def from_mem(data):
+
+        self = DeltaMorphPLG()
+        entries_count = unpack_from("<I", data)[0]
+
+        pos = 4
+        for i in range(entries_count):
+            dm = DeltaMorph.from_mem(data[pos:])
+            self.append_entry(dm)
+            pos += dm.size
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+
+        if not self.entries:
+            return b''
+
+        data = pack("<I", len(self.entries))
+        for entry in self.entries:
+            data += entry.to_mem()
+
+        return Sections.write_chunk(data, types['Delta Morph PLG'])
+
+    #######################################################
+    def __add__(self, other):
+        self.entries += other.entries # concatinate entries
+        return self
+
 #######################################################
 class Geometry:
 
@@ -1847,8 +2029,8 @@ class dff:
                         if chunk.type == types["Material List"]:  
                             self.read_material_list(chunk)
 
-                        elif chunk.type == types["Extension"]:  
-                            pass # will fallthrough
+                        elif chunk.type == types["Extension"]:
+                            self.read_geometry_extension(chunk,geometry)
 
                         elif chunk.type == types["Skin PLG"]:
                             
@@ -1909,6 +2091,46 @@ class dff:
         # Set geometry's pipeline
         if pipeline and atomic:
             self.geometry_list[atomic.geometry].pipeline = pipeline
+
+    #######################################################
+    def read_geometry_extension(self, parent_chunk, geometry):
+
+        chunk_end = self.pos + parent_chunk.size
+
+        while self.pos < chunk_end:
+            chunk = self.read_chunk()
+
+            if chunk.type == types["Bin Mesh PLG"]: 
+                self.read_mesh_plg(chunk, geometry)
+
+            elif chunk.type == types["Skin PLG"]:
+                skin = SkinPLG.from_mem(self.data[self.pos:], geometry)
+                geometry.extensions["skin"] = skin
+
+                self._read(chunk.size)
+
+            elif chunk.type == types["Morph PLG"]:
+                # TODO:
+                # morph = DeltaMorphPLG.from_mem(self.data[self.pos:])
+
+                self._read(chunk.size)
+
+            elif chunk.type == types["Delta Morph PLG"]:
+                delta_morph = DeltaMorphPLG.from_mem(self.data[self.pos:])
+                geometry.extensions["delta_morph"] = delta_morph
+
+                self._read(chunk.size)
+
+            elif chunk.type == types["User Data PLG"]:
+                user_data = UserData.from_mem(self.data[self.pos:])
+                geometry.extensions['user_data'] = user_data
+                                
+                self._read(chunk.size)
+
+            else:
+                # TODO:
+                self._read(chunk.size)
+
 
     #######################################################
     def read_clump(self, root_chunk):
