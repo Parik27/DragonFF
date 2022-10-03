@@ -918,7 +918,7 @@ class dff_exporter:
     def export_objects(objects, name=None):
         self = dff_exporter
         
-        self.dff = dff.dff()
+        self.dff = dff.DffFile()
 
         # Skip empty collections
         if len(objects) < 1:

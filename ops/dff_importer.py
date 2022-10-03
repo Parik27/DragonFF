@@ -21,6 +21,8 @@ import math
 import mathutils
 
 from ..gtaLib import dff
+from ..gtaLib.dff import DffFile
+
 from .importer_common import (
     link_object, create_collection,
     material_helper, set_object_mode,
@@ -74,28 +76,31 @@ class dff_importer:
     warning            = ""
     current_clump      = 0
 
-    __slots__ = [
-        'dff',
-        'meshes',
-        'objects',
-        'file_name',
-        'skin_data',
-        'bones'
-    ]
+
+    meshes : dict[int, bpy.types.Mesh] = {}
+    delta_morph : dict[int, dff.DeltaMorphPLG] = {}
+    objects : list[bpy.types.Object] = []
+    file_name = ""
+    skin_data : dict[int, dff.SkinPLG] = {}
+    dff : DffFile = DffFile ()
+    bones = {}
+    materials : dict[int, bpy.types.Material]= {}
 
     #######################################################
     def multiply_matrix(a, b):
+
         # For compatibility with 2.79
         if bpy.app.version < (2, 80, 0):
             return a * b
         return a @ b
     
     #######################################################
+    @staticmethod
     def _init():
         self = dff_importer
 
         # Variables
-        self.dff = None
+        self.dff = DffFile ()
         self.meshes = {}
         self.delta_morph = {}
         self.objects = []
@@ -107,7 +112,8 @@ class dff_importer:
 
     #######################################################
     # TODO: Cyclomatic Complexity too high
-    def import_atomics(clump):
+    @staticmethod
+    def import_atomics(clump : int):
         self = dff_importer
 
         # Import atomics (meshes)
@@ -253,6 +259,7 @@ class dff_importer:
 
 
     #######################################################
+    @staticmethod
     def merge_meshes(mesha, meshb):
         bm = bmesh.new()
 
@@ -262,6 +269,7 @@ class dff_importer:
         bm.to_mesh(mesha)
                 
     #######################################################
+    @staticmethod
     def set_empty_draw_properties(empty):
         if (2, 80, 0) > bpy.app.version:
             empty.empty_draw_type = 'CUBE'
@@ -278,6 +286,7 @@ class dff_importer:
             pass
 
     ##################################################################
+    @staticmethod
     def generate_material_name(material, fallback):
 
         name = None
@@ -330,6 +339,7 @@ class dff_importer:
         return name if name else fallback
         
     ##################################################################
+    @staticmethod
     # TODO: MatFX: Dual Textures
     def import_materials(geometry, frame, mesh):
 
@@ -456,6 +466,7 @@ class dff_importer:
                 self.materials[hash(material)] = helper.material
 
     #######################################################
+    @staticmethod
     def construct_bone_dict(clump):
         self = dff_importer
         
@@ -467,6 +478,7 @@ class dff_importer:
                                               'index': index}
                         
     #######################################################
+    @staticmethod
     def align_roll( vec, vecz, tarz ):
 
         sine_roll = vec.normalized().dot(vecz.normalized().cross(tarz.normalized()))
@@ -484,6 +496,7 @@ class dff_importer:
             return -math.asin( sine_roll ) - math.pi
 
     #######################################################
+    @staticmethod
     def get_skinned_obj_index(frame, frame_index):
         self = dff_importer
 
@@ -505,6 +518,7 @@ class dff_importer:
         raise Exception("Cannot construct an armature without skinned mesh")
         
     #######################################################
+    @staticmethod
     def construct_armature(frame, frame_index):
 
         self = dff_importer
@@ -589,6 +603,7 @@ class dff_importer:
         return (armature, obj)
 
     #######################################################
+    @staticmethod
     def set_vertex_groups(obj, skin_data):
 
         # Allocate vertex groups
@@ -606,6 +621,7 @@ class dff_importer:
                 obj.vertex_groups[bone].add([i], weight, 'ADD')
 
     #######################################################
+    @staticmethod
     def remove_object_doubles():
         self = dff_importer
 
@@ -628,6 +644,7 @@ class dff_importer:
             bm.to_mesh(self.meshes[frame])
                 
     #######################################################
+    @staticmethod
     def import_frames(clump):
         self = dff_importer
 
@@ -746,6 +763,7 @@ class dff_importer:
             self.remove_object_doubles()
 
     #######################################################
+    @staticmethod
     def preprocess_atomics(clump):
         self = dff_importer
 
@@ -778,6 +796,7 @@ class dff_importer:
                     
 
     #######################################################
+    @staticmethod
     def import_collisions(clump):
         self = dff_importer
 
@@ -845,12 +864,13 @@ class dff_importer:
 
 
     #######################################################
+    @staticmethod
     def import_dff(file_name):
         self = dff_importer
         self._init()
 
         # Load the DFF
-        self.dff = dff.dff()
+        self.dff = dff.DffFile()
         self.dff.load_file(file_name)
         self.file_name = file_name
 

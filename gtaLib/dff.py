@@ -18,6 +18,8 @@ from collections import namedtuple
 from struct import unpack_from, calcsize, pack
 from enum import Enum, IntEnum
 
+import typing
+
 # Data types
 Chunk       = namedtuple("Chunk"       , "type size version")
 ClumpStruct = namedtuple("ClumpStruct" , "atomics lights cameras")
@@ -127,7 +129,7 @@ def strlen(bytes, offset=0):
 class Sections:
 
     # Unpack/pack format for above data types
-    formats =  {
+    formats : dict[typing.Type[typing.NamedTuple],str] =  {
         Chunk       : "<3I",
         ClumpStruct : "<3I",
         Vector      : "<3f",
@@ -144,9 +146,11 @@ class Sections:
     }
 
     library_id = 0 # used for writing
-    
+
     #######################################################
-    def read(type, data, offset=0):
+    T = typing.TypeVar('T', bound=typing.NamedTuple)
+    @staticmethod
+    def read(type : typing.Type[T], data, offset=0) -> T:
 
         # These are simple non-nested data types that can be returned in a single
         # unpack calls, and thus do not need any special functions
@@ -155,7 +159,7 @@ class Sections:
             return type._make(unpack_from(unpacker,data,offset))
 
         elif type is Matrix:
-            return Matrix._make(
+            return type._make(
                 (
                     Sections.read(Vector, data, offset),
                     Sections.read(Vector, data, offset+12),
@@ -164,15 +168,16 @@ class Sections:
             )
 
         elif type is UVFrame:
-            return UVFrame(
+            return type._make((
                 unpack_from("<f", data, offset)[0], #Time
                 list(unpack_from("<6f", data, offset + 4)), #UV
                 unpack_from("<i", data, offset + 28)[0] #Prev
-            )
+            ))
         else:
             raise NotImplementedError("unknown type", type)
 
     #######################################################
+    @staticmethod
     def pad_string(str):
 
         str_len = len(str)
@@ -183,6 +188,7 @@ class Sections:
         return pack("%ds" % str_len, str.encode('utf8'))
         
     #######################################################
+    @staticmethod
     def write(type, data, chunk_type=None):
         _data = b''
         
@@ -205,10 +211,12 @@ class Sections:
         
 
     #######################################################
-    def write_chunk(data, type):
+    @staticmethod
+    def write_chunk(data : bytes, type) -> bytes:
         return pack("<III", type, len(data), Sections.library_id) + data
         
-     ########################################################
+    ########################################################
+    @staticmethod
     def get_rw_version(library_id=None):
         #see https://gtamods.com/wiki/RenderWare
 
@@ -222,6 +230,7 @@ class Sections:
         return (library_id << 8)
 
     #######################################################
+    @staticmethod
     def get_library_id(version, build):
         #see https://gtamods.com/wiki/RenderWare
         
@@ -232,6 +241,7 @@ class Sections:
                (build & 0xFFFF)
 
     #######################################################
+    @staticmethod
     def set_library_id(version, build):
         Sections.library_id = Sections.get_library_id(version,build)
         
@@ -250,6 +260,7 @@ class Texture:
         self.mask               = ""
     
     #######################################################
+    @staticmethod
     def from_mem(data):
 
         self = Texture()
@@ -292,15 +303,17 @@ class Material:
     #######################################################
     def __init__(self):
 
-        self.flags              = None
-        self.color              = None
-        self.is_textured        = None
-        self.surface_properties = None
-        self.textures           = []
+        self.flags              = 0
+        self.color              = RGBA (0,0,0,0)
+        self.is_textured        = False
+        self.surface_properties = GeomSurfPro(0,0,0)
+
+        self.textures : list[Texture] = []
         self.plugins            = {}
         self._hasMatFX          = False #Used only internally for export
     
     #######################################################
+    @staticmethod
     def from_mem(data):
 
         self = Material()
@@ -472,9 +485,10 @@ class UserData:
     
     #######################################################
     def __init__(self):
-        self.sections = []
+        self.sections : list[UserDataSection] = []
 
     #######################################################
+    @staticmethod
     def from_mem(data):
 
         self = UserData()
@@ -482,7 +496,7 @@ class UserData:
         num_sections = unpack_from("<I", data)[0]
         offset = 4
         
-        for i in range(num_sections):
+        for _ in range(num_sections):
 
             # Section name
             name_len = unpack_from("<I", data, offset)[0]
@@ -505,7 +519,7 @@ class UserData:
                 offset += 4 * num_elements
 
             elif element_type == UserDataType.USERDATASTRING:
-                for j in range(num_elements):
+                for _ in range(num_elements):
                     str_len = unpack_from("<I", data, offset)[0]
                     string = unpack_from("<%ds" % (str_len), data, offset + 4)[0]
                     elements.append(string.decode('ascii'))
@@ -566,15 +580,18 @@ class Frame:
     
     ##################################################################
     def __init__(self):
-        self.rotation_matrix = None
-        self.position        = None
-        self.parent          = None
-        self.creation_flags  = None
-        self.name            = None
-        self.bone_data       = None
-        self.user_data       = None
+        self.rotation_matrix : Matrix | None = None
+        self.position        : Vector | None = None
+
+        self.name : str | None = None
+        self.parent            = -1
+        self.creation_flags    = 0
+
+        self.bone_data : HAnimPLG | None = None
+        self.user_data : UserData | None = None
 
     ##################################################################
+    @staticmethod
     def from_mem(data):
 
         self = Frame()
@@ -613,6 +630,7 @@ class Frame:
         return Sections.write_chunk(data, types["Extension"])
 
     ##################################################################
+    @staticmethod
     def size():
         return 56
 
@@ -626,10 +644,11 @@ class HAnimPLG:
     
     #######################################################
     def __init__(self):
-        self.header = 0
-        self.bones = []
+        self.header : HAnimHeader | None = None
+        self.bones : list[Bone]          = []
 
     #######################################################
+    @staticmethod
     def from_mem(data):
 
         self = HAnimPLG()
@@ -638,12 +657,13 @@ class HAnimPLG:
         if self.header.bone_count > 0:
             pos = 20  # offset to bone array
 
-            for i in range(self.header.bone_count):
+            for _ in range(self.header.bone_count):
                 bone = Sections.read(Bone, data, pos)
                 self.bones.append(bone)
                 pos += 12
 
         return self
+
     #######################################################
     def to_mem(self):
 
@@ -676,9 +696,10 @@ class UVAnim:
         self.duration = 0
         self.name = ""
         self.node_to_uv = [0] * 8
-        self.frames = []
+        self.frames : list[UVFrame] = []
 
     #######################################################
+    @staticmethod
     def from_mem(data):
         self = UVAnim()
 
@@ -729,13 +750,13 @@ class SkinPLG:
     ##################################################################
     def __init__(self):
         
-        self.num_bones = None
+        self.num_bones = 0
         self._num_used_bones = 0
         self.max_weights_per_vertex = 0
-        self.bones_used = []
-        self.vertex_bone_indices = []
-        self.vertex_bone_weights = []
-        self.bone_matrices = []
+        self.bones_used : list[int] = []
+        self.vertex_bone_indices : list[tuple[int]] = []
+        self.vertex_bone_weights : list[tuple[int]] = []
+        self.bone_matrices : list[list[list[float]]] = []
 
     ##################################################################
     def calc_max_weights_per_vertex (self):
@@ -837,7 +858,7 @@ class SkinPLG:
             unpack_format = "<4x16f"
 
         # Read bone matrices
-        for i in range(self.num_bones):
+        for _ in range(self.num_bones):
 
             _data = list(unpack_from(unpack_format, data, pos))
             _data[ 3] = 0.0
@@ -872,7 +893,7 @@ class ExtraVertColorExtension:
         magic = unpack_from("<I", data, offset)[0]
         if magic != 0:
             colors = []
-            for i in range(len(geometry.vertices)):
+            for _ in range(len(geometry.vertices)):
 
                 offset += 4
                 colors.append(
@@ -934,7 +955,7 @@ class Light2dfx:
         self.shadowTexName = ""
         self.shadowZDistance = 0
         self._flags2 = 0
-        self.lookDirection = None
+        self.lookDirection : tuple[int] | None = None
     
     #######################################################
     @staticmethod
@@ -992,11 +1013,11 @@ class Light2dfx:
     
     #######################################################
     def set_flag(self, flag):
-        self._flag |= flag
+        self._flags1 |= flag
 
     #######################################################
     def set_flag2(self, flag):
-        self._flag2 |= flag
+        self._flags2 |= flag
 
 #######################################################
 class Particle2dfx:
@@ -1058,7 +1079,7 @@ class PedAttractor2dfx:
         self.type = unpack_from("<I", data, offset)[0]
         self.rotation_matrix = Sections.read(Matrix, data, offset + 4)
         self.external_script = data[offset + 40: strlen(data, offset + 40)]
-        self.ped_existing_probabiliy = unpack_from("<I", data, offset + 48)[0]
+        self.ped_existing_probability = unpack_from("<I", data, offset + 48)[0]
 
         self.external_script = self.external_script.decode('ascii')
         
@@ -1094,7 +1115,7 @@ class Extension2dfx:
 
     #######################################################
     def __init__(self):
-        self.entries = []
+        self.entries : list[Light2dfx|Particle2dfx|PedAttractor2dfx|SunGlare2dfx] = []
 
     #######################################################
     def append_entry(self, entry):
@@ -1108,7 +1129,7 @@ class Extension2dfx:
         entries_count = unpack_from("<I", data, offset)[0]
 
         pos = 4 + offset
-        for i in range(entries_count):
+        for _ in range(entries_count):
 
             # Stores classes for each effect
             entries_funcs = {
@@ -1165,18 +1186,18 @@ class DeltaMorph:
 
         self.name = ''
         self.lock_flags = 0
-        self.indices = []
-        self.positions = []
-        self.normals = []
-        self.prelits = []
-        self.uvs = []
-        self.bounding_sphere = None
+        self.indices : list[int] = []
+        self.positions : list[Vector] = []
+        self.normals : list[Vector] = []
+        self.prelits : list[int] = []
+        self.uvs : list[TexCoords] = []
+        self.bounding_sphere : Sphere = Sphere(0,0,0,0)
         self.size = 0
 
     #######################################################
-    def _decode_indices_rle(self, data):
+    def _decode_indices_rle(self, data : bytes):
         n = 0
-        for p, b in enumerate(data):
+        for b in data:
             d = b & 0x7f
             if b & 0x80:
                 self.indices += [n+i for i in range(d)]
@@ -1215,7 +1236,8 @@ class DeltaMorph:
         return data
 
     #######################################################
-    def from_mem(data):
+    @staticmethod
+    def from_mem(data : bytes):
         self = DeltaMorph()
 
         str_len = unpack_from("<I", data)[0]
@@ -1225,6 +1247,7 @@ class DeltaMorph:
         flags, lock_flags, rle_size, verts_num = unpack_from("<IIII", data, pos)
         pos += 16
 
+        self.lock_flags = lock_flags
         self._decode_indices_rle(data[pos:pos+rle_size])
         pos += rle_size
 
@@ -1237,7 +1260,7 @@ class DeltaMorph:
             pos += verts_num * 12
 
         if flags & rpGEOMETRYPRELIT:
-            self.prelits = [unpack_from("<I", data, pos + i * 4) for i in range(verts_num)]
+            self.prelits = [unpack_from("<I", data, pos + i * 4)[0] for i in range(verts_num)]
             pos += verts_num * 4
 
         if flags & rpGEOMETRYTEXTURED:
@@ -1296,21 +1319,22 @@ class DeltaMorphPLG:
 
    #######################################################
     def __init__(self):
-        self.entries = []
+        self.entries : list[DeltaMorph] = []
         self.base_name = ""
 
     #######################################################
-    def append_entry(self, entry):
+    def append_entry(self, entry : DeltaMorph):
         self.entries.append(entry)
 
     #######################################################
+    @staticmethod
     def from_mem(data):
 
         self = DeltaMorphPLG()
         entries_count = unpack_from("<I", data)[0]
 
         pos = 4
-        for i in range(entries_count):
+        for _ in range(entries_count):
             dm = DeltaMorph.from_mem(data[pos:])
             self.append_entry(dm)
             pos += dm.size
@@ -1358,17 +1382,22 @@ class Geometry:
     
     ##################################################################
     def __init__(self):
-        self.flags              = None
-        self.triangles          = []
-        self.vertices           = []
-        self.surface_properties = None
-        self.prelit_colors      = []
-        self.uv_layers          = []
-        self.bounding_sphere    = None
-        self.has_vertices       = None
-        self.has_normals        = None
-        self.normals            = []
-        self.materials          = []
+        self.flags = 0
+
+        self.triangles     : list[Triangle]  = []
+        self.vertices      : list[Vector]    = []
+        self.normals       : list[Vector]    = []
+        self.prelit_colors : list[RGBA]      = []
+        self.materials     : list[Material]  = []
+
+        self.surface_properties = GeomSurfPro(0,0,0)
+        self.bounding_sphere    = Sphere(0,0,0,0)
+
+        self.uv_layers : list[list[TexCoords]] = []
+
+        self.has_vertices       = False
+        self.has_normals        = False
+
         self.extensions         = {}
         self.pipeline           = None
 
@@ -1428,7 +1457,7 @@ class Geometry:
 
                     self.uv_layers.append([]) #add empty new layer
                     
-                    for j in range(num_vertices):
+                    for _ in range(num_vertices):
                         
                         tex_coord = Sections.read(TexCoords, data, pos)
                         self.uv_layers[i].append(tex_coord)
@@ -1472,7 +1501,7 @@ class Geometry:
         data = b''
         
         data += pack("<I", len(self.materials))
-        for i in range(len(self.materials)):
+        for _ in range(len(self.materials)):
             data += pack("<i", -1)
 
         data = Sections.write_chunk(data, types["Struct"])
@@ -1591,15 +1620,15 @@ class Geometry:
 #######################################################
 class Clump:
 
-    frame_list    = []
-    geometry_list = []
-    collisions    = []
-    atomic_list   = []
+    frame_list    : list[Frame]    = []
+    geometry_list : list[Geometry] = []
+    collisions    : list[bytes]    = []
+    atomic_list   : list[Atomic]   = []
 
     light_list    = []
     ext_2dfx      = Extension2dfx()
     pos           = 0
-    data          = ""
+    data          = b""
     rw_version    = ""
 
     #######################################################
@@ -1690,7 +1719,7 @@ class Clump:
         opengl = calculated_size >= parent_chunk.size
         
         is_tri_strip = header.flags == 1
-        for i in range(header.mesh_count):
+        for _ in range(header.mesh_count):
             
             # Read header
             split_header = _SplitHeader._make(unpack_from("<II",
@@ -1848,7 +1877,7 @@ class Clump:
     def read_matfx(self, material, chunk):
 
         self._read(4) #header - effect type (not really required to be read)
-        for i in range(2):
+        for _ in range(2):
             effect_type = unpack_from("<I", self.data, self._read(4))[0]
             
             # Bump Map
@@ -1900,7 +1929,7 @@ class Clump:
             materials_count = unpack_from("<I", self.data, self._read(4))[0]
             materials_indices = []
 
-            for i in range(materials_count):
+            for _ in range(materials_count):
 
                 materials_indices.append
                 (
@@ -1911,7 +1940,8 @@ class Clump:
                         self._read(4)
                     )[0]
                 )
-                
+
+            material = Material ()
             while self.pos < list_end:
 
                 chunk = self.read_chunk()
@@ -1982,7 +2012,7 @@ class Clump:
                                                                  self._read(4))
 
                                         # Read n animations
-                                        for i in range(anim_count[0]):
+                                        for _ in range(anim_count[0]):
                                             material.add_plugin('uv_anim',
                                                                 self.raw(
                                                                     strlen(
@@ -2014,7 +2044,7 @@ class Clump:
             geometries = unpack_from("<I", self.data, self._read(4))[0]
 
             # Read geometries
-            for i in range(geometries):
+            for _ in range(geometries):
                 chunk = self.read_chunk()
 
                 # GEOMETRY
@@ -2189,7 +2219,7 @@ class Clump:
         self.light_list    = []
         self.ext_2dfx      = Extension2dfx()
         self.pos           = 0
-        self.data          = ""
+        self.data          = b""
         self.rw_version    = ""
                        
     #######################################################
@@ -2261,10 +2291,10 @@ class Clump:
 
         # Old RW versions didn't have cameras and lights in their clump structure
         if Sections.get_rw_version() < 0x33000:
-            data = Sections.write_chunk(ClumpStruct,
-                                        pack("<I",
-                                             len(self.atomic_list)),
-                                        types["ClumpStruct"])
+            data = Sections.write(ClumpStruct,
+                                  pack("<I",
+                                       len(self.atomic_list)),
+                                  types["ClumpStruct"])
 
         data += self.write_frame_list()
         data += self.write_geometry_list()
@@ -2295,32 +2325,33 @@ class Clump:
         self.clear()
 
 #######################################################
-class dff:
+class DffFile:
 
-    clumps        = []
-    ext_2dfx      = Extension2dfx()
-    pos           = 0
-    data          = ""
-    rw_version    = ""
-    uvanim_dict   = []
+    clumps : list[Clump]       = []
+    ext_2dfx                   = Extension2dfx()
+    pos                        = 0
+    data                       = b""
+    rw_version                 = ""
+    uvanim_dict : list[UVAnim] = []
 
     #######################################################
     def __init__(self):
         self.clumps        = []
         self.ext_2dfx      = Extension2dfx()
         self.pos           = 0
-        self.data          = ""
+        self.data          = b""
         self.rw_version    = ""
         self.uvanim_dict   = []
 
     #######################################################
     def read_uv_anim_dict(self):
         chunk = self.read_chunk()
-        
+
+        num_anims = 0
         if chunk.type == types["Struct"]:
             num_anims = unpack_from("<I", self.data, self._read(4))[0]
 
-        for i in range(num_anims):
+        for _ in range(num_anims):
             
             chunk = self.read_chunk()
 
@@ -2371,7 +2402,7 @@ class dff:
                 self.read_uv_anim_dict()
     
     #######################################################
-    def read_chunk(self):
+    def read_chunk(self) -> Chunk:
         chunk = Sections.read(Chunk, self.data, self._read(12))
         return chunk
     
