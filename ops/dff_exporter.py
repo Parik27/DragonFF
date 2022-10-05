@@ -482,10 +482,11 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def populate_geometry_from_vertices_data(vertices_list, skin_plg, dm_entries, mesh, obj, geometry):
+    def populate_geometry_from_vertices_data(vertices_list, skin_plg, dm_entries,
+                                             mesh, obj, geometry, num_vcols):
 
-        has_prelit_colors = len(mesh.vertex_colors) > 0 and obj.dff.day_cols
-        has_night_colors  = len(mesh.vertex_colors) > 1 and obj.dff.night_cols
+        has_prelit_colors = num_vcols > 0 and obj.dff.day_cols
+        has_night_colors  = num_vcols > 1 and obj.dff.night_cols
 
         # This number denotes what the maximum number of uv maps exported will be.
         # If obj.dff.uv_map2 is set (i.e second UV map WILL be exported), the
@@ -571,14 +572,49 @@ class dff_exporter:
                     verts[2] #c
                 ))
             )
-                    
+
+    #######################################################
+    @staticmethod
+    def convert_slinear_to_srgb (col):
+        color = mathutils.Color (col[:3])
+        return tuple(color.from_scene_linear_to_srgb ()) + (col[3],)
+
+    #######################################################
+    @staticmethod
+    def get_vertex_colors(mesh : bpy.types.Mesh):
+        self = dff_exporter
+        if bpy.app.version < (3, 2, 0):
+            return (i.color for i in mesh.vertex_colors.data)
+
+        v_cols = []
+
+        for attrib in mesh.color_attributes[:2]:
+            # Already per loop
+            if attrib.domain == 'CORNER':
+                v_cols.append(
+                    [
+                        list(self.convert_slinear_to_srgb(i.color))
+                        for i in attrib.data
+                    ]
+                )
+
+            # Per-vertex, need to convert to per-loop
+            else:
+                colors = {}
+                for polygon in mesh.polygons:
+                    for v_ix, l_ix in zip(polygon.vertices, polygon.loop_indices):
+                        colors[l_ix] = self.convert_slinear_to_srgb(
+                            list(attrib.data[v_ix].color))
+
+        return v_cols
+
     #######################################################
     @staticmethod
     def populate_geometry_with_mesh_data(obj, geometry):
         self = dff_exporter
 
         mesh = self.convert_to_mesh(obj)
-        self.transfer_color_attributes_to_vertex_colors(mesh)
+        vcols = self.get_vertex_colors (mesh)
         
         self.triangulate_mesh(mesh)
         mesh.calc_normals_split()
@@ -608,8 +644,8 @@ class dff_exporter:
                 for uv_layer in mesh.uv_layers:
                     uvs.append(uv_layer.data[loop_index].uv)
 
-                for vert_col in mesh.vertex_colors:
-                    vert_cols.append(vert_col.data[loop_index].color)
+                for vert_col in vcols:
+                    vert_cols.append(vert_col[loop_index])
 
                 for group in vertex.groups:
                     # Only upto 4 vertices per group are supported
@@ -648,7 +684,7 @@ class dff_exporter:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
 
         self.populate_geometry_from_vertices_data(
-            vertices_list, skin_plg, dm_entries, mesh, obj, geometry)
+            vertices_list, skin_plg, dm_entries, mesh, obj, geometry, len(vcols))
 
         self.populate_geometry_from_faces_data(faces_list, geometry)
         
@@ -693,29 +729,6 @@ class dff_exporter:
             kb.value = v
 
         return mesh
-    
-    #######################################################
-    @staticmethod
-    def transfer_color_attributes_to_vertex_colors(mesh):
-        if bpy.app.version < (3, 2, 0):
-            return
-
-        vertex_map = defaultdict(list)
-        for poly in mesh.polygons:
-            for v_ix, l_ix in zip(poly.vertices, poly.loop_indices):
-                vertex_map[v_ix].append(l_ix)
-
-        range_end = len(mesh.color_attributes)
-        range_end = range_end > 2 and 2 or range_end
-        for index in range( range_end ):
-            color_attr = mesh.color_attributes[index]
-            if len(mesh.vertex_colors) < (index + 1):
-                mesh.vertex_colors.new()
-            color_layer = mesh.vertex_colors[index]
-            for vert_idx, loop_indices in vertex_map.items():
-                the_color = [float(v) for v in color_attr.data[vert_idx].color]
-                for loop in loop_indices:
-                    setattr(color_layer.data[loop], "color", the_color)
     
     #######################################################
     def populate_atomic(obj):
