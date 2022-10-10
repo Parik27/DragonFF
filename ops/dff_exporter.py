@@ -614,11 +614,11 @@ class dff_exporter:
         self = dff_exporter
 
         mesh = self.convert_to_mesh(obj)
-        vcols = self.get_vertex_colors (mesh)
         
         self.triangulate_mesh(mesh)
         mesh.calc_normals_split()
 
+        vcols = self.get_vertex_colors (mesh)
         verts_indices = {}
         vertices_list = []
         faces_list = []
