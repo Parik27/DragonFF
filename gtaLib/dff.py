@@ -2030,7 +2030,13 @@ class dff:
                             self.read_material_list(chunk)
 
                         elif chunk.type == types["Extension"]:
-                            self.read_geometry_extension(chunk,geometry)
+                            pass
+
+                        elif chunk.type == types["Delta Morph PLG"]:
+                            delta_morph = DeltaMorphPLG.from_mem(self.data[self.pos:])
+                            geometry.extensions["delta_morph"] = delta_morph
+
+                            self._read(chunk.size)
 
                         elif chunk.type == types["Skin PLG"]:
                             
@@ -2091,46 +2097,6 @@ class dff:
         # Set geometry's pipeline
         if pipeline and atomic:
             self.geometry_list[atomic.geometry].pipeline = pipeline
-
-    #######################################################
-    def read_geometry_extension(self, parent_chunk, geometry):
-
-        chunk_end = self.pos + parent_chunk.size
-
-        while self.pos < chunk_end:
-            chunk = self.read_chunk()
-
-            if chunk.type == types["Bin Mesh PLG"]: 
-                self.read_mesh_plg(chunk, geometry)
-
-            elif chunk.type == types["Skin PLG"]:
-                skin = SkinPLG.from_mem(self.data[self.pos:], geometry)
-                geometry.extensions["skin"] = skin
-
-                self._read(chunk.size)
-
-            elif chunk.type == types["Morph PLG"]:
-                # TODO:
-                # morph = DeltaMorphPLG.from_mem(self.data[self.pos:])
-
-                self._read(chunk.size)
-
-            elif chunk.type == types["Delta Morph PLG"]:
-                delta_morph = DeltaMorphPLG.from_mem(self.data[self.pos:])
-                geometry.extensions["delta_morph"] = delta_morph
-
-                self._read(chunk.size)
-
-            elif chunk.type == types["User Data PLG"]:
-                user_data = UserData.from_mem(self.data[self.pos:])
-                geometry.extensions['user_data'] = user_data
-                                
-                self._read(chunk.size)
-
-            else:
-                # TODO:
-                self._read(chunk.size)
-
 
     #######################################################
     def read_clump(self, root_chunk):
