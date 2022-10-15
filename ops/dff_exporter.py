@@ -583,10 +583,13 @@ class dff_exporter:
     @staticmethod
     def get_vertex_colors(mesh : bpy.types.Mesh):
         self = dff_exporter
-        if bpy.app.version < (3, 2, 0):
-            return (i.color for i in mesh.vertex_colors.data)
 
         v_cols = []
+
+        if bpy.app.version < (3, 2, 0):
+            for layer in mesh.vertex_colors:
+                v_cols.append([list(i.color) for i in layer.data])
+            return v_cols
 
         for attrib in mesh.color_attributes[:2]:
             # Already per loop
