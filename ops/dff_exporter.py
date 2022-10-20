@@ -608,7 +608,7 @@ class dff_exporter:
                     for v_ix, l_ix in zip(polygon.vertices, polygon.loop_indices):
                         colors[l_ix] = self.convert_slinear_to_srgb(
                             list(attrib.data[v_ix].color))
-
+                v_cols.append(colors)
         return v_cols
 
     #######################################################
