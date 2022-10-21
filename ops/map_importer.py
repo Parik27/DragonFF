@@ -107,6 +107,7 @@ class Map_Import_Operator(bpy.types.Operator):
                     'use_mat_split'  : False,
                     'remove_doubles' : True,
                     'group_materials': True,
+                    'import_normals' : True
                 }
             )
 
