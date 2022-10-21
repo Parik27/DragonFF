@@ -187,9 +187,9 @@ class material_helper:
 
                 # Could also use round here perhaps. I don't know what's better
                 mapping.inputs['Location'].keyframe_insert("default_value",
-                                                           -1, frame.time * fps)
+                                                           frame=frame.time * fps)
                 mapping.inputs['Scale'].keyframe_insert("default_value",
-                                                        -1, frame.time * fps)
+                                                        frame=frame.time * fps)
 
         self.material.dff.animation_name   = uv_anim.name
         self.material.dff.export_animation = True
