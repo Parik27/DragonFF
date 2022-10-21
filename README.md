@@ -56,4 +56,5 @@ The python scripts have been designed with reusability in mind. As of now, the d
 The following have contributed significantly to the project:
 
 * [swift502](https://github.com/swift502) - For the map importer.
+* [Psycrow101](https://github.com/Psycrow101) - For delta morphs importer.
 
