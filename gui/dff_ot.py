@@ -132,10 +132,10 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "export_coll"    : self.export_coll
                 }
             )
+            self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
+
         except dff_exporter.DffExportException as e:
             self.report({"ERROR"}, str(e))
-
-        self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
 
         # Save settings of the export in scene custom properties for later
         context.scene['dragonff_imported_version'] = self.export_version
