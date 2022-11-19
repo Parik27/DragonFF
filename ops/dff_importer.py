@@ -169,12 +169,12 @@ class dff_importer:
 
             # Add Vertex Colors
             if geom.flags & dff.rpGEOMETRYPRELIT:
-                vertex_color = bm.loops.layers.color.new()
+                vertex_color = bm.loops.layers.color.new('Day')
                 mesh['dragon_day_cols'] = True
 
             extra_vertex_color = None
             if 'extra_vert_color' in geom.extensions:
-                extra_vertex_color = bm.loops.layers.color.new()
+                extra_vertex_color = bm.loops.layers.color.new('Night')
                 mesh['dragon_night_cols'] = True
 
             if dff_importer.use_mat_split and 'mat_split' in geom.extensions:
