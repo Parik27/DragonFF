@@ -347,6 +347,8 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
             ("[0, 255, 200, 255]", "Right Headlight", ""),
             ("[255, 175, 0, 255]", "Left Headlight", ""),
             ("[0, 255, 255, 255]", "4 Colors Paintjob", ""),
+            ("[255, 0, 255, 255]", "Fourth Color", ""),
+            ("[0, 255, 255, 255]", "Third Color", ""),
             ("[255, 0, 175, 255]", "Secondary Color", ""),
             ("[60, 255, 0, 255]", "Primary Color", ""),
             ("[184, 255, 0, 255]", "ImVehFT - Breaklight L", ""),
