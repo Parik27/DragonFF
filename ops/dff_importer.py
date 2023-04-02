@@ -138,15 +138,7 @@ class dff_importer:
 
             # Will use this later when creating frames to construct an armature
             if 'skin' in geom.extensions:
-
-                if atomic.frame in self.skin_data:
-                    skin = geom.extensions['skin']
-                    self.skin_data[atomic.frame].vertex_bone_indices += \
-                        skin.vertex_bone_indices
-                    self.skin_data[atomic.frame].vertex_bone_weights += \
-                        skin.vertex_bone_weights
-                    
-                else:
+                if atomic.frame not in self.skin_data:
                     self.skin_data[atomic.frame] = geom.extensions['skin']
                     
             if 'user_data' in geom.extensions:
@@ -239,26 +231,39 @@ class dff_importer:
 
             # Import materials and add the mesh to the meshes list
             self.import_materials(geom, frame, mesh)
+
+            obj = bpy.data.objects.new('mesh', mesh)
+            link_object(obj, dff_importer.current_collection)
+
+            obj.rotation_mode       = 'QUATERNION'
+
+            # Set object properties from mesh properties
+            obj.dff.pipeline       = mesh['dragon_pipeline']
+            obj.dff.export_normals = mesh['dragon_normals']
+            obj.dff.light          = mesh['dragon_light']
+            obj.dff.modulate_color = mesh['dragon_modulate_color']
+
+            if obj.dff.pipeline == 'CUSTOM':
+                obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
+                    
+            # Delete temporary properties used earlier
+            del mesh['dragon_pipeline'      ]
+            del mesh['dragon_normals'       ]
+            del mesh['dragon_cust_pipeline' ]
+            del mesh['dragon_light'         ]
+            del mesh['dragon_modulate_color']
+                    
+            # Set vertex groups
+            if 'skin' in geom.extensions:
+                self.set_vertex_groups(obj, geom.extensions['skin'])
+
             if atomic.frame in self.meshes:
-                self.merge_meshes(self.meshes[atomic.frame], mesh)
-
-                self.warning = \
-                "Multiple Meshes with same Atomic index. Export will be invalid."
-                
-                pass
+                self.meshes[atomic.frame].append(obj)
+                self.delta_morph[atomic.frame].append(geom.extensions.get('delta_morph'))
             else:
-                self.meshes[atomic.frame] = mesh
-                self.delta_morph[atomic.frame] = geom.extensions.get('delta_morph')
+                self.meshes[atomic.frame] = [obj]
+                self.delta_morph[atomic.frame] = [geom.extensions.get('delta_morph')]
 
-
-    #######################################################
-    def merge_meshes(mesha, meshb):
-        bm = bmesh.new()
-
-        bm.from_mesh(mesha)
-        bm.from_mesh(meshb)
-
-        bm.to_mesh(mesha)
                 
     #######################################################
     def set_empty_draw_properties(empty):
@@ -518,7 +523,7 @@ class dff_importer:
             raise e
         
         skinned_obj_data = self.skin_data[skinned_obj_index]
-        skinned_obj = self.objects[skinned_obj_index]
+        skinned_objs = self.meshes[skinned_obj_index]
         
         # armature edit bones are only available in edit mode :/
         set_object_mode(obj, "EDIT")
@@ -531,7 +536,8 @@ class dff_importer:
             bone_frame = self.bones[bone.id]['frame']
 
             # Set vertex group name of the skinned object
-            skinned_obj.vertex_groups[index].name = bone_frame.name
+            for skinned_obj in skinned_objs:
+                skinned_obj.vertex_groups[index].name = bone_frame.name
             
             e_bone = edit_bones.new(bone_frame.name)
             e_bone.tail = (0,0.05,0) # Stop bone from getting delete
@@ -582,8 +588,9 @@ class dff_importer:
         set_object_mode(obj, "OBJECT")
 
         # Add Armature modifier to skinned object
-        modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
-        modifier.object = obj
+        for skinned_obj in skinned_objs:
+            modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
+            modifier.object = obj
         
         return (armature, obj)
 
@@ -609,22 +616,22 @@ class dff_importer:
         self = dff_importer
 
         for frame in self.meshes:
-            bm = bmesh.new()
-            bm.from_mesh(self.meshes[frame])
+            for mesh in self.meshes[frame]:
+                bm = bmesh.new()
+                bm.from_mesh(mesh.data)
 
-            # Mark edges with 1 linked face, sharp
-            for edge in bm.edges:
-                if len(edge.link_loops) == 1:
-                    edge.smooth = False
-            
-            bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
+                # Mark edges with 1 linked face, sharp
+                for edge in bm.edges:
+                    if len(edge.link_loops) == 1:
+                        edge.smooth = False
+                
+                bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
 
-            # Add an edge split modifier
-            object   = self.objects[frame]
-            modifier = object.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
-            modifier.use_edge_angle = False
-            
-            bm.to_mesh(self.meshes[frame])
+                # Add an edge split modifier
+                modifier = mesh.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
+                modifier.use_edge_angle = False
+                
+                bm.to_mesh(mesh.data)
                 
     #######################################################
     def import_frames():
@@ -636,10 +643,10 @@ class dff_importer:
         
         for index, frame in enumerate(self.dff.frame_list):
 
-            # Check if the mesh for the frame has been loaded
-            mesh = None
+            # Check if the meshes for the frame has been loaded
+            meshes = []
             if index in self.meshes:
-                mesh = self.meshes[index]
+                meshes = self.meshes[index]
 
             obj = None
 
@@ -665,71 +672,58 @@ class dff_importer:
                         continue
                     
                 # Skip bones
-                elif frame.bone_data.header.id in self.bones and mesh is None:
+                elif frame.bone_data.header.id in self.bones and not meshes:
                     continue
-                    
+
+            if meshes:
+                # First mesh is base object
+                obj = meshes[0]
+
+                # Set parent for mesh objects
+                for mesh in meshes[1:]:
+                    mesh.parent = obj
+
+                # Add shape keys by delta morph
+                for mesh_index, mesh in enumerate(meshes):
+                    delta_morph = self.delta_morph.get(index)[mesh_index]
+                    if delta_morph:
+                        verts = mesh.data.vertices
+
+                        sk_basis = mesh.shape_key_add(name='Basis')
+                        sk_basis.interpolation = 'KEY_LINEAR'
+                        mesh.data.shape_keys.use_relative = True
+
+                        for dm in delta_morph.entries:
+                            sk = mesh.shape_key_add(name=dm.name)
+                            sk.interpolation = 'KEY_LINEAR'
+
+                            positions, normals, prelits, uvs = dm.positions, dm.normals, dm.prelits, dm.uvs
+                            for i, vi in enumerate(dm.indices):
+                                if positions:
+                                    sk.data[vi].co = verts[vi].co + mathutils.Vector(positions[i])
+                                # TODO: normals, prelits and uvs
+
             # Create and link the object to the scene
             if obj is None:
-                obj = bpy.data.objects.new(frame.name, mesh)
+                obj = bpy.data.objects.new(frame.name, None)
                 link_object(obj, dff_importer.current_collection)
 
-                obj.rotation_mode       = 'QUATERNION'
-                obj.rotation_quaternion = matrix.to_quaternion()
-                obj.location            = frame.position
-                obj.scale               = matrix.to_scale()
-
-
                 # Set empty display properties to something decent
-                if mesh is None:
-                    self.set_empty_draw_properties(obj)                        
+                if not meshes:
+                    self.set_empty_draw_properties(obj)
 
-                else:
-                    # Set object properties from mesh properties
-                    obj.dff.pipeline       = mesh['dragon_pipeline']
-                    obj.dff.export_normals = mesh['dragon_normals']
-                    obj.dff.light          = mesh['dragon_light']
-                    obj.dff.modulate_color = mesh['dragon_modulate_color']
+            obj.rotation_mode       = 'QUATERNION'
+            obj.rotation_quaternion = matrix.to_quaternion()
+            obj.location            = frame.position
+            obj.scale               = matrix.to_scale()
 
-                    if obj.dff.pipeline == 'CUSTOM':
-                        obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
-                    
-                    # Delete temporary properties used earlier
-                    del mesh['dragon_pipeline'      ]
-                    del mesh['dragon_normals'       ]
-                    del mesh['dragon_cust_pipeline' ]
-                    del mesh['dragon_light'         ]
-                    del mesh['dragon_modulate_color']
-                    
-                # Set vertex groups
-                if index in self.skin_data:
-                    self.set_vertex_groups(obj, self.skin_data[index])
-            
             # set parent
             # Note: I have not considered if frames could have parents
             # that have not yet been defined. If I come across such
             # a model, the code will be modified to support that
 
-            if  frame.parent != -1:
+            if frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
-
-            # Add shape keys by delta morph
-            delta_morph = self.delta_morph.get(index)
-            if mesh and delta_morph:
-                verts = mesh.vertices
-
-                sk_basis = obj.shape_key_add(name='Basis')
-                sk_basis.interpolation = 'KEY_LINEAR'
-                mesh.shape_keys.use_relative = True
-
-                for dm in delta_morph.entries:
-                    sk = obj.shape_key_add(name=dm.name)
-                    sk.interpolation = 'KEY_LINEAR'
-
-                    positions, normals, prelits, uvs = dm.positions, dm.normals, dm.prelits, dm.uvs
-                    for i, vi in enumerate(dm.indices):
-                        if positions:
-                            sk.data[vi].co = verts[vi].co + mathutils.Vector(positions[i])
-                        # TODO: normals, prelits and uvs
 
             self.objects.append(obj)
 

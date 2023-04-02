@@ -735,7 +735,7 @@ class dff_exporter:
         return mesh
     
     #######################################################
-    def populate_atomic(obj):
+    def populate_atomic(obj, subls):
         self = dff_exporter
 
         # Get armature
@@ -744,57 +744,59 @@ class dff_exporter:
             if modifier.type == 'ARMATURE':
                 armature = modifier.object
 
-        # Create geometry
-        geometry = dff.Geometry()
-        self.populate_geometry_with_mesh_data (obj, geometry)
         self.create_frame(obj, True, obj.parent != armature)
-
-        # Bounding sphere
-        sphere_center = 0.125 * sum(
-            (mathutils.Vector(b) for b in obj.bound_box),
-            mathutils.Vector()
-        )
-        sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
-        sphere_radius = 1.732 * max(*obj.dimensions) / 2        
-        
-        geometry.bounding_sphere = dff.Sphere._make(
-            list(sphere_center) + [sphere_radius]
-        )
-
-        geometry.surface_properties = (0,0,0)
-        geometry.materials = self.generate_material_list(obj)
-
-        geometry.export_flags['export_normals'] = obj.dff.export_normals
-        geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
-        geometry.export_flags['light'] = obj.dff.light
-        geometry.export_flags['modulate_color'] = obj.dff.modulate_color
-        
-        if "dff_user_data" in obj.data:
-            geometry.extensions['user_data'] = dff.UserData.from_mem(
-                obj.data['dff_user_data'])
-
-        try:
-            if obj.dff.pipeline != 'NONE':
-                if obj.dff.pipeline == 'CUSTOM':
-                    geometry.pipeline = int(obj.dff.custom_pipeline, 0)
-                else:
-                    geometry.pipeline = int(obj.dff.pipeline, 0)
-                    
-        except ValueError:
-            print("Invalid (Custom) Pipeline")
-            
-        # Add Geometry to list
-        self.dff.geometry_list.append(geometry)
-        
-        # Create Atomic from geometry and frame
-        geometry_index = len(self.dff.geometry_list) - 1
         frame_index    = len(self.dff.frame_list) - 1
-        atomic         = dff.Atomic._make((frame_index,
-                                           geometry_index,
-                                           0x4,
-                                           0
-        ))
-        self.dff.atomic_list.append(atomic)
+
+        for o in [obj] + subls:
+            # Create geometry
+            geometry = dff.Geometry()
+            self.populate_geometry_with_mesh_data (o, geometry)
+
+            # Bounding sphere
+            sphere_center = 0.125 * sum(
+                (mathutils.Vector(b) for b in o.bound_box),
+                mathutils.Vector()
+            )
+            sphere_center = self.multiply_matrix(o.matrix_world, sphere_center)
+            sphere_radius = 1.732 * max(*o.dimensions) / 2
+
+            geometry.bounding_sphere = dff.Sphere._make(
+                list(sphere_center) + [sphere_radius]
+            )
+
+            geometry.surface_properties = (0,0,0)
+            geometry.materials = self.generate_material_list(o)
+
+            geometry.export_flags['export_normals'] = o.dff.export_normals
+            geometry.export_flags['write_mesh_plg'] = o.dff.export_binsplit
+            geometry.export_flags['light'] = o.dff.light
+            geometry.export_flags['modulate_color'] = o.dff.modulate_color
+
+            if "dff_user_data" in o.data:
+                geometry.extensions['user_data'] = dff.UserData.from_mem(
+                    o.data['dff_user_data'])
+
+            try:
+                if o.dff.pipeline != 'NONE':
+                    if o.dff.pipeline == 'CUSTOM':
+                        geometry.pipeline = int(o.dff.custom_pipeline, 0)
+                    else:
+                        geometry.pipeline = int(o.dff.pipeline, 0)
+
+            except ValueError:
+                print("Invalid (Custom) Pipeline")
+
+            # Add Geometry to list
+            self.dff.geometry_list.append(geometry)
+
+            # Create Atomic from geometry and frame
+            geometry_index = len(self.dff.geometry_list) - 1
+            atomic         = dff.Atomic._make((frame_index,
+                                            geometry_index,
+                                            0x4,
+                                            0
+            ))
+            self.dff.atomic_list.append(atomic)
 
         # Export armature
         if armature is not None:
@@ -891,23 +893,31 @@ class dff_exporter:
     @staticmethod
     def export_objects(objects, name=None):
         self = dff_exporter
-        
+
         self.dff = dff.dff()
 
         # Skip empty collections
         if len(objects) < 1:
             return
-        
+
+        meshes = {}
+
         for obj in objects:
 
             # create atomic in this case
             if obj.type == "MESH":
-                self.populate_atomic(obj)
+                if obj.parent in meshes:
+                    meshes[obj.parent].append(obj)
+                else:
+                    meshes[obj] = []
 
             # create an empty frame
             elif obj.type == "EMPTY":
                 self.create_frame(obj)
-        
+
+        for parent, mesh in meshes.items():
+            self.populate_atomic(parent, sorted(mesh, key=lambda o: o.name))
+
         # Collision
         if self.export_coll:
             mem = export_col({
