@@ -620,6 +620,7 @@ class dff_exporter:
         mesh = self.convert_to_mesh(obj)
         
         self.triangulate_mesh(mesh)
+        mesh.calc_normals()
         mesh.calc_normals_split()
 
         vcols = self.get_vertex_colors (mesh)
@@ -667,12 +668,14 @@ class dff_exporter:
                        tuple(loop.normal),
                        tuple(tuple(uv) for uv in uvs))
 
+                normal = loop.normal if obj.dff.export_split_normals else vertex.normal
+
                 if key not in verts_indices:
                     face['verts'].append (len(vertices_list))
                     verts_indices[key] = len(vertices_list)
                     vertices_list.append({"idx": loop.vertex_index,
                                           "co": vertex.co,
-                                          "normal": loop.normal,
+                                          "normal": normal,
                                           "uvs": uvs,
                                           "vert_cols": vert_cols,
                                           "bones": bones,
