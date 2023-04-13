@@ -8,43 +8,50 @@ from ..ops import dff_exporter, dff_importer, col_importer
 #######################################################
 class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     
-    bl_idname      = "export_dff.scene"
-    bl_description = "Export a Renderware DFF or COL File"
-    bl_label       = "DragonFF DFF (.dff)"
-    filename_ext   = ".dff"
+    bl_idname           = "export_dff.scene"
+    bl_description      = "Export a Renderware DFF or COL File"
+    bl_label            = "DragonFF DFF (.dff)"
+    filename_ext        = ".dff"
 
-    filepath       : bpy.props.StringProperty(name="File path",
+    filepath            : bpy.props.StringProperty(name="File path",
                                               maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH')
     
-    filter_glob    : bpy.props.StringProperty(default="*.dff;*.col",
+    filter_glob         : bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
     
-    directory      : bpy.props.StringProperty(maxlen=1024,
+    directory           : bpy.props.StringProperty(maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH')
 
-    mass_export     :  bpy.props.BoolProperty(
-        name        = "Mass Export",
-        default     = False
+    mass_export         : bpy.props.BoolProperty(
+        name            = "Mass Export",
+        default         = False
     )
 
-    export_coll     : bpy.props.BoolProperty(
-        name        = "Export Collision",
-        default     = True
+    export_coll         : bpy.props.BoolProperty(
+        name            = "Export Collision",
+        default         = True
     )
     
-    only_selected   :  bpy.props.BoolProperty(
-        name        = "Only Selected",
-        default     = False
+    export_frame_names  : bpy.props.BoolProperty(
+        name            = "Export Frame Names",
+        default         = True
     )
-    reset_positions :  bpy.props.BoolProperty(
-        name        = "Preserve Positions",
-        description = "Don't set object positions to (0,0,0)",
-        default     = False
+    
+    only_selected       : bpy.props.BoolProperty(
+        name            = "Only Selected",
+        default         = False
     )
-    export_version  : bpy.props.EnumProperty(
+    
+    reset_positions     : bpy.props.BoolProperty(
+        name            = "Preserve Positions",
+        description     = "Don't set object positions to (0,0,0)",
+        default         = False
+    )
+    
+    export_version      : bpy.props.EnumProperty(
         items =
         (
             ('0x33002', "GTA 3 (v3.3.0.2)", "Grand Theft Auto 3 PC (v3.3.0.2)"),
@@ -54,6 +61,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         ),
         name = "Version Export"
     )
+    
     custom_version      : bpy.props.StringProperty(
         maxlen=7,
         default="",
@@ -88,6 +96,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
 
         layout.prop(self, "only_selected")
         layout.prop(self, "export_coll")
+        layout.prop(self, "export_frame_names")
         layout.prop(self, "export_version")
 
         if self.export_version == 'custom':
@@ -124,12 +133,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         try:
             dff_exporter.export_dff(
                 {
-                    "file_name"      : self.filepath,
-                    "directory"      : self.directory,
-                    "selected"       : self.only_selected,
-                    "mass_export"    : self.mass_export,
-                    "version"        : self.get_selected_rw_version(),
-                    "export_coll"    : self.export_coll
+                    "file_name"          : self.filepath,
+                    "directory"          : self.directory,
+                    "selected"           : self.only_selected,
+                    "mass_export"        : self.mass_export,
+                    "version"            : self.get_selected_rw_version(),
+                    "export_coll"        : self.export_coll,
+                    "export_frame_names" : self.export_frame_names
                 }
             )
             self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
