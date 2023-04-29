@@ -101,6 +101,7 @@ class dff_importer:
         self.file_name = ""
         self.skin_data = {}
         self.bones = {}
+        self.frame_bones = {}
         self.materials = {}
         self.warning = ""
 
@@ -583,6 +584,7 @@ class dff_importer:
                     print("DragonFF: Bone parent not found")
             
             bone_list[self.bones[bone.id]['index']] = [e_bone, False]
+            self.frame_bones[self.bones[bone.id]['index']] = {'armature': obj, 'name': e_bone.name}
             
                     
         set_object_mode(obj, "OBJECT")
@@ -591,7 +593,8 @@ class dff_importer:
         for skinned_obj in skinned_objs:
             modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
             modifier.object = obj
-        
+            skinned_obj.parent = obj
+
         return (armature, obj)
 
     #######################################################
@@ -648,6 +651,27 @@ class dff_importer:
             if index in self.meshes:
                 meshes = self.meshes[index]
 
+            # Add shape keys by delta morph
+            for mesh_index, mesh in enumerate(meshes):
+
+                delta_morph = self.delta_morph.get(index)[mesh_index]
+                if delta_morph:
+                    verts = mesh.data.vertices
+
+                    sk_basis = mesh.shape_key_add(name='Basis')
+                    sk_basis.interpolation = 'KEY_LINEAR'
+                    mesh.data.shape_keys.use_relative = True
+
+                    for dm in delta_morph.entries:
+                        sk = mesh.shape_key_add(name=dm.name)
+                        sk.interpolation = 'KEY_LINEAR'
+
+                        positions, normals, prelits, uvs = dm.positions, dm.normals, dm.prelits, dm.uvs
+                        for i, vi in enumerate(dm.indices):
+                            if positions:
+                                sk.data[vi].co = verts[vi].co + mathutils.Vector(positions[i])
+                            # TODO: normals, prelits and uvs
+
             obj = None
 
             # Load rotation matrix
@@ -666,42 +690,26 @@ class dff_importer:
                 # Construct an armature
                 if frame.bone_data.header.bone_count > 0:
                     try:
-                        mesh, obj = self.construct_armature(frame, index)
+                        armature, obj = self.construct_armature(frame, index)
                     except Exception as e:
                         print(e)
                         continue
                     
                 # Skip bones
-                elif frame.bone_data.header.id in self.bones and not meshes:
+                elif frame.bone_data.header.id in self.bones:
+
+                    # Link mesh to frame
+                    for mesh in meshes:
+                        armature = self.frame_bones[index]['armature']
+                        bone_name = self.frame_bones[index]['name']
+
+                        constraint = mesh.constraints.new('COPY_TRANSFORMS')
+                        constraint.target = armature
+                        constraint.subtarget = bone_name
+
+                        mesh.parent = armature
+
                     continue
-
-            if meshes:
-                # First mesh is base object
-                obj = meshes[0]
-
-                # Set parent for mesh objects
-                for mesh in meshes[1:]:
-                    mesh.parent = obj
-
-                # Add shape keys by delta morph
-                for mesh_index, mesh in enumerate(meshes):
-                    delta_morph = self.delta_morph.get(index)[mesh_index]
-                    if delta_morph:
-                        verts = mesh.data.vertices
-
-                        sk_basis = mesh.shape_key_add(name='Basis')
-                        sk_basis.interpolation = 'KEY_LINEAR'
-                        mesh.data.shape_keys.use_relative = True
-
-                        for dm in delta_morph.entries:
-                            sk = mesh.shape_key_add(name=dm.name)
-                            sk.interpolation = 'KEY_LINEAR'
-
-                            positions, normals, prelits, uvs = dm.positions, dm.normals, dm.prelits, dm.uvs
-                            for i, vi in enumerate(dm.indices):
-                                if positions:
-                                    sk.data[vi].co = verts[vi].co + mathutils.Vector(positions[i])
-                                # TODO: normals, prelits and uvs
 
             # Create and link the object to the scene
             if obj is None:
@@ -709,8 +717,7 @@ class dff_importer:
                 link_object(obj, dff_importer.current_collection)
 
                 # Set empty display properties to something decent
-                if not meshes:
-                    self.set_empty_draw_properties(obj)
+                self.set_empty_draw_properties(obj)
 
             obj.rotation_mode       = 'QUATERNION'
             obj.rotation_quaternion = matrix.to_quaternion()
@@ -777,7 +784,7 @@ class dff_importer:
         self.dff.load_file(file_name)
         self.file_name = file_name
 
-        self.preprocess_atomics()
+        # self.preprocess_atomics()
         
         # Create a new group/collection
         self.current_collection = create_collection(
@@ -815,5 +822,4 @@ def import_dff(options):
 
     dff_importer.import_dff(options['file_name'])
 
-    return dff_importer
     return dff_importer

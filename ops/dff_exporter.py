@@ -280,6 +280,7 @@ class dff_exporter:
     dff = None
     version = None
     frames = {}
+    frame_objects = {}
     bones = {}
     parent_queue = {}
     collection = None
@@ -340,7 +341,13 @@ class dff_exporter:
         if append:
             self.dff.frame_list.append(frame)
 
+        self.frame_objects[obj] = frame_index
         return frame
+
+    #######################################################
+    @staticmethod
+    def get_last_frame_index():
+        return len(dff_exporter.dff.frame_list) - 1
 
     #######################################################
     @staticmethod
@@ -738,72 +745,82 @@ class dff_exporter:
         return mesh
     
     #######################################################
-    def populate_atomic(obj, subls):
+    def populate_atomic(obj):
         self = dff_exporter
 
-        # Get armature
-        armature = None
+        # Get frame index
+        frame_index = None
         for modifier in obj.modifiers:
             if modifier.type == 'ARMATURE':
-                armature = modifier.object
+                frame_index = self.frame_objects[modifier.object]
 
-        self.create_frame(obj, True, obj.parent != armature)
-        frame_index    = len(self.dff.frame_list) - 1
+        if frame_index is None:
+            for constraint in obj.constraints:
+                if constraint.type == 'COPY_TRANSFORMS':
+                    armature = constraint.target
+                    if not armature:
+                        continue
 
-        for o in [obj] + subls:
-            # Create geometry
-            geometry = dff.Geometry()
-            self.populate_geometry_with_mesh_data (o, geometry)
+                    bone = armature.data.bones.get(constraint.subtarget)
+                    if not bone:
+                        continue
 
-            # Bounding sphere
-            sphere_center = 0.125 * sum(
-                (mathutils.Vector(b) for b in o.bound_box),
-                mathutils.Vector()
-            )
-            sphere_center = self.multiply_matrix(o.matrix_world, sphere_center)
-            sphere_radius = 1.732 * max(*o.dimensions) / 2
+                    frame_index = self.frame_objects[bone]
 
-            geometry.bounding_sphere = dff.Sphere._make(
-                list(sphere_center) + [sphere_radius]
-            )
+        if frame_index is None:
+            self.create_frame(obj, True, obj.parent != armature)
+            frame_index = self.get_last_frame_index()
 
-            geometry.surface_properties = (0,0,0)
-            geometry.materials = self.generate_material_list(o)
+        # Create geometry
+        geometry = dff.Geometry()
+        self.populate_geometry_with_mesh_data (obj, geometry)
 
-            geometry.export_flags['export_normals'] = o.dff.export_normals
-            geometry.export_flags['write_mesh_plg'] = o.dff.export_binsplit
-            geometry.export_flags['light'] = o.dff.light
-            geometry.export_flags['modulate_color'] = o.dff.modulate_color
+        # Bounding sphere
+        sphere_center = 0.125 * sum(
+            (mathutils.Vector(b) for b in obj.bound_box),
+            mathutils.Vector()
+        )
+        sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
+        sphere_radius = 1.732 * max(*obj.dimensions) / 2
 
-            if "dff_user_data" in o.data:
-                geometry.extensions['user_data'] = dff.UserData.from_mem(
-                    o.data['dff_user_data'])
+        geometry.bounding_sphere = dff.Sphere._make(
+            list(sphere_center) + [sphere_radius]
+        )
 
-            try:
-                if o.dff.pipeline != 'NONE':
-                    if o.dff.pipeline == 'CUSTOM':
-                        geometry.pipeline = int(o.dff.custom_pipeline, 0)
-                    else:
-                        geometry.pipeline = int(o.dff.pipeline, 0)
+        geometry.surface_properties = (0,0,0)
+        geometry.materials = self.generate_material_list(obj)
 
-            except ValueError:
-                print("Invalid (Custom) Pipeline")
+        geometry.export_flags['export_normals'] = obj.dff.export_normals
+        geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
+        geometry.export_flags['light'] = obj.dff.light
+        geometry.export_flags['modulate_color'] = obj.dff.modulate_color
 
-            # Add Geometry to list
-            self.dff.geometry_list.append(geometry)
+        if "dff_user_data" in obj.data:
+            geometry.extensions['user_data'] = dff.UserData.from_mem(
+                obj.data['dff_user_data'])
 
-            # Create Atomic from geometry and frame
-            geometry_index = len(self.dff.geometry_list) - 1
-            atomic         = dff.Atomic._make((frame_index,
-                                            geometry_index,
-                                            0x4,
-                                            0
-            ))
-            self.dff.atomic_list.append(atomic)
+        try:
+            if obj.dff.pipeline != 'NONE':
+                if obj.dff.pipeline == 'CUSTOM':
+                    geometry.pipeline = int(obj.dff.custom_pipeline, 0)
+                else:
+                    geometry.pipeline = int(obj.dff.pipeline, 0)
 
-        # Export armature
-        if armature is not None:
-            self.export_armature(armature, obj)
+        except ValueError:
+            print("Invalid (Custom) Pipeline")
+
+        # Add Geometry to list
+        self.dff.geometry_list.append(geometry)
+
+        # Create Atomic from geometry and frame
+        geometry_index = len(self.dff.geometry_list) - 1
+        atomic         = dff.Atomic._make((frame_index,
+                                        geometry_index,
+                                        0x4,
+                                        0
+        ))
+
+        self.dff.atomic_list.append(atomic)
 
 
     #######################################################
@@ -843,7 +860,7 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def export_armature(obj, parent):
+    def export_armature(obj):
         self = dff_exporter
         
         for index, bone in enumerate(obj.data.bones):
@@ -855,7 +872,11 @@ class dff_exporter:
                 frame = self.create_frame(bone, False)
 
                 # set the first bone's parent to armature's parent
-                frame.parent = self.frames[parent.name]
+                if obj.parent and obj.parent in self.frame_objects:
+                    frame.parent = self.frame_objects[obj.parent]
+                else:
+                    self.create_frame(obj)
+                    frame.parent = self.get_last_frame_index()
 
                 bone_data = dff.HAnimPLG()
                 bone_data.header = dff.HAnimHeader(
@@ -877,6 +898,7 @@ class dff_exporter:
 
                 frame.bone_data = bone_data
                 self.dff.frame_list.append(frame)
+                self.frame_objects[obj] = self.get_last_frame_index()
                 continue
 
             # Create a regular Bone
@@ -891,6 +913,7 @@ class dff_exporter:
             )
             frame.bone_data = bone_data
             self.dff.frame_list.append(frame)
+            self.frame_objects[bone] = self.get_last_frame_index()
 
     #######################################################
     @staticmethod
@@ -903,23 +926,25 @@ class dff_exporter:
         if len(objects) < 1:
             return
 
-        meshes = {}
+        meshes = []
 
         for obj in objects:
 
             # create atomic in this case
             if obj.type == "MESH":
-                if obj.parent in meshes:
-                    meshes[obj.parent].append(obj)
-                else:
-                    meshes[obj] = []
+                meshes.append(obj)
 
             # create an empty frame
             elif obj.type == "EMPTY":
                 self.create_frame(obj)
 
-        for parent, mesh in meshes.items():
-            self.populate_atomic(parent, sorted(mesh, key=lambda o: o.name))
+            elif obj.type == "ARMATURE":
+                self.export_armature(obj)
+
+        meshes = sorted(meshes, key=lambda o: o.name)
+
+        for mesh in meshes:
+            self.populate_atomic(mesh)
 
         # Collision
         if self.export_coll:
