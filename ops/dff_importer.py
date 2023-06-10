@@ -524,8 +524,11 @@ class dff_importer:
             raise e
         
         skinned_obj_data = self.skin_data[skinned_obj_index]
-        skinned_objs = self.meshes[skinned_obj_index]
-        
+
+        skinned_objs = []
+        for _, index in enumerate(self.skin_data):
+            skinned_objs += self.meshes[index]
+
         # armature edit bones are only available in edit mode :/
         set_object_mode(obj, "EDIT")
         edit_bones = obj.data.edit_bones
@@ -589,11 +592,14 @@ class dff_importer:
                     
         set_object_mode(obj, "OBJECT")
 
+        # Set parent to skinned object
+        for skinned_obj in self.meshes[skinned_obj_index]:
+            skinned_obj.parent = obj
+
         # Add Armature modifier to skinned object
         for skinned_obj in skinned_objs:
             modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
             modifier.object = obj
-            skinned_obj.parent = obj
 
         return (armature, obj)
 
