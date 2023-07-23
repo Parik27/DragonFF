@@ -236,6 +236,7 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
             col.prop(settings, "custom_pipeline", icon=icon, text="Custom Pipeline")
         
         box.prop(settings, "export_normals", text="Export Normals")
+        box.prop(settings, "export_split_normals", text="Export Custom Split Normals")
         box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
         box.prop(settings, "light", text="Enable Lighting")
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
@@ -406,6 +407,11 @@ class DFFObjectProps(bpy.types.PropertyGroup):
     export_normals : bpy.props.BoolProperty(
         default=True,
         description="Whether Normals will be exported. (Disable for Map objects)"
+    )
+
+    export_split_normals : bpy.props.BoolProperty(
+        default=False,
+        description="Whether Custom Split Normals will be exported (Flat Shading)."
     )
 
     light : bpy.props.BoolProperty(
