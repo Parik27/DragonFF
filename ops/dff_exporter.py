@@ -302,7 +302,8 @@ class dff_exporter:
         frame_index = len(self.dff.frame_list)
         
         # Get rid of everything before the last period
-        frame.name = clear_extension(obj.name)
+        if self.export_frame_names:
+            frame.name = clear_extension(obj.name)
 
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
@@ -979,10 +980,11 @@ class dff_exporter:
 def export_dff(options):
 
     # Shadow Function
-    dff_exporter.selected    = options['selected']
-    dff_exporter.mass_export = options['mass_export']
-    dff_exporter.path        = options['directory']
-    dff_exporter.version     = options['version']
-    dff_exporter.export_coll = options['export_coll']
+    dff_exporter.selected           = options['selected']
+    dff_exporter.export_frame_names = options['export_frame_names']
+    dff_exporter.mass_export        = options['mass_export']
+    dff_exporter.path               = options['directory']
+    dff_exporter.version            = options['version']
+    dff_exporter.export_coll        = options['export_coll']
 
     dff_exporter.export_dff(options['file_name'])
