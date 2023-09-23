@@ -309,6 +309,8 @@ class dff_importer:
             "[185, 255, 0, 255]": "left rear light",
             "[0, 255, 200, 255]": "right front light",
             "[255, 175, 0, 255]": "left front light",
+            "[255, 0, 255, 255]": "fourth",
+            "[0, 255, 255, 255]": "third",
             "[255, 0, 175, 255]": "secondary",
             "[60, 255, 0, 255]": "primary",
             "[184, 255, 0, 255]": "breaklight l",
