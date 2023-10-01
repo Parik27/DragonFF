@@ -1,0 +1,384 @@
+# GTA DragonFF - Blender scripts to edit basic GTA formats
+# Copyright (C) 2019  Parik
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+from struct import unpack_from, calcsize, pack
+
+from .dff import RGBA, Sections, TexCoords, Triangle, Vector
+from .dff import ExtraVertColorExtension
+
+# geometry flags
+rpGEOMETRYTRISTRIP              = 0x00000001
+rpGEOMETRYPOSITIONS             = 0x00000002
+rpGEOMETRYTEXTURED              = 0x00000004
+rpGEOMETRYPRELIT                = 0x00000008
+rpGEOMETRYNORMALS               = 0x00000010
+rpGEOMETRYLIGHT                 = 0x00000020
+rpGEOMETRYMODULATEMATERIALCOLOR = 0x00000040
+rpGEOMETRYTEXTURED2             = 0x00000080
+rpGEOMETRYNATIVE                = 0x01000000
+
+#######################################################
+class NativePS2Skin:
+
+    #######################################################
+    @staticmethod
+    def unpack(skin, data, geometry):
+
+        skin.num_bones, _num_used_bones, skin.max_weights_per_vertex = unpack_from("<3Bx", data)
+
+        skin.bones_used = []
+        for pos in range(4, _num_used_bones + 4):
+            skin.bones_used.append(unpack_from("<B", data, pos)[0])
+
+        unpack_format = "<16f"
+        pos = _num_used_bones + 4
+
+        # Read bone matrices
+        skin.bone_matrices = []
+        for _ in range(skin.num_bones):
+
+            _data = list(unpack_from(unpack_format, data, pos))
+            _data[ 3] = 0.0
+            _data[ 7] = 0.0
+            _data[11] = 0.0
+            _data[15] = 1.0
+
+            skin.bone_matrices.append(
+                [_data[0:4], _data[4:8], _data[8:12],
+                _data[12:16]]
+            )
+
+            pos += calcsize(unpack_format)
+
+        weights = geometry._vertex_bone_weights
+        indices = []
+
+        if not geometry.normals and not geometry.uv_layers[0] and not geometry.prelit_colors:
+            index_div = 3
+        else:
+            index_div = 4
+
+        for _, wg in enumerate(weights):
+            ig = []
+            for j in range(4):
+                index = pack("<f", wg[j])[0]
+                if index > 0:
+                    index = index // index_div - 1
+                    ig.append(index)
+            indices.append(ig)
+
+        skin.vertex_bone_indices = indices
+        skin.vertex_bone_weights = weights
+
+#######################################################
+class NativePS2Geometry:
+    __slots__ = [
+        "_pos",
+        "_indices",
+        "_vertex_index"
+    ]
+
+    #######################################################
+    def __init__(self):
+        self._pos = 0
+        self._indices = []
+        self._vertex_index = 0
+
+    #######################################################
+    @staticmethod
+    def unpack(geometry, data):
+        self = NativePS2Geometry()
+
+        geometry.normals = []
+        geometry.prelit_colors = []
+        geometry.triangles = []
+        geometry.uv_layers = []
+        geometry._vertex_bone_weights = []
+        geometry.vertices = []
+
+        if geometry.flags & (rpGEOMETRYTEXTURED | rpGEOMETRYTEXTURED2):
+            tex_count = (geometry.flags & 0x00FF0000) >> 16
+            if tex_count == 0:
+                tex_count = 2 if (geometry.flags & rpGEOMETRYTEXTURED2) else \
+                    1 if (geometry.flags & rpGEOMETRYTEXTURED) else 0
+        else:
+            tex_count = 1
+
+        for _ in range(tex_count):
+            geometry.uv_layers.append([])
+
+        read_types = []
+
+        for split_index, split_header in enumerate(geometry.extensions['split_headers']):
+            split_size, no_pointers = unpack_from("<II", data, self._read(8))
+
+            self._indices.append([])
+
+            split_start = self._pos
+            split_end = split_start + split_size
+
+            section_a_last, section_b_last = False, False
+            data_a_read = False
+
+            while self._pos < split_end:
+
+                # Section A
+                reached_end = False
+                while not reached_end and not section_a_last:
+                    chunk8 = unpack_from("16B", data, self._pos)
+                    chunk32 = unpack_from("<4I", data, self._read(16))
+
+                    if chunk8[3] == 0x30:
+                        # read all split data when we find the
+                        # first data block and ignore all
+                        # other blocks
+                        if data_a_read:
+                            # skip dummy data
+                            self._pos += 16
+                            continue
+
+                        old_pos = self._pos
+                        data_pos = split_start + chunk32[1] * 16
+                        self._pos = data_pos
+                        self._read_geometry(geometry, data, split_index, split_header.indices_count, chunk32[3])
+                        self._pos = old_pos + 16
+                    elif chunk8[3] == 0x60:
+                        section_a_last = True
+                        reached_end = True
+                        data_a_read = True
+                    elif chunk8[3] == 0x10:
+                        reached_end = True
+                        data_a_read = True
+
+                # Section B
+                reached_end = False
+                while not reached_end and not section_b_last:
+                    chunk8 = unpack_from("16B", data, self._pos)
+                    chunk32 = unpack_from("<4I", data, self._read(16))
+
+                    if chunk8[3] == 0x00 or chunk8[3] == 0x07:
+                        self._read_geometry(geometry, data, split_index, chunk8[14], chunk32[3])
+                        read_types.append(chunk32[3])
+                    elif chunk8[3] == 0x04:
+                        # if (chunk8[7] == 0x15)
+                        #     # first
+                        # else if (chunk8[7] == 0x17)
+                        #     # not first
+
+                        if (chunk8[11] == 0x11 and chunk8[15] == 0x11) or (chunk8[11] == 0x11 and chunk8[15] == 0x06):
+                            #  last
+                            self._pos = split_end
+                            read_types = []
+                            section_b_last = True
+                        elif chunk8[11] == 0 and chunk8[15] == 0 and geometry.flags & rpGEOMETRYTRISTRIP != 0:
+                            self._delete_split_overlapping(geometry, read_types, split_index)
+                            read_types = []
+                            # not last
+                        reached_end = True
+
+        self._generate_triangles(geometry)
+
+
+    #######################################################
+    def _read(self, size):
+        current_pos = self._pos
+        self._pos += size
+
+        return current_pos
+
+    #######################################################
+    def _read_geometry(self, geometry, data, split_index, indices_count, split_type):
+        size = 0
+        split_type &= 0xFF00FFFF
+
+        # Read vertices
+        if split_type == 0x68008000:
+            size = 12
+
+            for _ in range(indices_count):
+                vertex = Sections.read(Vector, data, self._read(size))
+                geometry.vertices.append(vertex)
+                self._indices[split_index].append(self._vertex_index)
+                self._vertex_index += 1
+
+        elif split_type == 0x6D008000:
+            size = 8
+
+            vertex_scale = (1.0/128.0) if (geometry.flags & rpGEOMETRYPRELIT) > 0 else (1.0/1024.0)
+            for _ in range(indices_count):
+                x, y, z, flag = unpack_from("<4h", data, self._read(size))
+                vertex = Vector(x * vertex_scale, y * vertex_scale, z * vertex_scale)
+                geometry.vertices.append(vertex)
+
+                if flag & 0xFFFF == 0x8000:
+                    self._indices[split_index].append(self._vertex_index - 1)
+                    self._indices[split_index].append(self._vertex_index - 1)
+
+                self._indices[split_index].append(self._vertex_index)
+                self._vertex_index += 1
+
+        # Read texture mapping coordinates
+        elif split_type == 0x64008001:
+            size = 8
+
+            for _ in range(indices_count):
+                tex_coord = Sections.read(TexCoords, data, self._read(size))
+                geometry.uv_layers[0].append(tex_coord)
+
+            for uv in geometry.uv_layers[1:]:
+                for _ in range(indices_count):
+                    uv.append(TexCoords(0, 0))
+
+        elif split_type == 0x6D008001:
+            size = 4
+
+            for _ in range(indices_count):
+                for uv in geometry.uv_layers:
+                    u, v = unpack_from("<2h", data, self._read(size))
+                    tex_coord = TexCoords(u / 4096.0, v / 4096.0)
+                    uv.append(tex_coord)
+
+            size *= len(geometry.uv_layers)
+
+        elif split_type == 0x65008001:
+            size = 4
+
+            for _ in range(indices_count):
+                u, v = unpack_from("<2h", data, self._read(size))
+                tex_coord = TexCoords(u / 4096.0, v / 4096.0)
+                geometry.uv_layers[0].append(tex_coord)
+
+            for uv in geometry.uv_layers[1:]:
+                for _ in range(indices_count):
+                    uv.append(TexCoords(0, 0))
+
+        # Read normals
+        elif split_type in (0x6E008002, 0x6E008003):
+            size = 4
+
+            for _ in range(indices_count):
+                x, y, z = unpack_from("3b", data, self._read(3))
+                normal = Vector(x / 128.0, y / 128.0, z / 128.0)
+                geometry.normals.append(normal)
+                self._pos += 1
+
+        elif split_type in (0x6A008002, 0x6A008003):
+            size = 3
+
+            for _ in range(indices_count):
+                x, y, z = unpack_from("3b", data, self._read(3))
+                normal = Vector(x / 128.0, y / 128.0, z / 128.0)
+                geometry.normals.append(normal)
+
+        # Read prelighting colors
+        elif split_type == 0x6E00C002:
+            size = 4
+
+            for _ in range(indices_count):
+                prelit_color = Sections.read(RGBA, data, self._read(size))
+                geometry.prelit_colors.append(prelit_color)
+
+        elif split_type == 0x6D00C002:
+            size = 8
+
+            extension = geometry.extensions.get('extra_vert_color')
+            if not extension:
+                extension = ExtraVertColorExtension([])
+                geometry.extensions['extra_vert_color'] = extension
+
+            for _ in range(indices_count):
+                colors = unpack_from("8B", data, self._read(size))
+                prelit_color = RGBA(colors[0], colors[2], colors[4], colors[6])
+                geometry.prelit_colors.append(prelit_color)
+                extra_color = RGBA(colors[1], colors[3], colors[5], colors[7])
+                extension.colors.append(extra_color)
+
+        # Read vertex bone weights
+        elif split_type in (0x6C008004, 0x6C008003, 0x6C008001):
+            size = 16
+
+            for _ in range(indices_count):
+                weights = unpack_from("<4f", data, self._read(size))
+                geometry._vertex_bone_weights.append(weights)
+
+        else:
+            print("Unknown Native PS2 data:", hex(split_type))
+
+        padding = indices_count * size & 0xF
+        if padding:
+            self._pos += 16 - padding
+
+    #######################################################
+    def _delete_split_overlapping(self, geometry, read_types, split_index):
+        for split_type in read_types:
+            split_type &= 0xFF00FFFF
+            if split_type in (0x68008000, 0x6D008000):
+                geometry.vertices = geometry.vertices[:-2]
+                self._indices[split_index] = self._indices[split_index][:-2]
+                self._vertex_index -= 2
+            elif split_type in (0x64008001, 0x65008001, 0x6D008001):
+                for i in range(len(geometry.uv_layers)):
+                    geometry.uv_layers[i] = geometry.uv_layers[i][:-2]
+            elif split_type in (0x6E008002, 0x6E008003, 0x6A008002, 0x6A008003):
+                geometry.normals = geometry.normals[:-2]
+            elif split_type in (0x6E00C002,):
+                geometry.prelit_colors = geometry.prelit_colors[:-2]
+            elif split_type in (0x6D00C002,):
+                geometry.prelit_colors = geometry.prelit_colors[:-2]
+                extension = geometry.extensions['extra_vert_color']
+                extension.colors = extension.colors[:-2]
+            elif split_type in (0x6C008004, 0x6C008003, 0x6C008001):
+                geometry._vertex_bone_weights = geometry._vertex_bone_weights[:-2]
+
+    #######################################################
+    def _generate_triangles(self, geometry):
+        geometry.triangles = []
+
+        for split_index, split_header in enumerate(geometry.extensions['split_headers']):
+            indices = self._indices[split_index]
+            if geometry.flags & rpGEOMETRYTRISTRIP != 0:
+                for i in range(len(indices) - 2):
+                    v1 = geometry.vertices[indices[i+0]]
+                    v2 = geometry.vertices[indices[i+1]]
+                    v3 = geometry.vertices[indices[i+2]]
+                    if v1 == v2 or v1 == v3 or v2 == v3:
+                        continue
+
+                    if i % 2 == 0:
+                        triangle = Triangle(
+                            indices[i+1],
+                            indices[i+0],
+                            split_header.material,
+                            indices[i+2]
+                        )
+                    else:
+                      triangle = Triangle(
+                            indices[i+0],
+                            indices[i+1],
+                            split_header.material,
+                            indices[i+2]
+                        )
+
+                    geometry.triangles.append(triangle)
+            else:
+                for i in range(0, len(indices) - 2, 3):
+                    triangle = Triangle(
+                            indices[i+1],
+                            indices[i+0],
+                            split_header.material,
+                            indices[i+2]
+                        )
+                    geometry.triangles.append(triangle)
