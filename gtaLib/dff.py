@@ -73,7 +73,16 @@ class UserDataType(IntEnum):
     USERDATAINT = 1
     USERDATAFLOAT = 2
     USERDATASTRING = 3
-    
+
+# Native Platform Type
+class NativePlatformType(IntEnum):
+    OGL         = 0x2
+    PS2         = 0x4
+    XBOX        = 0x5
+    D3D8        = 0x8
+    D3D9        = 0x9
+    PS2FOURCC   = 0x00325350
+
 # Block types
 types = {
     "Struct"                  : 1,
@@ -98,6 +107,7 @@ types = {
     "Delta Morph PLG"         : 290,
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
+    "Native Data PLG"         : 1296,
     "Pipeline Set"            : 39056115,
     "Specular Material"       : 39056118,
     "2d Effect"               : 39056120,
@@ -804,58 +814,67 @@ class SkinPLG:
 
         self = SkinPLG()
 
-        _data = unpack_from("<3Bx", data)
-        self.num_bones, self._num_used_bones, self.max_weights_per_vertex = _data
+        if geometry.flags & rpGEOMETRYNATIVE == 0:
+            _data = unpack_from("<3Bx", data)
+            self.num_bones, self._num_used_bones, self.max_weights_per_vertex = _data
 
-        # num used bones and max weights per vertex apparently didn't exist in old versions.
-        oldver = self._num_used_bones == 0
-        
-        # Used bones array starts at offset 4
-        for pos in range(4, self._num_used_bones + 4):
-            self.bones_used.append(unpack_from("<B", data, pos)[0])
+            # num used bones and max weights per vertex apparently didn't exist in old versions.
+            oldver = self._num_used_bones == 0
 
-        pos = 4 + self._num_used_bones
-        vertices_count = len(geometry.vertices)
+            # Used bones array starts at offset 4
+            for pos in range(4, self._num_used_bones + 4):
+                self.bones_used.append(unpack_from("<B", data, pos)[0])
 
-        # Read vertex bone indices
-        _data = unpack_from("<%dB" % (vertices_count * 4), data, pos)
-        self.vertex_bone_indices = list(
-            _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
-        )
-        pos += vertices_count * 4
-        
-        # Read vertex bone weights        
-        _data = unpack_from("<%df" % (vertices_count * 4), data, pos)
-        self.vertex_bone_weights = list(
-            _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
-        )
-        pos += vertices_count * 4 * 4 #floats have size 4 bytes
+            pos = 4 + self._num_used_bones
+            vertices_count = len(geometry.vertices)
 
-        # Old version has additional 4 bytes 0xdeaddead
-        unpack_format = "<16f"
-        if oldver:
-            unpack_format = "<4x16f"
-
-        # Read bone matrices
-        for i in range(self.num_bones):
-
-            _data = list(unpack_from(unpack_format, data, pos))
-            _data[ 3] = 0.0
-            _data[ 7] = 0.0
-            _data[11] = 0.0
-            _data[15] = 1.0
-            
-            self.bone_matrices.append(
-                [_data[0:4], _data[4:8], _data[8:12],
-                 _data[12:16]]
+            # Read vertex bone indices
+            _data = unpack_from("<%dB" % (vertices_count * 4), data, pos)
+            self.vertex_bone_indices = list(
+                _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
             )
+            pos += vertices_count * 4
 
-            pos += calcsize(unpack_format)
+            # Read vertex bone weights
+            _data = unpack_from("<%df" % (vertices_count * 4), data, pos)
+            self.vertex_bone_weights = list(
+                _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
+            )
+            pos += vertices_count * 4 * 4 #floats have size 4 bytes
 
-        # TODO: (maybe) read skin split data for new version
-        # if not oldver:
-        #     readSkinSplit(...)
-            
+            # Old version has additional 4 bytes 0xdeaddead
+            unpack_format = "<16f"
+            if oldver:
+                unpack_format = "<4x16f"
+
+            # Read bone matrices
+            for i in range(self.num_bones):
+
+                _data = list(unpack_from(unpack_format, data, pos))
+                _data[ 3] = 0.0
+                _data[ 7] = 0.0
+                _data[11] = 0.0
+                _data[15] = 1.0
+
+                self.bone_matrices.append(
+                    [_data[0:4], _data[4:8], _data[8:12],
+                    _data[12:16]]
+                )
+
+                pos += calcsize(unpack_format)
+
+            # TODO: (maybe) read skin split data for new version
+            # if not oldver:
+            #     readSkinSplit(...)
+
+        else:
+            native_chunk = unpack_from("<3I", data)
+            platform = unpack_from("<I", data, 12)[0]
+
+            if platform == NativePlatformType.PS2:
+                from .native_ps2 import NativePS2Skin
+                NativePS2Skin.unpack(self, data[16:], geometry)
+
         return self
 
 #######################################################
@@ -1356,6 +1375,7 @@ class Geometry:
         'extensions',
         'export_flags',
         'pipeline',
+        '_vertex_bone_weights',
         '_hasMatFX'
     ]
     
@@ -1374,6 +1394,9 @@ class Geometry:
         self.materials          = []
         self.extensions         = {}
         self.pipeline           = None
+
+        # user for native plg
+        self._vertex_bone_weights = []
 
         # used for export
         self.export_flags = {
@@ -1663,6 +1686,10 @@ class dff:
                     self.frame_list[i].bone_data = bone_data
                 if user_data is not None:
                     self.frame_list[i].user_data = user_data
+                    for section in user_data.sections:
+                        if section.name == "name\0":
+                            self.frame_list[i].name = section.data[0]
+                            break
 
             if self.frame_list[i].name is None:
                 self.frame_list[i].name = "unnamed"
@@ -1682,7 +1709,10 @@ class dff:
         # calculate if the indices are stored in 32 bit or 16 bit
         calculated_size = 12 + header.mesh_count * 8 + (header.total_indices * 2)
         opengl = calculated_size >= parent_chunk.size
-        
+
+        if geometry.flags & rpGEOMETRYNATIVE != 0:
+            geometry.extensions['split_headers'] = []
+
         is_tri_strip = header.flags == 1
         for i in range(header.mesh_count):
             
@@ -1690,6 +1720,10 @@ class dff:
             split_header = _SplitHeader._make(unpack_from("<II",
                                                           self.data,
                                                           self._read(8)))
+
+            if geometry.flags & rpGEOMETRYNATIVE != 0:
+                geometry.extensions['split_headers'].append(split_header)
+                continue
 
             unpack_format = "<H" if opengl else "<H2x"
             total_iterations = split_header.indices_count
@@ -1756,6 +1790,21 @@ class dff:
                 triangles.append(triangle)
 
         geometry.extensions['mat_split'] = triangles
+
+    #######################################################
+    def read_native_data_plg(self, parent_chunk, geometry):
+        native_chunk = self.read_chunk() # wrong size
+        chunk_size = parent_chunk.size - 16
+
+        platform = unpack_from("<I", self.data, self._read(4))[0]
+
+        if platform == NativePlatformType.PS2:
+            from .native_ps2 import NativePS2Geometry
+            NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
+        else:
+            print("Unsupported native platform %d" % (platform))
+
+        self._read(chunk_size)
 
     #######################################################
     def read_matfx_bumpmap(self):
@@ -2065,6 +2114,9 @@ class dff:
                             
                         elif chunk.type == types["Bin Mesh PLG"]: 
                            self.read_mesh_plg(chunk,geometry)
+
+                        elif chunk.type == types["Native Data PLG"]:
+                            self.read_native_data_plg(chunk,geometry)
 
                         else:
                             self._read(chunk.size)
