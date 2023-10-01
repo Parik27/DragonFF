@@ -191,6 +191,10 @@ class NativePS2Geometry:
 
         self._generate_triangles(geometry)
 
+        if geometry.prelit_colors:
+            geometry.flags |= rpGEOMETRYPRELIT
+        else:
+            geometry.flags &= ~rpGEOMETRYPRELIT
 
     #######################################################
     def _read(self, size):
