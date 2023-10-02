@@ -2105,6 +2105,8 @@ class dff:
                             geometry.extensions['user_data'] = \
                                 UserData.from_mem(self.data[self.pos:])
 
+                            self._read(chunk.size)
+
                         # 2dfx (usually at the last geometry index)
                         elif chunk.type == types["2d Effect"]:
                             self.ext_2dfx += Extension2dfx.from_mem(
