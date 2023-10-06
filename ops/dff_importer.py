@@ -711,11 +711,10 @@ class dff_importer:
                         armature = self.frame_bones[index]['armature']
                         bone_name = self.frame_bones[index]['name']
 
-                        constraint = mesh.constraints.new('COPY_TRANSFORMS')
-                        constraint.target = armature
-                        constraint.subtarget = bone_name
-
-                        mesh.parent = armature
+                        mesh.rotation_mode       = 'QUATERNION'
+                        mesh.matrix_local        = armature.pose.bones[bone_name].matrix.copy()
+                        mesh.parent              = armature
+                        mesh.dff.frame_index     = index
 
                     continue
 
@@ -727,10 +726,15 @@ class dff_importer:
                 # Set empty display properties to something decent
                 self.set_empty_draw_properties(obj)
 
-            obj.rotation_mode       = 'QUATERNION'
-            obj.rotation_quaternion = matrix.to_quaternion()
-            obj.location            = frame.position
-            obj.scale               = matrix.to_scale()
+                obj.rotation_mode       = 'QUATERNION'
+                obj.rotation_quaternion = matrix.to_quaternion()
+                obj.location            = frame.position
+                obj.scale               = matrix.to_scale()
+
+            # Link mesh to frame
+            for mesh in meshes:
+                mesh.parent = obj
+                mesh.dff.frame_index = index
 
             # set parent
             # Note: I have not considered if frames could have parents

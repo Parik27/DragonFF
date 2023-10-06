@@ -240,6 +240,7 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
         box.prop(settings, "light", text="Enable Lighting")
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
+        box.prop(settings, "frame_index", text="Frame Index")
             
         properties = [         
             ["day_cols", "Day Vertex Colours"],
@@ -423,7 +424,13 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         default=True,
         description="Enable rpGEOMETRYMODULATEMATERIALCOLOR flag"
     )
-    
+
+    frame_index : bpy.props.IntProperty(
+        default=0,
+        description="Frame index",
+        min=0
+    )
+
     uv_map1 : bpy.props.BoolProperty(
         default=True,
         description="First UV Map will be exported")
