@@ -714,7 +714,17 @@ class dff_importer:
                         mesh.rotation_mode       = 'QUATERNION'
                         mesh.matrix_local        = armature.pose.bones[bone_name].matrix.copy()
                         mesh.parent              = armature
-                        mesh.dff.frame_index     = index
+
+                        # Create a constraint to link the frame
+                        constraint = mesh.constraints.new('COPY_TRANSFORMS')
+                        constraint.target = armature
+                        constraint.subtarget = bone_name
+
+                        # Disable constraint for skinned mesh
+                        for modifier in mesh.modifiers:
+                            if modifier.type == 'ARMATURE' and modifier.object == armature:
+                                constraint.enabled = False
+                                break
 
                     continue
 
@@ -734,7 +744,6 @@ class dff_importer:
             # Link mesh to frame
             for mesh in meshes:
                 mesh.parent = obj
-                mesh.dff.frame_index = index
 
             # set parent
             # Note: I have not considered if frames could have parents

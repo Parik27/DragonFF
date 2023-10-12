@@ -752,17 +752,39 @@ class dff_exporter:
     def populate_atomic(obj):
         self = dff_exporter
 
-        # Get armature
-        armature = None
-        for modifier in obj.modifiers:
-            if modifier.type == 'ARMATURE':
-                armature = modifier.object
+        # Get frame index from constraint
+        frame_index = None
+        for constraint in obj.constraints:
+            if constraint.type != 'COPY_TRANSFORMS':
+                continue
 
-        # Get frame index
-        frame_index = obj.dff.frame_index
+            armature = constraint.target
+            if not armature:
+                continue
 
-        if frame_index >= len(self.frame_objects):
-            self.create_frame(obj, True, obj.parent != armature)
+            bone = armature.data.bones.get(constraint.subtarget)
+            if not bone:
+                continue
+
+            frame_index = self.frame_objects.get(bone)
+            if frame_index is not None:
+                break
+
+        # Get frame index from armature modifier
+        if frame_index is None:
+            for modifier in obj.modifiers:
+                if modifier.type == 'ARMATURE':
+                    frame_index = self.frame_objects.get(modifier.object)
+                    if frame_index is not None:
+                        break
+
+        # Get frame index from parent
+        if frame_index is None:
+            frame_index = self.frame_objects.get(obj.parent)
+
+        # Create new frame
+        if frame_index is None:
+            self.create_frame(obj)
             frame_index = self.get_last_frame_index()
 
         # Create geometry
