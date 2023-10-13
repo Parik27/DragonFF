@@ -313,8 +313,11 @@ class dff_exporter:
             if name == obj.name:
                 index = self.parent_queue[name]
                 self.dff.frame_list[index].parent = frame_index
-        
-        matrix                = obj.matrix_local
+
+        matrix = obj.matrix_local
+        if is_bone and obj.parent is not None:
+            matrix = self.multiply_matrix(obj.parent.matrix_local.inverted(), matrix)
+
         frame.creation_flags  =  0
         frame.parent          = -1
         frame.position        = matrix.to_translation()
