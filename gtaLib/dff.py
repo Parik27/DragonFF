@@ -76,9 +76,13 @@ class UserDataType(IntEnum):
 
 # Native Platform Type
 class NativePlatformType(IntEnum):
+    D3D7        = 0x1
     OGL         = 0x2
+    MAC         = 0x3
     PS2         = 0x4
     XBOX        = 0x5
+    GC          = 0x6
+    SOFTRAS     = 0x7
     D3D8        = 0x8
     D3D9        = 0x9
     PS2FOURCC   = 0x00325350
