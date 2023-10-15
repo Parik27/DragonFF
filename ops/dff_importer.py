@@ -509,7 +509,7 @@ class dff_importer:
         for _, index in enumerate(self.skin_data):
             return index
 
-        raise Exception("Cannot construct an armature without skinned mesh")
+        return None
         
     #######################################################
     def construct_armature(frame, frame_index):
@@ -520,31 +520,31 @@ class dff_importer:
         obj = bpy.data.objects.new(frame.name, armature)
         link_object(obj, dff_importer.current_collection)
 
-        try:
-            skinned_obj_index = self.get_skinned_obj_index(frame, frame_index)
-        except Exception as e:
-            raise e
-        
-        skinned_obj_data = self.skin_data[skinned_obj_index]
-
+        skinned_obj_data = None
         skinned_objs = []
-        for _, index in enumerate(self.skin_data):
-            skinned_objs += self.meshes[index]
+
+        skinned_obj_index = self.get_skinned_obj_index(frame, frame_index)
+
+        if skinned_obj_index is not None:
+            skinned_obj_data = self.skin_data[skinned_obj_index]
+
+            for _, index in enumerate(self.skin_data):
+                skinned_objs += self.meshes[index]
 
         # armature edit bones are only available in edit mode :/
         set_object_mode(obj, "EDIT")
         edit_bones = obj.data.edit_bones
-        
+
         bone_list = {}
-                        
+
         for index, bone in enumerate(frame.bone_data.bones):
-            
+
             bone_frame = self.bones[bone.id]['frame']
 
             # Set vertex group name of the skinned object
             for skinned_obj in skinned_objs:
                 skinned_obj.vertex_groups[index].name = bone_frame.name
-            
+
             e_bone = edit_bones.new(bone_frame.name)
             e_bone.tail = (0,0.05,0) # Stop bone from getting delete
 
@@ -553,55 +553,69 @@ class dff_importer:
 
             if bone_frame.user_data is not None:
                 e_bone['dff_user_data'] = bone_frame.user_data.to_mem()[12:]
-            
-            matrix = skinned_obj_data.bone_matrices[bone.index]
-            matrix = mathutils.Matrix(matrix).transposed()
-            matrix = matrix.inverted()
 
-            e_bone.transform(matrix, scale=True, roll=False)
-            e_bone.roll = self.align_roll(e_bone.vector,
-                                          e_bone.z_axis,
-                                          self.multiply_matrix(
-                                              matrix.to_3x3(),
-                                              mathutils.Vector((0,0,1))
-                                          )
-            )
-            
-            # Setting parent. See "set parent" note below
-            if bone_frame.parent != -1:
-                try:
-                    e_bone.parent = bone_list[bone_frame.parent][0]
-                    if self.use_bone_connect:
+            if skinned_obj_data is not None:
+                matrix = skinned_obj_data.bone_matrices[bone.index]
+                matrix = mathutils.Matrix(matrix).transposed()
+                matrix = matrix.inverted()
 
-                        if not bone_list[bone_frame.parent][1]:
+                e_bone.transform(matrix, scale=True, roll=False)
+                e_bone.roll = self.align_roll(e_bone.vector,
+                                            e_bone.z_axis,
+                                            self.multiply_matrix(
+                                                matrix.to_3x3(),
+                                                mathutils.Vector((0,0,1))
+                                            )
+                )
 
-                            mat = [e_bone.parent.head, e_bone.parent.tail, e_bone.head]
-                            mat = mathutils.Matrix(mat)
-                            if abs(mat.determinant()) < 0.0000001:
-                                
-                                length = (e_bone.parent.head - e_bone.head).length
-                                e_bone.length      = length
-                                e_bone.use_connect = self.use_bone_connect
-                            
-                                bone_list[bone_frame.parent][1] = True
-                        
-                except BaseException:
-                    print("DragonFF: Bone parent not found")
-            
+            else:
+                matrix = mathutils.Matrix(
+                    (
+                        bone_frame.rotation_matrix.right,
+                        bone_frame.rotation_matrix.up,
+                        bone_frame.rotation_matrix.at
+                    )
+                )
+
+                e_bone.matrix = self.multiply_matrix(
+                    mathutils.Matrix.Translation(bone_frame.position),
+                    matrix.transposed().to_4x4()
+                )
+
+            if bone_frame.parent >= frame_index and bone_frame.parent in bone_list:
+                e_bone.parent = bone_list[bone_frame.parent][0]
+                if skinned_obj_data is None:
+                    e_bone.matrix = self.multiply_matrix(e_bone.parent.matrix, e_bone.matrix)
+
+                if self.use_bone_connect:
+
+                    if not bone_list[bone_frame.parent][1]:
+
+                        mat = [e_bone.parent.head, e_bone.parent.tail, e_bone.head]
+                        mat = mathutils.Matrix(mat)
+                        if abs(mat.determinant()) < 0.0000001:
+
+                            length = (e_bone.parent.head - e_bone.head).length
+                            e_bone.length      = length
+                            e_bone.use_connect = self.use_bone_connect
+
+                            bone_list[bone_frame.parent][1] = True
+
             bone_list[self.bones[bone.id]['index']] = [e_bone, False]
             self.frame_bones[self.bones[bone.id]['index']] = {'armature': obj, 'name': e_bone.name}
-            
-                    
+
+
         set_object_mode(obj, "OBJECT")
 
-        # Set parent to skinned object
-        for skinned_obj in self.meshes[skinned_obj_index]:
-            skinned_obj.parent = obj
+        if skinned_obj_data is not None:
+            # Set parent to skinned object
+            for skinned_obj in self.meshes[skinned_obj_index]:
+                skinned_obj.parent = obj
 
-        # Add Armature modifier to skinned object
-        for skinned_obj in skinned_objs:
-            modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
-            modifier.object = obj
+            # Add Armature modifier to skinned object
+            for skinned_obj in skinned_objs:
+                modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
+                modifier.object = obj
 
         return (armature, obj)
 
@@ -697,12 +711,8 @@ class dff_importer:
                 
                 # Construct an armature
                 if frame.bone_data.header.bone_count > 0:
-                    try:
-                        armature, obj = self.construct_armature(frame, index)
-                    except Exception as e:
-                        print(e)
-                        continue
-                    
+                    armature, obj = self.construct_armature(frame, index)
+
                 # Skip bones
                 elif frame.bone_data.header.id in self.bones:
 
@@ -746,10 +756,6 @@ class dff_importer:
                 mesh.parent = obj
 
             # set parent
-            # Note: I have not considered if frames could have parents
-            # that have not yet been defined. If I come across such
-            # a model, the code will be modified to support that
-
             if frame.parent != -1:
                 obj.parent = self.objects[frame.parent]
 
