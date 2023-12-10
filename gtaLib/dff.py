@@ -76,9 +76,13 @@ class UserDataType(IntEnum):
 
 # Native Platform Type
 class NativePlatformType(IntEnum):
+    D3D7        = 0x1
     OGL         = 0x2
+    MAC         = 0x3
     PS2         = 0x4
     XBOX        = 0x5
+    GC          = 0x6
+    SOFTRAS     = 0x7
     D3D8        = 0x8
     D3D9        = 0x9
     PS2FOURCC   = 0x00325350
@@ -874,6 +878,9 @@ class SkinPLG:
             if platform == NativePlatformType.PS2:
                 from .native_ps2 import NativePS2Skin
                 NativePS2Skin.unpack(self, data[16:], geometry)
+            elif platform == NativePlatformType.GC:
+                from .native_gc import NativeGSSkin
+                NativeGSSkin.unpack(self, data[16:], geometry)
 
         return self
 
@@ -1375,6 +1382,8 @@ class Geometry:
         'extensions',
         'export_flags',
         'pipeline',
+        '_num_triangles',
+        '_num_vertices',
         '_vertex_bone_weights',
         '_hasMatFX'
     ]
@@ -1420,8 +1429,8 @@ class Geometry:
         self = Geometry()
         
         self.flags    = unpack_from("<I", data)[0]
-        num_triangles = unpack_from("<I", data,4)[0]
-        num_vertices  = unpack_from("<I", data,8)[0]
+        self._num_triangles = unpack_from("<I", data,4)[0]
+        self._num_vertices  = unpack_from("<I", data,8)[0]
         rw_version    = Sections.get_rw_version(parent_chunk.version)
         
         # read surface properties (only on rw below 0x34000)
@@ -1436,7 +1445,7 @@ class Geometry:
             if self.flags & rpGEOMETRYPRELIT:
                 self.prelit_colors = []
                 
-                for i in range(num_vertices):
+                for i in range(self._num_vertices):
                     prelit_color = Sections.read(RGBA, data, pos)
                     self.prelit_colors.append(prelit_color)
 
@@ -1454,14 +1463,14 @@ class Geometry:
 
                     self.uv_layers.append([]) #add empty new layer
                     
-                    for j in range(num_vertices):
+                    for j in range(self._num_vertices):
                         
                         tex_coord = Sections.read(TexCoords, data, pos)
                         self.uv_layers[i].append(tex_coord)
                         pos += 8
 
             # Read Triangles
-            for i in range(num_triangles):
+            for i in range(self._num_triangles):
                 triangle = Sections.read(Triangle, data, pos)
                 self.triangles.append(triangle)
                 
@@ -1477,14 +1486,14 @@ class Geometry:
 
         # read vertices
         if self.has_vertices:
-            for i in range(num_vertices):
+            for i in range(self._num_vertices):
                 vertice = Sections.read(Vector, data, pos)
                 self.vertices.append(vertice)
                 pos += 12
             
         # read normals
         if self.has_normals:
-            for i in range(num_vertices):
+            for i in range(self._num_vertices):
                 normal = Sections.read(Vector, data, pos)
                 self.normals.append(normal)
                 pos += 12
@@ -1801,6 +1810,9 @@ class dff:
         if platform == NativePlatformType.PS2:
             from .native_ps2 import NativePS2Geometry
             NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
+        elif platform == NativePlatformType.GC:
+            from .native_gc import NativeGCGeometry
+            NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
         else:
             print("Unsupported native platform %d" % (platform))
 
