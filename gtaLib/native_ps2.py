@@ -191,6 +191,12 @@ class NativePS2Geometry:
 
         self._generate_triangles(geometry)
 
+        if geometry.vertices:
+            geometry.has_vertices = 1
+
+        if geometry.normals:
+            geometry.has_normals = 1
+
         if geometry.prelit_colors:
             geometry.flags |= rpGEOMETRYPRELIT
         else:
