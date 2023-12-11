@@ -268,23 +268,23 @@ class NativeGCGeometry:
                     geometry.triangles.append(Triangle(vertex1, vertex2, mat, vertex3))
 
                     if tri_normals:
-                        geometry.normals.append(self.normals[tri_normals[idx1]])
                         geometry.normals.append(self.normals[tri_normals[idx2]])
+                        geometry.normals.append(self.normals[tri_normals[idx1]])
                         geometry.normals.append(self.normals[tri_normals[idx3]])
 
                     if tri_prelit_colors:
-                        geometry.prelit_colors.append(self.prelit_colors[tri_prelit_colors[idx1]])
                         geometry.prelit_colors.append(self.prelit_colors[tri_prelit_colors[idx2]])
+                        geometry.prelit_colors.append(self.prelit_colors[tri_prelit_colors[idx1]])
                         geometry.prelit_colors.append(self.prelit_colors[tri_prelit_colors[idx3]])
 
                     if tri_tex_coords:
-                        geometry.uv_layers[0].append(self.tex_coords[tri_tex_coords[idx1]])
                         geometry.uv_layers[0].append(self.tex_coords[tri_tex_coords[idx2]])
+                        geometry.uv_layers[0].append(self.tex_coords[tri_tex_coords[idx1]])
                         geometry.uv_layers[0].append(self.tex_coords[tri_tex_coords[idx3]])
 
                     if tri_tex_coords2:
-                        geometry.uv_layers[1].append(self.tex_coords2[tri_tex_coords2[idx1]])
                         geometry.uv_layers[1].append(self.tex_coords2[tri_tex_coords2[idx2]])
+                        geometry.uv_layers[1].append(self.tex_coords2[tri_tex_coords2[idx1]])
                         geometry.uv_layers[1].append(self.tex_coords2[tri_tex_coords2[idx3]])
 
 #######################################################
