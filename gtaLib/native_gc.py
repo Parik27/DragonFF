@@ -96,22 +96,26 @@ class NativeGCGeometry:
     __slots__ = [
         "section_headers",
         "triangle_section_headers",
+        "normals",
+        "prelit_colors",
+        "tex_coords",
+        "tex_coords2",
         "_pos",
         "_header_size",
-        "_data_size",
-        "_tex_coords",
-        "_tex_coords2"
+        "_data_size"
     ]
 
     #######################################################
     def __init__(self):
         self.section_headers = []
         self.triangle_section_headers = []
+        self.normals = []
+        self.prelit_colors = []
+        self.tex_coords = []
+        self.tex_coords2 = []
         self._pos = 0
         self._header_size = 0
         self._data_size = 0
-        self._tex_coords = []
-        self._tex_coords2 = []
 
     #######################################################
     @staticmethod
@@ -150,8 +154,6 @@ class NativeGCGeometry:
 
     #######################################################
     def _read_sections(self, geometry, data, data_pos):
-        geometry.normals = []
-        geometry.uv_layers = []
         geometry.vertices = []
 
         last_section_index = len(self.section_headers) - 1
@@ -168,33 +170,44 @@ class NativeGCGeometry:
                 for _ in range(geometry._num_vertices):
                     vertex = Vector._make(unpack_from(">3f", data, self._read(hdr.entry_size)))
                     geometry.vertices.append(vertex)
+                    geometry.has_vertices = 1
 
             elif hdr.section_type == GC_SECTIONTYPE_NORMAL:
-                for _ in range(geometry._num_vertices):
+                for _ in range(entries_num):
                     normal = Vector._make(unpack_from(">3f", data, self._read(hdr.entry_size)))
-                    geometry.normals.append(normal)
+                    self.normals.append(normal)
+                    geometry.has_normals = 1
 
             elif hdr.section_type == GC_SECTIONTYPE_COLOR:
-                for _ in range(geometry._num_vertices):
+                for _ in range(entries_num):
                     prelit_color = Sections.read(RGBA, data, self._read(hdr.entry_size))
-                    geometry.prelit_colors.append(prelit_color)
+                    self.prelit_colors.append(prelit_color)
 
             elif hdr.section_type == GC_SECTIONTYPE_TEXCOORD:
-                self._tex_coords = [unpack_from(">2f", data, self._read(hdr.entry_size)) for _ in range(entries_num)]
-                uv_layer = [None for _ in range(geometry._num_vertices)]
-                geometry.uv_layers.append(uv_layer)
+                for _ in range(entries_num):
+                    tex_coords = TexCoords._make(unpack_from(">2f", data, self._read(hdr.entry_size)))
+                    self.tex_coords.append(tex_coords)
 
             elif hdr.section_type == GC_SECTIONTYPE_TEXCOORD2:
-                self._tex_coords2 = [unpack_from(">2f", data, self._read(hdr.entry_size)) for _ in range(entries_num)]
-                uv_layer = [None for _ in range(geometry._num_vertices)]
-                geometry.uv_layers.append(uv_layer)
+                for _ in range(entries_num):
+                    tex_coords2 = TexCoords._make(unpack_from(">2f", data, self._read(hdr.entry_size)))
+                    self.tex_coords2.append(tex_coords2)
 
             else:
                 raise Exception("Unknown GC section")
 
     #######################################################
     def _read_triangles(self, geometry, data, data_pos, skip_byte):
+        geometry.normals = []
+        geometry.prelit_colors = []
         geometry.triangles = []
+        geometry.uv_layers = []
+
+        if self.tex_coords:
+            geometry.uv_layers.append([])
+
+        if self.tex_coords2:
+            geometry.uv_layers.append([])
 
         for mat, hdr in enumerate(self.triangle_section_headers):
             self._pos = data_pos + hdr.section_offset
@@ -210,61 +223,69 @@ class NativeGCGeometry:
 
                 unk, entries_num = unpack_from(">BB", data, self._read(2))
 
-                entries = []
+                tri_vertices = []
+                tri_normals = []
+                tri_prelit_colors = []
+                tri_tex_coords = []
+                tri_tex_coords2 = []
+
                 for _ in range(entries_num):
                     if skip_byte:
                         self._pos += 1
-                    entry = []
+
                     for sec_hdr in self.section_headers:
                         if sec_hdr.byte_type == 0x02:
-                            entry.append(unpack_from(">B", data, self._read(1))[0])
+                            val = unpack_from(">B", data, self._read(1))[0]
                         elif sec_hdr.byte_type == 0x03:
-                            entry.append(unpack_from(">H", data, self._read(2))[0])
+                            val = unpack_from(">H", data, self._read(2))[0]
                         else:
                             raise Exception("Unexpected value")
-                    entries.append(entry)
 
-                vertex_section = next(i for i, hdr in enumerate(self.section_headers) if hdr.section_type == GC_SECTIONTYPE_VERTEX)
+                        if sec_hdr.section_type == GC_SECTIONTYPE_VERTEX:
+                            tri_vertices.append(val)
+                        elif sec_hdr.section_type == GC_SECTIONTYPE_NORMAL:
+                            tri_normals.append(val)
+                        elif sec_hdr.section_type == GC_SECTIONTYPE_COLOR:
+                            tri_prelit_colors.append(val)
+                        elif sec_hdr.section_type == GC_SECTIONTYPE_TEXCOORD:
+                            tri_tex_coords.append(val)
+                        elif sec_hdr.section_type == GC_SECTIONTYPE_TEXCOORD2:
+                            tri_tex_coords2.append(val)
 
-                # Generate triangles
-                for i in range(len(entries) - 2):
-                    v1 = entries[i+0][vertex_section]
-                    v2 = entries[i+1][vertex_section]
-                    v3 = entries[i+2][vertex_section]
-                    if v1 == v2 or v1 == v3 or v2 == v3:
+                for i in range(len(tri_vertices) - 2):
+                    if i % 2 == 0:
+                        idx1 = i + 1
+                        idx2 = i + 0
+                    else:
+                        idx1 = i + 0
+                        idx2 = i + 1
+                    idx3 = i + 2
+
+                    vertex1, vertex2, vertex3 = tri_vertices[idx1], tri_vertices[idx2], tri_vertices[idx3]
+                    if vertex1 == vertex2 or vertex1 == vertex3 or vertex2 == vertex3:
                         continue
 
-                    if i % 2 == 0:
-                        triangle = Triangle(
-                            v2,
-                            v1,
-                            mat,
-                            v3
-                        )
-                    else:
-                        triangle = Triangle(
-                            v1,
-                            v2,
-                            mat,
-                            v3
-                        )
+                    geometry.triangles.append(Triangle(vertex1, vertex2, mat, vertex3))
 
-                    geometry.triangles.append(triangle)
+                    if tri_normals:
+                        geometry.normals.append(self.normals[tri_normals[idx1]])
+                        geometry.normals.append(self.normals[tri_normals[idx2]])
+                        geometry.normals.append(self.normals[tri_normals[idx3]])
 
-                # Generate Tex Coodrs
-                if self._tex_coords:
-                    texcoord_section = next(i for i, hdr in enumerate(self.section_headers) if hdr.section_type == GC_SECTIONTYPE_TEXCOORD)
-                    for entry in entries:
-                        vertex = entry[vertex_section]
-                        texcoord = self._tex_coords[entry[texcoord_section]]
-                        geometry.uv_layers[0][vertex] = TexCoords(*texcoord)
+                    if tri_prelit_colors:
+                        geometry.prelit_colors.append(self.prelit_colors[tri_prelit_colors[idx1]])
+                        geometry.prelit_colors.append(self.prelit_colors[tri_prelit_colors[idx2]])
+                        geometry.prelit_colors.append(self.prelit_colors[tri_prelit_colors[idx3]])
 
-                if self._tex_coords2:
-                    texcoord_section = next(i for i, hdr in enumerate(self.section_headers) if hdr.section_type == GC_SECTIONTYPE_TEXCOORD2)
-                    for entry in entries:
-                        vertex = entry[vertex_section]
-                        texcoord = self._tex_coords[entry[texcoord_section]]
-                        geometry.uv_layers[1][vertex] = TexCoords(*texcoord)
+                    if tri_tex_coords:
+                        geometry.uv_layers[0].append(self.tex_coords[tri_tex_coords[idx1]])
+                        geometry.uv_layers[0].append(self.tex_coords[tri_tex_coords[idx2]])
+                        geometry.uv_layers[0].append(self.tex_coords[tri_tex_coords[idx3]])
+
+                    if tri_tex_coords2:
+                        geometry.uv_layers[1].append(self.tex_coords2[tri_tex_coords2[idx1]])
+                        geometry.uv_layers[1].append(self.tex_coords2[tri_tex_coords2[idx2]])
+                        geometry.uv_layers[1].append(self.tex_coords2[tri_tex_coords2[idx3]])
 
 #######################################################
 class NativeGCSectionHeader:

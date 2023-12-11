@@ -1382,6 +1382,7 @@ class Geometry:
         'extensions',
         'export_flags',
         'pipeline',
+        'native_platform_type',
         '_num_triangles',
         '_num_vertices',
         '_vertex_bone_weights',
@@ -1405,6 +1406,9 @@ class Geometry:
         self.pipeline           = None
 
         # user for native plg
+        self.native_platform_type = 0
+        self._num_triangles = 0
+        self._num_vertices = 0
         self._vertex_bone_weights = []
 
         # used for export
@@ -1815,6 +1819,8 @@ class dff:
             NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
         else:
             print("Unsupported native platform %d" % (platform))
+
+        geometry.native_platform_type = platform
 
         self._read(chunk_size)
 
