@@ -202,6 +202,9 @@ class NativePS2Geometry:
         else:
             geometry.flags &= ~rpGEOMETRYPRELIT
 
+        if geometry.uv_layers and not geometry.uv_layers[0]:
+            geometry.uv_layers = []
+
     #######################################################
     def _read(self, size):
         current_pos = self._pos
