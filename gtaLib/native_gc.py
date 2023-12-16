@@ -133,7 +133,7 @@ class NativeGCGeometry:
             section_offset, section_type, entry_size, byte_type, pad = unpack_from(">IBBBB", data, self._read(8))
             self.section_headers.append(NativeGCSectionHeader(section_offset, section_type, entry_size, byte_type))
 
-        for _ in range(len(geometry.materials)):
+        for _ in range(len(geometry.extensions['split_headers'])):
             section_offset, section_size = unpack_from(">II", data, self._read(8))
             self.triangle_section_headers.append(NativeGCTriangleSectionHeader(section_offset, section_size))
 
@@ -209,7 +209,9 @@ class NativeGCGeometry:
         if self.tex_coords2:
             geometry.uv_layers.append([])
 
-        for mat, hdr in enumerate(self.triangle_section_headers):
+        for split_index, hdr in enumerate(self.triangle_section_headers):
+            split_header = geometry.extensions['split_headers'][split_index]
+
             self._pos = data_pos + hdr.section_offset
             end_pos = self._pos + hdr.section_size
 
@@ -265,7 +267,7 @@ class NativeGCGeometry:
                     if vertex1 == vertex2 or vertex1 == vertex3 or vertex2 == vertex3:
                         continue
 
-                    geometry.triangles.append(Triangle(vertex1, vertex2, mat, vertex3))
+                    geometry.triangles.append(Triangle(vertex1, vertex2, split_header.material, vertex3))
 
                     if tri_normals:
                         geometry.normals.append(self.normals[tri_normals[idx2]])
