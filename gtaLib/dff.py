@@ -878,6 +878,9 @@ class SkinPLG:
             if platform == NativePlatformType.PS2:
                 from .native_ps2 import NativePS2Skin
                 NativePS2Skin.unpack(self, data[16:], geometry)
+            elif platform == NativePlatformType.XBOX:
+                from .native_xbox import NativeXboxSkin
+                NativeXboxSkin.unpack(self, data[16:], geometry)
             elif platform == NativePlatformType.GC:
                 from .native_gc import NativeGSSkin
                 NativeGSSkin.unpack(self, data[16:], geometry)
@@ -1814,6 +1817,9 @@ class dff:
         if platform == NativePlatformType.PS2:
             from .native_ps2 import NativePS2Geometry
             NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
+        elif platform == NativePlatformType.XBOX:
+            from .native_xbox import NativeXboxGeometry
+            NativeXboxGeometry.unpack(geometry, self.raw(chunk_size))
         elif platform == NativePlatformType.GC:
             from .native_gc import NativeGCGeometry
             NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
