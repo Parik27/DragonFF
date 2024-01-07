@@ -243,6 +243,21 @@ class NativePS2Geometry:
                 self._indices[split_index].append(self._vertex_index)
                 self._vertex_index += 1
 
+        elif split_type == 0x6c008000:
+            size = 16
+
+            for _ in range(indices_count):
+                x, y, z, flag = unpack_from("<3fI", data, self._read(size))
+                vertex = Vector(x, y, z)
+                geometry.vertices.append(vertex)
+
+                if flag & 0xFFFF == 0x8000:
+                    self._indices[split_index].append(self._vertex_index - 1)
+                    self._indices[split_index].append(self._vertex_index - 1)
+
+                self._indices[split_index].append(self._vertex_index)
+                self._vertex_index += 1
+
         # Read texture mapping coordinates
         elif split_type == 0x64008001:
             size = 8
@@ -338,7 +353,7 @@ class NativePS2Geometry:
     def _delete_split_overlapping(self, geometry, read_types, split_index):
         for split_type in read_types:
             split_type &= 0xFF00FFFF
-            if split_type in (0x68008000, 0x6D008000):
+            if split_type in (0x68008000, 0x6D008000, 0x6c008000):
                 geometry.vertices = geometry.vertices[:-2]
                 self._indices[split_index] = self._indices[split_index][:-2]
                 self._vertex_index -= 2
