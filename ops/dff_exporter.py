@@ -581,7 +581,8 @@ class dff_exporter:
     @staticmethod
     def convert_slinear_to_srgb (col):
         color = mathutils.Color (col[:3])
-        return tuple(color.from_scene_linear_to_srgb ()) + (col[3],)
+        color_srgb = color.from_scene_linear_to_srgb()
+        return tuple(max(0, min(1, channel)) for channel in color_srgb) + (col[3],)  # Including alpha unchanged
 
     #######################################################
     @staticmethod
