@@ -778,6 +778,7 @@ class dff_exporter:
         geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
         geometry.export_flags['light'] = obj.dff.light
         geometry.export_flags['modulate_color'] = obj.dff.modulate_color
+        geometry.export_flags['triangle_strip'] = obj.dff.triangle_strip
         
         if "dff_user_data" in obj.data:
             geometry.extensions['user_data'] = dff.UserData.from_mem(

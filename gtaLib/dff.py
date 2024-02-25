@@ -18,6 +18,8 @@ from collections import namedtuple
 from struct import unpack_from, calcsize, pack
 from enum import Enum, IntEnum
 
+from .pyffi.utils import tristrip
+
 # Data types
 Chunk       = namedtuple("Chunk"       , "type size version")
 Clump       = namedtuple("Clump"       , "atomics lights cameras")
@@ -1380,7 +1382,8 @@ class Geometry:
             "light"              : True,
             "modulate_color"     : True,
             "export_normals"     : True,
-            "write_mesh_plg"     : True
+            "write_mesh_plg"     : True,
+            "triangle_strip"     : False,
         }
         self._hasMatFX = False
 
@@ -1488,22 +1491,35 @@ class Geometry:
 
     #######################################################
     # TODO: Triangle Strips support
-    # TODO: OpenGL support
     def write_bin_split(self):
-        
+
         data = b''
-        
+
         meshes = {}
+        is_tri_strip = self.export_flags["triangle_strip"]
 
-        for triangle in self.triangles:
-            
-            if triangle.material not in meshes:
-                meshes[triangle.material] = []
-                
-            meshes[triangle.material] += [triangle.a, triangle.b, triangle.c]
+        if is_tri_strip:
+            for triangle in self.triangles:
 
-        data += pack("<III", 0, len(meshes), len(self.triangles) * 3)
-        
+                if triangle.material not in meshes:
+                    meshes[triangle.material] = []
+
+                meshes[triangle.material].append([triangle.a, triangle.b, triangle.c])
+
+            for mesh in meshes:
+                meshes[mesh] = tristrip.stripify(meshes[mesh], True)[0]
+
+        else:
+            for triangle in self.triangles:
+
+                if triangle.material not in meshes:
+                    meshes[triangle.material] = []
+
+                meshes[triangle.material] += [triangle.a, triangle.b, triangle.c]
+
+        total_indices = sum(len(triangles) for triangles in meshes.values())
+        data += pack("<III", int(is_tri_strip), len(meshes), total_indices)
+
         for mesh in meshes:
             data += pack("<II", len(meshes[mesh]), mesh)
             data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
@@ -1534,6 +1550,8 @@ class Geometry:
 
         # Set flags
         flags = rpGEOMETRYPOSITIONS
+        if self.export_flags["triangle_strip"]:
+            flags |= rpGEOMETRYTRISTRIP
         if len(self.uv_layers) > 1:
             flags |= rpGEOMETRYTEXTURED2
         elif len(self.uv_layers) > 0:
@@ -1547,7 +1565,7 @@ class Geometry:
             self.export_flags["modulate_color"]
 
         flags |= (len(self.uv_layers) & 0xff) << 16
-        
+
         data = b''
         data += pack("<IIII", flags, len(self.triangles), len(self.vertices), 1)
 
