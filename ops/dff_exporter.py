@@ -588,7 +588,8 @@ class dff_exporter:
     @staticmethod
     def convert_slinear_to_srgb (col):
         color = mathutils.Color (col[:3])
-        return tuple(color.from_scene_linear_to_srgb ()) + (col[3],)
+        color_srgb = color.from_scene_linear_to_srgb()
+        return tuple(max(0, min(1, channel)) for channel in color_srgb) + (col[3],)  # Including alpha unchanged
 
     #######################################################
     @staticmethod
@@ -812,7 +813,8 @@ class dff_exporter:
         geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
         geometry.export_flags['light'] = obj.dff.light
         geometry.export_flags['modulate_color'] = obj.dff.modulate_color
-
+        geometry.export_flags['triangle_strip'] = obj.dff.triangle_strip
+        
         if "dff_user_data" in obj.data:
             geometry.extensions['user_data'] = dff.UserData.from_mem(
                 obj.data['dff_user_data'])

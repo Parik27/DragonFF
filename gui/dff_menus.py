@@ -238,6 +238,7 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "export_normals", text="Export Normals")
         box.prop(settings, "export_split_normals", text="Export Custom Split Normals")
         box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
+        box.prop(settings, "triangle_strip", text="Use Triangle Strip")
         box.prop(settings, "light", text="Enable Lighting")
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
             
@@ -447,6 +448,11 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         default=True,
         description="Enabling will increase file size, but will increase\
 compatibiility with DFF Viewers"
+    )
+    
+    triangle_strip : bpy.props.BoolProperty(
+        default=False,
+        description="Use Triangle Strip instead of Triangle List for Bin Mesh PLG"
     )
 
     col_material : bpy.props.IntProperty(
