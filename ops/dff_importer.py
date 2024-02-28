@@ -126,6 +126,7 @@ class dff_importer:
             mesh['dragon_light'] = (geom.flags & dff.rpGEOMETRYLIGHT) != 0
             mesh['dragon_modulate_color'] = \
                 (geom.flags & dff.rpGEOMETRYMODULATEMATERIALCOLOR) != 0
+            mesh['dragon_triangle_strip'] = (geom.flags & dff.rpGEOMETRYTRISTRIP) != 0
 
             uv_layers = []
             
@@ -691,6 +692,7 @@ class dff_importer:
                     obj.dff.export_normals = mesh['dragon_normals']
                     obj.dff.light          = mesh['dragon_light']
                     obj.dff.modulate_color = mesh['dragon_modulate_color']
+                    obj.dff.triangle_strip = mesh['dragon_triangle_strip']
 
                     if obj.dff.pipeline == 'CUSTOM':
                         obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
@@ -701,6 +703,7 @@ class dff_importer:
                     del mesh['dragon_cust_pipeline' ]
                     del mesh['dragon_light'         ]
                     del mesh['dragon_modulate_color']
+                    del mesh['dragon_triangle_strip']
                     
                 # Set vertex groups
                 if index in self.skin_data:
