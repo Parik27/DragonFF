@@ -285,6 +285,7 @@ class dff_exporter:
     parent_queue = {}
     collection = None
     export_coll = False
+    exclude_geo_faces = False
 
     #######################################################
     @staticmethod
@@ -814,6 +815,7 @@ class dff_exporter:
         geometry.export_flags['light'] = obj.dff.light
         geometry.export_flags['modulate_color'] = obj.dff.modulate_color
         geometry.export_flags['triangle_strip'] = obj.dff.triangle_strip
+        geometry.export_flags['exclude_geo_faces'] = self.exclude_geo_faces
         
         if "dff_user_data" in obj.data:
             geometry.extensions['user_data'] = dff.UserData.from_mem(
@@ -1036,6 +1038,7 @@ def export_dff(options):
     # Shadow Function
     dff_exporter.selected           = options['selected']
     dff_exporter.export_frame_names = options['export_frame_names']
+    dff_exporter.exclude_geo_faces  = options['exclude_geo_faces']
     dff_exporter.mass_export        = options['mass_export']
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
