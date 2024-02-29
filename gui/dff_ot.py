@@ -40,6 +40,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         default         = True
     )
     
+    exclude_geo_faces   : bpy.props.BoolProperty(
+        name            = "Exclude Geometry Faces",
+        description     = "Exclude faces from the Geometry section and force export Bin Mesh PLG",
+        default         = False
+    )
+    
     only_selected       : bpy.props.BoolProperty(
         name            = "Only Selected",
         default         = False
@@ -97,6 +103,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         layout.prop(self, "only_selected")
         layout.prop(self, "export_coll")
         layout.prop(self, "export_frame_names")
+        layout.prop(self, "exclude_geo_faces")
         layout.prop(self, "export_version")
 
         if self.export_version == 'custom':
@@ -139,7 +146,8 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "mass_export"        : self.mass_export,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
-                    "export_frame_names" : self.export_frame_names
+                    "export_frame_names" : self.export_frame_names,
+                    "exclude_geo_faces"  : self.exclude_geo_faces
                 }
             )
             self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
