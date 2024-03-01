@@ -186,11 +186,11 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         
 #######################################################
 def import_dff_func(self, context):
-    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff)")
+    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF multi-mesh (.dff)")
 
 #######################################################
 def export_dff_func(self, context):
-    self.layout.menu("DFF_MT_ExportChoice", text="DragonFF")
+    self.layout.menu("DFF_MT_ExportChoice", text="DragonFF multi-mesh")
 
 #######################################################
 class OBJECT_PT_dffObjects(bpy.types.Panel):
