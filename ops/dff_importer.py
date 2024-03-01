@@ -165,7 +165,7 @@ class dff_importer:
             if 'extra_vert_color' in geom.extensions:
                 extra_vertex_color = bm.loops.layers.color.new()
 
-            if dff_importer.use_mat_split and 'mat_split' in geom.extensions:
+            if (dff_importer.use_mat_split or not geom.triangles) and 'mat_split' in geom.extensions:
                 faces = geom.extensions['mat_split']
             else:
                 faces = geom.triangles
