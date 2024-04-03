@@ -223,7 +223,10 @@ class dff_importer:
                         normals.append(geom.normals[loop.vertex_index])
 
                 mesh.normals_split_custom_set(normals)
-                mesh.use_auto_smooth = True
+
+                # NOTE: Mesh.use_auto_smooth is removed
+                if bpy.app.version < (4, 1, 0):
+                    mesh.use_auto_smooth = True
 
             mesh['dragon_normals'] = geom.has_normals
 
