@@ -626,9 +626,8 @@ class dff_exporter:
 
         self.triangulate_mesh(mesh)
         # NOTE: Mesh.calc_normals is no longer needed and has been removed
-        if bpy.app.version < (4, 0, 0):
+        if bpy.app.version < (4, 5, 0):
             mesh.calc_normals()
-        mesh.calc_normals_split()
 
         vcols = self.get_vertex_colors (mesh)
         verts_indices = {}
