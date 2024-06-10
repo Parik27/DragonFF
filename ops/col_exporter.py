@@ -35,9 +35,13 @@ class col_exporter:
     def _process_mesh(obj, verts, faces):
 
         mesh = obj.data
-        bm   = bmesh.new()
 
-        bm.from_mesh(mesh)
+        if obj.mode == "EDIT":
+            bm = bmesh.from_edit_mesh(mesh)
+        else:
+            bm = bmesh.new()
+            bm.from_mesh(mesh)
+
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
 
         vert_offset = len(verts)
