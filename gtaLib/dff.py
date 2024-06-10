@@ -1384,6 +1384,7 @@ class Geometry:
             "export_normals"     : True,
             "write_mesh_plg"     : True,
             "triangle_strip"     : False,
+            "exclude_geo_faces"  : False,
         }
         self._hasMatFX = False
 
@@ -1532,7 +1533,7 @@ class Geometry:
         data = b''
 
         # Write Bin Mesh PLG
-        if self.export_flags['write_mesh_plg']:
+        if self.export_flags['write_mesh_plg'] or self.export_flags['exclude_geo_faces']:
             data += self.write_bin_split()
         
         for extension in self.extensions:
@@ -1567,7 +1568,11 @@ class Geometry:
         flags |= (len(self.uv_layers) & 0xff) << 16
 
         data = b''
-        data += pack("<IIII", flags, len(self.triangles), len(self.vertices), 1)
+        data += pack("<IIII",
+                     flags,
+                     len(self.triangles) if not self.export_flags["exclude_geo_faces"] else 0,
+                     len(self.vertices),
+                     1)
 
         # Only present in older RW
         if Sections.get_rw_version() < 0x34000:
@@ -1584,8 +1589,9 @@ class Geometry:
                 data += Sections.write(TexCoords, tex_coord)
 
         # Write Triangles
-        for triangle in self.triangles:
-            data += Sections.write(Triangle, triangle)
+        if not self.export_flags["exclude_geo_faces"]:
+            for triangle in self.triangles:
+                data += Sections.write(Triangle, triangle)
 
         # Bounding sphere and has_vertices, has_normals
         data += Sections.write(Sphere, self.bounding_sphere)
