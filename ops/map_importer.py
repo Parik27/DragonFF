@@ -104,7 +104,7 @@ class Map_Import_Operator(bpy.types.Operator):
                     ),
                     'image_ext'      : 'PNG',
                     'connect_bones'  : False,
-                    'use_mat_split'  : False,
+                    'use_mat_split'  : self.settings.read_mat_split,
                     'remove_doubles' : True,
                     'group_materials': True,
                     'import_normals' : True
