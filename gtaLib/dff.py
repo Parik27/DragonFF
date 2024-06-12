@@ -767,16 +767,21 @@ class SkinPLG:
 
         oldver = Sections.get_rw_version() < 0x34000
 
-        self.calc_max_weights_per_vertex ()
-        self.calc_used_bones ()
+        if not oldver:
+            self.calc_max_weights_per_vertex ()
+            self.calc_used_bones ()
+        else:
+            self.max_weights_per_vertex = 0
+            self.bones_used = []
 
         data = b''
         data += pack("<3Bx", self.num_bones, len(self.bones_used),
                      self.max_weights_per_vertex)
 
         # Used Bones
-        data += pack(f"<{len(self.bones_used)}B", *self.bones_used)
-        
+        if self.bones_used:
+            data += pack(f"<{len(self.bones_used)}B", *self.bones_used)
+
         # 4x Indices
         for indices in self.vertex_bone_indices:
             data += pack("<4B", *indices)
