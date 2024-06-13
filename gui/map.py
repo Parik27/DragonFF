@@ -38,14 +38,14 @@ class DFFSceneProps(bpy.types.PropertyGroup):
 
     game_root : bpy.props.StringProperty(
         name = 'Game root',
-        default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\',
+        default = 'C:/Program Files (x86)/Steam/steamapps/common/',
         description = "Folder with the game's executable",
         subtype = 'DIR_PATH'
     )
 
     dff_folder : bpy.props.StringProperty(
         name = 'Dff folder',
-        default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\dff',
+        default = 'C:/Users/blaha/Documents/GitHub/DragonFF/tests/dff',
         description = "Define a folder where all of the dff models are stored.",
         subtype = 'DIR_PATH'
     )
@@ -53,7 +53,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     # txd_folder = bpy.props.StringProperty \
     #     (
     #     name = 'Txd folder',
-    #     default = 'C:\\Users\\blaha\\Documents\\GitHub\\DragonFF\\tests\\txd',
+    #     default = 'C:/Users/blaha/Documents/GitHub/DragonFF/tests/txd',
     #     description = "Define a folder where all of the txd models are stored.",
     #     subtype = 'DIR_PATH'
     #     )
