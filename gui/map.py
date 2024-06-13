@@ -30,6 +30,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    read_mat_split  :  bpy.props.BoolProperty(
+        name        = "Read Material Split",
+        description = "Whether to read material split for loading triangles",
+        default     = False
+    )
+
     game_root : bpy.props.StringProperty(
         name = 'Game root',
         default = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\',
@@ -81,6 +87,7 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "map_sections", text="Map segment")
         col.separator()
         col.prop(settings, "skip_lod", text="Skip LOD objects")
+        col.prop(settings, "read_mat_split", text="Read Material Split")
 
         layout.separator()
 
