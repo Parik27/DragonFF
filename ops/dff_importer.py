@@ -169,8 +169,10 @@ class dff_importer:
                 faces = geom.extensions['mat_split']
             else:
                 faces = geom.triangles
-                 
-            
+
+            use_face_loops = geom.native_platform_type == dff.NativePlatformType.GC
+            vert_index = -1
+
             for f in faces:
                 try:
                     face = bm.faces.new(
@@ -184,11 +186,15 @@ class dff_importer:
                     
                     # Setting UV coordinates
                     for loop in face.loops:
+                        if use_face_loops:
+                            vert_index += 1
+                        else:
+                            vert_index = loop.vert.index
                         for i, layer in enumerate(geom.uv_layers):
 
                             bl_layer = uv_layers[i]
-                            
-                            uv_coords = layer[loop.vert.index]
+
+                            uv_coords = layer[vert_index]
 
                             loop[bl_layer].uv = (
                                 uv_coords.u,
@@ -198,14 +204,14 @@ class dff_importer:
                         if geom.flags & dff.rpGEOMETRYPRELIT:
                             loop[vertex_color] = [
                                 c / 255.0 for c in
-                                geom.prelit_colors[loop.vert.index]
+                                geom.prelit_colors[vert_index]
                             ]
                         # Night/Extra Vertex Colors
                         if extra_vertex_color:
                             extension = geom.extensions['extra_vert_color']
                             loop[extra_vertex_color] = [
                                 c / 255.0 for c in
-                                extension.colors[loop.vert.index]
+                                extension.colors[vert_index]
                             ]
                             
                     face.smooth = True
@@ -217,8 +223,11 @@ class dff_importer:
             # Set loop normals
             if geom.has_normals and self.import_normals:
                 normals = []
-                for loop in mesh.loops:
-                    normals.append(geom.normals[loop.vertex_index])
+                if use_face_loops:
+                    normals = geom.normals
+                else:
+                    for loop in mesh.loops:
+                        normals.append(geom.normals[loop.vertex_index])
 
                 mesh.normals_split_custom_set(normals)
 
