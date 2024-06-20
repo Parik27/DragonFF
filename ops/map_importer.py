@@ -17,7 +17,8 @@
 import bpy
 import os
 from ..gtaLib import map as map_utilites
-from ..ops import dff_importer
+from ..ops import dff_importer, col_importer
+from .importer_common import (hide_object)
 
 #######################################################
 class Map_Import_Operator(bpy.types.Operator):
@@ -120,6 +121,24 @@ class Map_Import_Operator(bpy.types.Operator):
             self._model_cache[inst.id] = importer.objects
             print(str(inst.id) + ' loaded new')
     
+        # Look for collision mesh
+        name = self._model_cache[inst.id][0].name
+        for obj in bpy.data.objects:
+            if obj.name.endswith("%s.ColMesh" % name):
+                new_obj = bpy.data.objects.new(obj.name, obj.data)
+                new_obj.location = obj.location
+                new_obj.rotation_quaternion = obj.rotation_quaternion
+                new_obj.scale = obj.scale
+                Map_Import_Operator.apply_transformation_to_object(
+                    new_obj, inst
+                )
+                if '{}.dff'.format(name) in bpy.data.collections:
+                    bpy.data.collections['{}.dff'.format(name)].objects.link(
+                        new_obj
+                    )
+                hide_object(new_obj)
+                self._model_cache[inst.id].append(new_obj)
+
     #######################################################
     def modal(self, context, event):
 
@@ -169,6 +188,25 @@ class Map_Import_Operator(bpy.types.Operator):
         
         self._object_instances = map_data['object_instances']
         self._object_data = map_data['object_data']
+
+        # Get all the col files from dff folder with the same region prefix as the current map section
+        region_prefix = self.settings.map_sections[:-4].split('\\')[-1].split("_")[0].lower()
+        for filename in os.listdir(self.settings.dff_folder):
+            if filename.endswith(".col") and filename.startswith(region_prefix):
+                if bpy.data.collections.get(filename):
+                    print("%s already loaded" % filename)
+                    continue
+                collection = bpy.data.collections.new(filename)
+                bpy.context.scene.collection.children.link(collection)
+                col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
+                # Move all collisions to a top collection named for the file they came from
+                for c in col_list:
+                    bpy.context.scene.collection.children.unlink(c)
+                    collection.children.link(c)
+                # Hide this collection in the viewport (individual collision meshes will be linked and transformed
+                # as needed to their respective map sections, this collection is just for export)
+                context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
+                bpy.context.view_layer.active_layer_collection.hide_viewport = True
 
         wm = context.window_manager
         wm.progress_begin(0, 100.0)
