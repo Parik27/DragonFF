@@ -59,7 +59,8 @@ def register():
     else:
         bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
         bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
-        
+        bpy.types.OUTLINER_MT_collection.append(gui.export_col_func)
+
     
 
 #######################################################
@@ -72,7 +73,8 @@ def unregister():
     else:
         bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
         bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
-    
+        bpy.types.OUTLINER_MT_collection.remove(gui.export_col_func)
+
     # Unregister all the classes
     for cls in _classes:
         unregister_class(cls)      

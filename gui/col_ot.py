@@ -37,6 +37,11 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
         name = "Version Export"
     )
 
+    use_active_collection : bpy.props.BoolProperty(
+        name = "Only the objects from the active collection",
+        default = False
+    )
+
     #######################################################
     def draw(self, context):
         layout = self.layout
@@ -51,7 +56,7 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
             {
                 "file_name"      : self.filepath,
                 "version"        : int(self.export_version),
-                "collection"     : None,
+                "collection"     : context.collection if self.use_active_collection else None,
                 "memory"         : False,
                 "mass_export"    : True,
                 "only_selected"  : self.only_selected

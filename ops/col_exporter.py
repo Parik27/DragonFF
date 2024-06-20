@@ -216,7 +216,7 @@ def export_col(options):
     if options['mass_export']:
         output = b'';
         
-        root_collection = bpy.context.scene.collection
+        root_collection = bpy.context.scene.collection if col_exporter.collection is None else col_exporter.collection
         collections = root_collection.children.values() + [root_collection]
         col_exporter.memory = True
 
