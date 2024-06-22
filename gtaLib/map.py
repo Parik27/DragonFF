@@ -143,7 +143,7 @@ class MapDataUtility:
         except FileNotFoundError:
 
             # If file doesn't exist, look for binary file inside gta3.img file (credit to Allerek)
-            fullpath = "%s%s" % (filepath, 'models\\gta3.img')
+            fullpath = "%s%s" % (filepath, 'models/gta3.img')
             with open(fullpath, 'rb') as img_file:
                 # Read the first 8 bytes for the header and unpack
                 header = img_file.read(8)
