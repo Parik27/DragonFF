@@ -40,6 +40,9 @@ DualFX      = namedtuple("DualFX"      , "src_blend dst_blend texture")
 ReflMat     = namedtuple("ReflMat"     , "s_x s_y o_x o_y intensity")
 SpecularMat = namedtuple("SpecularMap" , "level texture")
 
+TexDict = namedtuple("TexDict", "texture_count device_id")
+PITexDict = namedtuple("PITexDict", "texture_count device_id")
+
 UserDataSection = namedtuple("UserDataSection", "name data")
 
 # geometry flags
@@ -101,9 +104,13 @@ types = {
     "Geometry"                : 15,
     "Clump"                   : 16,
     "Atomic"                  : 20,
+    "Texture Native"          : 21,
+    "Texture Dictionary"      : 22,
+    "Image"                   : 24,
     "Geometry List"           : 26,
     "Animation Anim"          : 27,
     "Right to Render"         : 31,
+    "PI Texture Dictionary"   : 35,
     "UV Animation Dictionary" : 43,
     "Morph PLG"               : 261,
     "Skin PLG"                : 278,
@@ -156,7 +163,10 @@ class Sections:
         Atomic      : "<4I",
         TexCoords   : "<2f",
         ReflMat     : "<5f4x",
-        SpecularMat : "<f24s"
+        SpecularMat : "<f24s",
+
+        TexDict : "<2H",
+        PITexDict: "<2H"
     }
 
     library_id = 0 # used for writing
