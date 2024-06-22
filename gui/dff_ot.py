@@ -201,9 +201,13 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
          options     = {'HIDDEN'}
      )
 
-    
     load_txd :  bpy.props.BoolProperty(
         name        = "Load TXD file",
+        default     = False
+    )
+
+    skip_mipmaps :  bpy.props.BoolProperty(
+        name        = "Skip mipmaps",
         default     = True
     )
 
@@ -257,7 +261,11 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     def draw(self, context):
         layout = self.layout
 
-        layout.prop(self, "load_txd")
+        box = layout.box()
+        box.prop(self, "load_txd")
+        if self.load_txd:
+            box.prop(self, "skip_mipmaps")
+
         layout.prop(self, "connect_bones")
         
         box = layout.box()
@@ -286,6 +294,8 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                 importer = dff_importer.import_dff(
                     {
                         'file_name'      : file,
+                        'load_txd'       : self.load_txd,
+                        'skip_mipmaps'   : self.skip_mipmaps,
                         'image_ext'      : image_ext,
                         'connect_bones'  : self.connect_bones,
                         'use_mat_split'  : self.read_mat_split,

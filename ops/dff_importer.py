@@ -26,6 +26,7 @@ from .importer_common import (
     material_helper, set_object_mode,
     hide_object)
 from .col_importer import import_col_mem
+from ..ops import txd_importer
 
 #######################################################
 class ext_2dfx_importer:
@@ -63,6 +64,8 @@ class ext_2dfx_importer:
 #######################################################
 class dff_importer:
 
+    load_txd           = False
+    skip_mipmaps       = True
     image_ext          = "png"
     use_bone_connect   = False
     current_collection = None
@@ -102,6 +105,7 @@ class dff_importer:
         self.skin_data = {}
         self.bones = {}
         self.materials = {}
+        self.txd_images = {}
         self.warning = ""
 
     #######################################################
@@ -369,22 +373,28 @@ class dff_importer:
             helper.set_base_color(material.color)
 
             # Loading Texture
-            if material.is_textured == 1 and self.image_ext:
+            if material.is_textured == 1:
                 texture = material.textures[0]
-                path    = os.path.dirname(self.file_name)
-                image_name = "%s.%s" % (texture.name, self.image_ext)
+                image   = None
 
-                # name.None shouldn't exist, lol / Share loaded images among imported materials
-                if (image_name in bpy.data.images and
-                        path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                    image = bpy.data.images[image_name]
-                else:
-                    image = load_image(image_name,
-                                       path,
-                                       recursive=False,
-                                       place_holder=True,
-                                       check_existing=True
-                                       )
+                if texture.name in self.txd_images:
+                    image = self.txd_images[texture.name][0]
+
+                elif self.image_ext:
+                    path    = os.path.dirname(self.file_name)
+                    image_name = "%s.%s" % (texture.name, self.image_ext)
+
+                    # name.None shouldn't exist, lol / Share loaded images among imported materials
+                    if (image_name in bpy.data.images and
+                            path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
+                        image = bpy.data.images[image_name]
+                    else:
+                        image = load_image(image_name,
+                                        path,
+                                        recursive=False,
+                                        place_holder=True,
+                                        check_existing=True
+                                        )
                 helper.set_texture(image, texture.name)
                 
             # Normal Map
@@ -403,19 +413,25 @@ class dff_importer:
                         texture = bump_fx.bump_map
 
                     if texture:
-                        path = os.path.dirname(self.file_name)
-                        image_name = "%s.%s" % (texture.name, self.image_ext)
+                        image = None
 
-                        # see name.None note above / Share loaded images among imported materials
-                        if (image_name in bpy.data.images and
-                                path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                            image = bpy.data.images[image_name]
+                        if texture.name in self.txd_images:
+                            image = self.txd_images[texture.name][0]
+
                         else:
-                            image = load_image(image_name,
-                                               path,
-                                               recursive=False,
-                                               place_holder=True,
-                                               check_existing=True
+                            path = os.path.dirname(self.file_name)
+                            image_name = "%s.%s" % (texture.name, self.image_ext)
+
+                            # see name.None note above / Share loaded images among imported materials
+                            if (image_name in bpy.data.images and
+                                    path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
+                                image = bpy.data.images[image_name]
+                            else:
+                                image = load_image(image_name,
+                                                path,
+                                                recursive=False,
+                                                place_holder=True,
+                                                check_existing=True
                                                )
 
                         helper.set_normal_map(image,
@@ -800,6 +816,18 @@ class dff_importer:
         self.dff.load_file(file_name)
         self.file_name = file_name
 
+        # Load the TXD
+        if self.load_txd:
+            # Import txd from a file if file exists
+            txd_path = file_name[:-4] + ".txd"
+            if os.path.isfile(txd_path):
+                self.txd_images = txd_importer.import_txd(
+                    {
+                        'file_name'    : txd_path,
+                        'skip_mipmaps' : self.skip_mipmaps,
+                    }
+                ).images
+
         self.preprocess_atomics()
         
         # Create a new group/collection
@@ -829,6 +857,8 @@ class dff_importer:
 def import_dff(options):
 
     # Shadow function
+    dff_importer.load_txd         = options['load_txd']
+    dff_importer.skip_mipmaps     = options['skip_mipmaps']
     dff_importer.image_ext        = options['image_ext']
     dff_importer.use_bone_connect = options['connect_bones']
     dff_importer.use_mat_split    = options['use_mat_split']
