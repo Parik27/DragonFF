@@ -34,6 +34,8 @@ class Map_Import_Operator(bpy.types.Operator):
     _object_instances = []
     _object_data = []
     _model_cache = {}
+    _col_files = []
+    _col_files_to_load = 0
 
     settings = None
 
@@ -149,16 +151,38 @@ class Map_Import_Operator(bpy.types.Operator):
         if event.type == 'TIMER' and not self._updating:
             self._updating = True
 
-            for x in range(10):
-                try:
-                    self.import_object(context)
-                except:
-                    print("Can`t import model... skipping")
+            # Load collision files first if there are any left to load
+            if len(self._col_files) > 0:
+                filename = self._col_files.pop()
+                collection = bpy.data.collections.new(filename)
+                bpy.context.scene.collection.children.link(collection)
+                col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
+                # Move all collisions to a top collection named for the file they came from
+                for c in col_list:
+                    bpy.context.scene.collection.children.unlink(c)
+                    collection.children.link(c)
+                # Hide this collection in the viewport (individual collision meshes will be linked and transformed
+                # as needed to their respective map sections, this collection is just for export)
+                context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
+                bpy.context.view_layer.active_layer_collection.hide_viewport = True
 
-            # Update cursor progress indicator if something needs to be loaded
-            num = (
-                float(self._inst_index) / float(len(self._object_instances)
-                )) if self._object_instances else 0
+                # Update cursor progress indicator if something needs to be loaded
+                num = (
+                        1.0 - float(len(self._col_files)) / float(self._col_files_to_load)
+                ) if self._col_files else 0
+
+            else:
+                for x in range(10):
+                    try:
+                        self.import_object(context)
+                    except:
+                        print("Can`t import model... skipping")
+
+                # Update cursor progress indicator if something needs to be loaded
+                num = (
+                    float(self._inst_index) / float(len(self._object_instances))
+                ) if self._object_instances else 0
+
             bpy.context.window_manager.progress_update(num)
 
             # Update dependency graph
@@ -196,17 +220,8 @@ class Map_Import_Operator(bpy.types.Operator):
                 if bpy.data.collections.get(filename):
                     print("%s already loaded" % filename)
                     continue
-                collection = bpy.data.collections.new(filename)
-                bpy.context.scene.collection.children.link(collection)
-                col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
-                # Move all collisions to a top collection named for the file they came from
-                for c in col_list:
-                    bpy.context.scene.collection.children.unlink(c)
-                    collection.children.link(c)
-                # Hide this collection in the viewport (individual collision meshes will be linked and transformed
-                # as needed to their respective map sections, this collection is just for export)
-                context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
-                bpy.context.view_layer.active_layer_collection.hide_viewport = True
+                self._col_files.append(filename)
+        self._col_files_to_load = len(self._col_files)
 
         wm = context.window_manager
         wm.progress_begin(0, 100.0)
