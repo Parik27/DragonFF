@@ -36,6 +36,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    load_collisions: bpy.props.BoolProperty(
+        name        = "Load Map Collisions",
+        default     = False
+    )
+
     game_root : bpy.props.StringProperty(
         name = 'Game root',
         default = 'C:/Program Files (x86)/Steam/steamapps/common/',
@@ -88,6 +93,7 @@ class MapImportPanel(bpy.types.Panel):
         col.separator()
         col.prop(settings, "skip_lod", text="Skip LOD objects")
         col.prop(settings, "read_mat_split", text="Read Material Split")
+        col.prop(settings, "load_collisions", text="Load Map Collisions")
 
         layout.separator()
 

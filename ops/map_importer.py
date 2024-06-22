@@ -214,14 +214,15 @@ class Map_Import_Operator(bpy.types.Operator):
         self._object_data = map_data['object_data']
 
         # Get all the col files from dff folder with the same region prefix as the current map section
-        region_prefix = self.settings.map_sections[:-4].split('\\')[-1].split("_")[0].lower()
-        for filename in os.listdir(self.settings.dff_folder):
-            if filename.endswith(".col") and filename.startswith(region_prefix):
-                if bpy.data.collections.get(filename):
-                    print("%s already loaded" % filename)
-                    continue
-                self._col_files.append(filename)
-        self._col_files_to_load = len(self._col_files)
+        if self.settings.load_collisions:
+            region_prefix = self.settings.map_sections[:-4].split('\\')[-1].split("_")[0].lower()
+            for filename in os.listdir(self.settings.dff_folder):
+                if filename.endswith(".col") and filename.startswith(region_prefix):
+                    if bpy.data.collections.get(filename):
+                        print("%s already loaded" % filename)
+                        continue
+                    self._col_files.append(filename)
+            self._col_files_to_load = len(self._col_files)
 
         wm = context.window_manager
         wm.progress_begin(0, 100.0)
