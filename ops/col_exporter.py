@@ -80,6 +80,11 @@ class col_exporter:
 
     #######################################################
     def _update_bounds(obj):
+
+        # Don't include shadow meshes in bounds calculations
+        if obj.dff.type == 'SHA':
+            return
+
         self = col_exporter
 
         if self.coll.bounds is None:
@@ -89,16 +94,25 @@ class col_exporter:
             ]
 
         dimensions = obj.dimensions
+        center = obj.location
             
         # Empties don't have a dimensions array
         if obj.type == 'EMPTY':
-            
-            # Multiplied by 2 because empty_display_size is a radius
-            dimensions = [
-                max(x * obj.empty_display_size * 2 for x in obj.scale)] * 3
-        
-        upper_bounds = [x + (y/2) for x, y in zip(obj.location, dimensions)]
-        lower_bounds = [x - (y/2) for x, y in zip(obj.location, dimensions)]
+
+            if obj.empty_display_type == 'SPHERE':
+                # Multiplied by 2 because empty_display_size is a radius
+                dimensions = [
+                    max(x * obj.empty_display_size * 2 for x in obj.scale)] * 3
+            else:
+                dimensions = obj.scale
+
+        # And Meshes require their proper center to be calculated because their transform is identity
+        else:
+            local_center = sum((mathutils.Vector(b) for b in obj.bound_box), mathutils.Vector()) / 8.0
+            center = obj.matrix_world @ local_center
+
+        upper_bounds = [x + (y/2) for x, y in zip(center, dimensions)]
+        lower_bounds = [x - (y/2) for x, y in zip(center, dimensions)]
 
         self.coll.bounds = [
             [max(x, y) for x,y in zip(self.coll.bounds[0], upper_bounds)],
@@ -112,11 +126,11 @@ class col_exporter:
         radius = 0.0
         center = [0, 0, 0]
         rect_min = [0, 0, 0]
-        rect_max  = [0, 0, 0]
+        rect_max = [0, 0, 0]
 
         if self.coll.bounds is not None:
             rect_min = self.coll.bounds[0]
-            rect_max  = self.coll.bounds[1]
+            rect_max = self.coll.bounds[1]
             center = [(x + y) / 2 for x, y in zip(*self.coll.bounds)]
             radius = (
                 mathutils.Vector(rect_min) - mathutils.Vector(rect_max)
