@@ -16,6 +16,7 @@
 
 import bpy
 import bmesh
+import mathutils
 
 from ..gtaLib import col
 from ..data import col_materials as mats
@@ -47,19 +48,27 @@ class col_importer:
         return col_importer(collision)
     
     #######################################################
-    def __add_spheres(self, collection, array):
+    def __add_shapes(self, collection, array, sphere=True):
 
         for index, entity in enumerate(array):
-            name = collection.name + ".Sphere.%d" % (index)
+            name = collection.name + (".Sphere.%d" if sphere else ".Box.%d") % (index)
         
             obj  = bpy.data.objects.new(name, None)
-            
-            obj.location = entity.center
-            obj.scale = [entity.radius] * 3
-            if (2, 80, 0) > bpy.app.version:
-                obj.empty_draw_type = 'SPHERE'
+
+            if sphere:
+                obj.location = entity.center
+                obj.scale = [entity.radius] * 3
             else:
-                obj.empty_display_type = 'SPHERE'
+                min = mathutils.Vector(entity.min)
+                max = mathutils.Vector(entity.max)
+                half = 0.5 * (max - min)
+                obj.location = min + half
+                obj.scale = half
+
+            if (2, 80, 0) > bpy.app.version:
+                obj.empty_draw_type = 'SPHERE' if sphere else 'CUBE'
+            else:
+                obj.empty_display_type = 'SPHERE' if sphere else 'CUBE'
 
             obj.dff.type = 'COL'
             obj.dff.col_material = entity.surface.material
@@ -162,7 +171,8 @@ class col_importer:
                                                            model.model_name),
                                            link
             )            
-            self.__add_spheres(collection, model.spheres)
+            self.__add_shapes(collection, model.spheres)
+            self.__add_shapes(collection, model.boxes, False)
 
             if len(model.mesh_verts) > 0:
                 self.__add_mesh(collection,

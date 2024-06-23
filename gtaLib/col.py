@@ -27,7 +27,7 @@ class ColModel:
         self.model_id      = 0
         self.bounds        = None
         self.spheres       = []
-        self.cubes         = []
+        self.boxes         = []
         self.mesh_verts    = []
         self.mesh_faces    = []
         self.lines         = []
@@ -217,7 +217,7 @@ class coll:
         model.spheres += self.__read_block(TSphere)
         self.__incr(4) # number of unk. data (from GTAModding)
 
-        model.cubes      += self.__read_block(TBox)
+        model.boxes      += self.__read_block(TBox)
         model.mesh_verts += self.__read_block(TVertex)
         model.mesh_faces += self.__read_block(TFace)
 
@@ -243,7 +243,7 @@ class coll:
 
         # Boxes
         self._pos = pos + box_offset + 4
-        model.cubes += self.__read_block(TBox, box_count)
+        model.boxes += self.__read_block(TBox, box_count)
         
         # Faces
         self._pos = pos + faces_offset + 4
@@ -373,7 +373,7 @@ class coll:
 
         data += self.__write_block(TSphere, model.spheres)
         data += pack('<I', 0)
-        data += self.__write_block(TBox, model.cubes)
+        data += self.__write_block(TBox, model.boxes)
         data += self.__write_block(TVertex, model.mesh_verts)
         data += self.__write_block(TFace, model.mesh_faces)
 
@@ -384,7 +384,7 @@ class coll:
         data = b''
 
         flags = 0
-        flags |= 2 if model.spheres or model.cubes or model.mesh_faces else 0
+        flags |= 2 if model.spheres or model.boxes or model.mesh_faces else 0
         flags |= 16 if model.shadow_faces and model.version >= 3 else 0
         
         header_len = 104
@@ -399,7 +399,7 @@ class coll:
 
         # Boxes
         offsets.append(len(data) + header_len)
-        data += self.__write_block(TBox, model.cubes, False)
+        data += self.__write_block(TBox, model.boxes, False)
 
         offsets.append(0) # TODO: Cones
         
@@ -435,7 +435,7 @@ class coll:
         # Write Header
         header_data = pack("<HHHBxIIIIIII",
                             len(model.spheres),
-                            len(model.cubes),
+                            len(model.boxes),
                             len(model.mesh_faces),
                             len(model.lines),
                             flags,

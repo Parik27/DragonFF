@@ -151,6 +151,27 @@ class col_exporter:
         pass
                 
     #######################################################
+    def _process_boxes(obj):
+        self = col_exporter
+
+        min = col.TVector(*(obj.location - obj.scale))
+        max = col.TVector(*(obj.location + obj.scale))
+
+        surface = col.TSurface(
+            obj.dff.col_material,
+            obj.dff.col_flags,
+            obj.dff.col_brightness,
+            obj.dff.col_light
+        )
+
+        self.coll.boxes.append(col.TBox(min=min,
+                                        max=max,
+                                        surface=surface,
+        ))
+
+        pass
+
+    #######################################################
     def _process_obj(obj):
         self = col_exporter
         
@@ -169,8 +190,11 @@ class col_exporter:
                 )
                     
         elif obj.type == 'EMPTY':
-            self._process_spheres(obj)
-        
+            if obj.empty_display_type == 'SPHERE':
+                self._process_spheres(obj)
+            else:
+                self._process_boxes(obj)
+
         self._update_bounds(obj)
         
     
