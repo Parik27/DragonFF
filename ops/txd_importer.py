@@ -64,10 +64,12 @@ class txd_importer:
 
             for level in range(num_levels):
                 image_name = "%s/%s/%d" % (txd_name, tex.name, level)
-                image = txd_importer._create_image(image_name,
-                                                    tex.to_rgba(level),
-                                                    tex.get_width(level),
-                                                    tex.get_height(level))
+                image = bpy.data.images.get(image_name)
+                if not image:
+                    image = txd_importer._create_image(image_name,
+                                                        tex.to_rgba(level),
+                                                        tex.get_width(level),
+                                                        tex.get_height(level))
                 images.append(image)
 
             self.images[tex.name] = images

@@ -295,6 +295,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     {
                         'file_name'      : file,
                         'load_txd'       : self.load_txd,
+                        'txd_file_name'  : '',
                         'skip_mipmaps'   : self.skip_mipmaps,
                         'image_ext'      : image_ext,
                         'connect_bones'  : self.connect_bones,

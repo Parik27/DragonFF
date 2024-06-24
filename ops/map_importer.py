@@ -57,6 +57,7 @@ class Map_Import_Operator(bpy.types.Operator):
             return
 
         model = self._object_data[inst.id].modelName
+        txd = self._object_data[inst.id].txdName
 
         if inst.id in self._model_cache:
 
@@ -102,6 +103,11 @@ class Map_Import_Operator(bpy.types.Operator):
                     'file_name'      : "%s/%s.dff" % (
                         self.settings.dff_folder, model
                     ),
+                    'load_txd'       : self.settings.load_txd,
+                    'txd_file_name'  : "%s/%s.txd" % (
+                        self.settings.dff_folder, txd
+                    ),
+                    'skip_mipmaps'   : True,
                     'image_ext'      : 'PNG',
                     'connect_bones'  : False,
                     'use_mat_split'  : self.settings.read_mat_split,
