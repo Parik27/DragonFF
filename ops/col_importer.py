@@ -48,27 +48,20 @@ class col_importer:
         return col_importer(collision)
     
     #######################################################
-    def __add_shapes(self, collection, array, sphere=True):
+    def __add_spheres(self, collection, array):
 
         for index, entity in enumerate(array):
-            name = collection.name + (".Sphere.%d" if sphere else ".Box.%d") % (index)
+            name = collection.name + ".ColSphere.%d" % index
         
-            obj  = bpy.data.objects.new(name, None)
+            obj = bpy.data.objects.new(name, None)
 
-            if sphere:
-                obj.location = entity.center
-                obj.scale = [entity.radius] * 3
-            else:
-                min = mathutils.Vector(entity.min)
-                max = mathutils.Vector(entity.max)
-                half = 0.5 * (max - min)
-                obj.location = min + half
-                obj.scale = half
+            obj.location = entity.center
+            obj.scale = [entity.radius] * 3
 
             if (2, 80, 0) > bpy.app.version:
-                obj.empty_draw_type = 'SPHERE' if sphere else 'CUBE'
+                obj.empty_draw_type = 'SPHERE'
             else:
-                obj.empty_display_type = 'SPHERE' if sphere else 'CUBE'
+                obj.empty_display_type = 'SPHERE'
 
             obj.dff.type = 'COL'
             obj.dff.col_material = entity.surface.material
@@ -76,6 +69,33 @@ class col_importer:
             obj.dff.col_brightness = entity.surface.brightness
             obj.dff.col_light = entity.surface.light
             
+            link_object(obj, collection)
+
+    #######################################################
+    def __add_boxes(self, collection, array):
+
+        for index, entity in enumerate(array):
+            name = collection.name + ".ColBox.%d" % index
+
+            obj = bpy.data.objects.new(name, None)
+
+            mn = mathutils.Vector(entity.min)
+            mx = mathutils.Vector(entity.max)
+            half = 0.5 * (mx - mn)
+            obj.location = mn + half
+            obj.scale = half
+
+            if (2, 80, 0) > bpy.app.version:
+                obj.empty_draw_type = 'CUBE'
+            else:
+                obj.empty_display_type = 'CUBE'
+
+            obj.dff.type = 'COL'
+            obj.dff.col_material = entity.surface.material
+            obj.dff.col_flags = entity.surface.flags
+            obj.dff.col_brightness = entity.surface.brightness
+            obj.dff.col_light = entity.surface.light
+
             link_object(obj, collection)
 
     #######################################################
@@ -171,8 +191,8 @@ class col_importer:
                                                            model.model_name),
                                            link
             )            
-            self.__add_shapes(collection, model.spheres)
-            self.__add_shapes(collection, model.boxes, False)
+            self.__add_spheres(collection, model.spheres)
+            self.__add_boxes(collection, model.boxes)
 
             if len(model.mesh_verts) > 0:
                 self.__add_mesh(collection,

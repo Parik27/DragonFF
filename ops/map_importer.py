@@ -215,7 +215,7 @@ class Map_Import_Operator(bpy.types.Operator):
 
         # Get all the col files from dff folder with the same region prefix as the current map section
         if self.settings.load_collisions:
-            region_prefix = self.settings.map_sections[:-4].split('\\')[-1].split("_")[0].lower()
+            region_prefix = self.settings.map_sections[:-4].split('/')[-1].split("_")[0].lower()
             for filename in os.listdir(self.settings.dff_folder):
                 if filename.endswith(".col") and filename.startswith(region_prefix):
                     if bpy.data.collections.get(filename):
