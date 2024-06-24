@@ -36,6 +36,7 @@ class Map_Import_Operator(bpy.types.Operator):
     _model_cache = {}
     _col_files = []
     _col_files_to_load = 0
+    ipl_collection = None
 
     settings = None
 
@@ -118,6 +119,10 @@ class Map_Import_Operator(bpy.types.Operator):
                 Map_Import_Operator.apply_transformation_to_object(
                     importer.objects[0], inst
                 )
+
+            # Move dff collection to a top collection named for the file it came from
+            bpy.context.scene.collection.children.unlink(importer.current_collection)
+            self.ipl_collection.children.link(importer.current_collection)
 
             # Save into buffer
             self._model_cache[inst.id] = importer.objects
@@ -212,6 +217,10 @@ class Map_Import_Operator(bpy.types.Operator):
         
         self._object_instances = map_data['object_instances']
         self._object_data = map_data['object_data']
+
+        # Create a top level collection to hold all the subsequent dffs loaded from this map section
+        self.ipl_collection = bpy.data.collections.new(self.settings.map_sections)
+        bpy.context.scene.collection.children.link(self.ipl_collection)
 
         # Get all the col files from dff folder with the same region prefix as the current map section
         if self.settings.load_collisions:
