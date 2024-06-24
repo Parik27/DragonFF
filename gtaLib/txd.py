@@ -565,14 +565,14 @@ class txd:
         self._read(pixels_len)
 
         # Palette
-        pallate_len = 0
+        palette_len = 0
         if image.depth == 8:
-            pallate_len = 1024
+            palette_len = 1024
         elif image.depth == 4:
-            pallate_len = 64
+            palette_len = 64
 
-        image.palette = self.raw(pallate_len)
-        self._read(pallate_len)
+        image.palette = self.raw(palette_len)
+        self._read(palette_len)
 
         return image
 

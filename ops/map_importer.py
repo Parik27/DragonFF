@@ -102,6 +102,8 @@ class Map_Import_Operator(bpy.types.Operator):
                     'file_name'      : "%s/%s.dff" % (
                         self.settings.dff_folder, model
                     ),
+                    'load_txd'       : False,
+                    'skip_mipmaps'   : False,
                     'image_ext'      : 'PNG',
                     'connect_bones'  : False,
                     'use_mat_split'  : self.settings.read_mat_split,
