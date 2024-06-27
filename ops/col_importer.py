@@ -171,7 +171,7 @@ class col_importer:
             except Exception as e:
                 print(e)
                 
-            bm.to_mesh(mesh)
+        bm.to_mesh(mesh)
         
         obj = bpy.data.objects.new(name, mesh)
         obj.dff.type = 'SHA' if shadow else 'COL'
