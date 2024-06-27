@@ -232,14 +232,14 @@ class MapDataUtility:
     ########################################################################
     def getMapData(gameID, gameRoot, iplSection):
         
-        data = map_data.data[gameID]
+        data = map_data.data[gameID].copy()
 
         # Prune IDEs unrelated to current IPL section (SA only). First, make IDE_paths a mutable list, then iterate
         # over a copy so we can remove elements during iteration. This is a naive pruning which keeps all ides with a
         # few generic keywords in their name and culls anything else with a prefix different from the given iplSection
         if gameID == game_version.SA:
             data['IDE_paths'] = list(data['IDE_paths'])
-            for p in list(data['IDE_paths']):
+            for p in data['IDE_paths'].copy():
                 if p.startswith('DATA/MAPS/generic/') or p.startswith('DATA/MAPS/leveldes/') or 'xref' in p:
                     continue
                 ide_prefix = p.split('/')[-1].lower()

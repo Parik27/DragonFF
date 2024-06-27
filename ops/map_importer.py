@@ -38,7 +38,9 @@ class Map_Import_Operator(bpy.types.Operator):
     _col_files = []
     _col_index = 0
     _check_collisions = True
-    ipl_collection = None
+    _mesh_collection = None
+    _collision_collection = None
+    _ipl_collection = None
 
     settings = None
 
@@ -124,7 +126,7 @@ class Map_Import_Operator(bpy.types.Operator):
 
             # Move dff collection to a top collection named for the file it came from
             context.scene.collection.children.unlink(importer.current_collection)
-            self.ipl_collection.children.link(importer.current_collection)
+            self._ipl_collection.children.link(importer.current_collection)
 
             # Save into buffer
             self._model_cache[inst.id] = importer.objects
@@ -182,7 +184,7 @@ class Map_Import_Operator(bpy.types.Operator):
                 if self._col_index >= len(self._col_files):
                     self._col_files.clear()
                 collection = bpy.data.collections.new(filename)
-                context.scene.collection.children.link(collection)
+                self._collision_collection.children.link(collection)
                 col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
                 # Move all collisions to a top collection named for the file they came from
                 for c in col_list:
@@ -246,9 +248,25 @@ class Map_Import_Operator(bpy.types.Operator):
         self._object_instances = map_data['object_instances']
         self._object_data = map_data['object_data']
 
-        # Create a top level collection to hold all the subsequent dffs loaded from this map section
-        self.ipl_collection = bpy.data.collections.new(self.settings.map_sections)
-        context.scene.collection.children.link(self.ipl_collection)
+        # Create collections to organize the scene between geometry and collision
+        meshcollname = '%s Meshes' % self.settings.game_version_dropdown
+        collcollname = '%s Collisions' % self.settings.game_version_dropdown
+        self._mesh_collection = bpy.data.collections.get(meshcollname)
+        if not self._mesh_collection:
+            self._mesh_collection = bpy.data.collections.new(meshcollname)
+            context.scene.collection.children.link(self._mesh_collection)
+        self._collision_collection = bpy.data.collections.get(collcollname)
+        if not self._collision_collection:
+            self._collision_collection = bpy.data.collections.new(collcollname)
+            context.scene.collection.children.link(self._collision_collection)
+
+        # Hide Collision collection
+        context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
+        context.view_layer.active_layer_collection.hide_viewport = True
+
+        # Create a new collection in Mesh to hold all the subsequent dffs loaded from this map section
+        self._ipl_collection = bpy.data.collections.new(self.settings.map_sections)
+        self._mesh_collection.children.link(self._ipl_collection)
 
         # Get a list of the .col files available
         for filename in os.listdir(self.settings.dff_folder):
