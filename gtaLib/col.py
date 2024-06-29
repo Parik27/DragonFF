@@ -30,6 +30,7 @@ class ColModel:
         self.boxes         = []
         self.mesh_verts    = []
         self.mesh_faces    = []
+        self.face_groups   = []
         self.lines         = []
         self.flags         = 0
         self.shadow_verts  = []
@@ -245,6 +246,13 @@ class coll:
         self._pos = pos + box_offset + 4
         model.boxes += self.__read_block(TBox, box_count)
         
+        # Face Groups
+        if flags & 8:
+            self._pos = pos + faces_offset
+            facegroup_count = unpack_from("<L", self._data, self._pos)
+            self._pos = pos + faces_offset - (28 * facegroup_count[0])
+            model.face_groups += self.__read_block(TFaceGroup, facegroup_count[0])
+
         # Faces
         self._pos = pos + faces_offset + 4
         model.mesh_faces += self.__read_block(TFace, face_count)
@@ -385,6 +393,7 @@ class coll:
 
         flags = 0
         flags |= 2 if model.spheres or model.boxes or model.mesh_faces else 0
+        flags |= 8 if model.face_groups else 0
         flags |= 16 if model.shadow_faces and model.version >= 3 else 0
         
         header_len = 104
@@ -409,6 +418,11 @@ class coll:
                                    Sections.compress_vertices(model.mesh_verts),
                                    False)
         
+        # Face Groups
+        if flags & 8:
+            data += self.__write_block(TFaceGroup, model.face_groups, False)
+            data += pack("<L", len(model.face_groups))
+
         # Faces
         offsets.append(len(data) + header_len)
         data += self.__write_block(TFace, model.mesh_faces, False)

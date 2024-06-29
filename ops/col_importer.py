@@ -137,7 +137,7 @@ class col_importer:
             object.data.materials.append(helper.material)
             
     #######################################################
-    def __add_mesh(self, collection, name, verts, faces, shadow=False):
+    def __add_mesh(self, collection, name, verts, faces, face_groups, shadow=False):
 
         mesh      = bpy.data.meshes.new(name)
         materials = {}
@@ -173,6 +173,15 @@ class col_importer:
                 
         bm.to_mesh(mesh)
         
+        # Face groups get stored in a face attribute on the mesh, each face storing the index of its group
+        if face_groups:
+            attribute = mesh.attributes.new(name="face group", type="INT", domain="FACE")
+            for fg_idx, fg in enumerate(face_groups):
+                for face_idx in range(fg.start, fg.end+1):
+                    if face_idx >= len(bm.faces):
+                        break
+                    attribute.data[face_idx].value = fg_idx
+
         obj = bpy.data.objects.new(name, mesh)
         obj.dff.type = 'SHA' if shadow else 'COL'
         
@@ -198,13 +207,15 @@ class col_importer:
                 self.__add_mesh(collection,
                                 collection.name + ".ColMesh",
                                 model.mesh_verts,
-                                model.mesh_faces)
+                                model.mesh_faces,
+                                model.face_groups if model.flags & 8 else None)
 
             if len(model.shadow_verts) > 0:
                 self.__add_mesh(collection,
                                 collection.name + ".ShadowMesh",
                                 model.shadow_verts,
                                 model.shadow_faces,
+                                None,
                                 True)
                         
             collection_list.append(collection)

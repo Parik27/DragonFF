@@ -32,7 +32,7 @@ class col_exporter:
     only_selected = False
 
     #######################################################
-    def _process_mesh(obj, verts, faces):
+    def _process_mesh(obj, verts, faces, face_groups=None):
 
         mesh = obj.data
 
@@ -50,7 +50,36 @@ class col_exporter:
         for vert in bm.verts:
             verts.append((*vert.co,))
 
-        for face in bm.faces:
+        # Setup for Face Groups
+        layer = bm.faces.layers.int.get("face group")
+        start_idx = fg_idx = 0
+        fg_min = [256] * 3
+        fg_max = [-256] * 3
+
+        for i, face in enumerate(bm.faces):
+
+            # Face Groups
+            if layer:
+                lastface = i == len(bm.faces)-1
+                idx = face[layer]
+
+                # Evaluate bounds if still the same face group index or this is the last face in the list
+                if idx == fg_idx or lastface:
+                    fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[0].co)]
+                    fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[0].co)]
+                    fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[1].co)]
+                    fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[1].co)]
+                    fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[2].co)]
+                    fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[2].co)]
+
+                # Create the face group if the face group index changed or this is the last face in the list
+                if idx != fg_idx or lastface:
+                    end_idx = i if lastface else i-1
+                    face_groups.append(col.TFaceGroup._make([fg_min, fg_max, start_idx, end_idx]))
+                    fg_min = [256] * 3
+                    fg_max = [-256] * 3
+                    start_idx = i
+                fg_idx = idx
 
             bm.verts.index_update()
             surface = [0, 0, 0, 0]
@@ -200,7 +229,8 @@ class col_exporter:
             else:
                 self._process_mesh(obj,
                                    self.coll.mesh_verts,
-                                   self.coll.mesh_faces
+                                   self.coll.mesh_faces,
+                                   self.coll.face_groups
                 )
                     
         elif obj.type == 'EMPTY':
