@@ -176,7 +176,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     
     bl_idname      = "import_scene.dff"
     bl_description = 'Import a Renderware DFF or COL File'
-    bl_label       = "DragonFF DFF (.dff)"
+    bl_label       = "DragonFF DFF (.dff, .col)"
 
     filter_glob   : bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
@@ -275,8 +275,14 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         
         for file in [os.path.join(self.directory,file.name) for file in self.files] if self.files else [self.filepath]:
             if file.endswith(".col"):
-                col_importer.import_col_file(file, os.path.basename(file))
-                            
+                col_list = col_importer.import_col_file(file, os.path.basename(file))
+                # Move all collisions to a top collection named for the file they came from
+                collection = bpy.data.collections.new(os.path.basename(file))
+                context.scene.collection.children.link(collection)
+                for c in col_list:
+                    context.scene.collection.children.unlink(c)
+                    collection.children.link(c)
+
             else:
                 # Set image_ext to none if scan images is disabled
                 image_ext = self.image_ext
