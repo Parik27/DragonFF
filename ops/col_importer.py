@@ -200,6 +200,11 @@ class col_importer:
                                                            model.model_name),
                                            link
             )            
+
+            # Store the import bounds as a custom property of the collection
+            collection['bounds min'] = model.bounds[0]
+            collection['bounds max'] = model.bounds[1]
+
             self.__add_spheres(collection, model.spheres)
             self.__add_boxes(collection, model.boxes)
 

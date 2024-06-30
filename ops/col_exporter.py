@@ -59,7 +59,7 @@ class col_exporter:
         for i, face in enumerate(bm.faces):
 
             # Face Groups
-            if layer:
+            if layer and col.Sections.version > 1:
                 lastface = i == len(bm.faces)-1
                 idx = face[layer]
 
@@ -253,9 +253,14 @@ class col_exporter:
         self.coll.version = self.version
         self.coll.model_name = os.path.basename(name)
 
+        bounds_found = False
         objects = bpy.data.objects
         if self.collection is not None:
             objects = self.collection.objects
+            # Get original import bounds from collection (some collisions come in as just bounds with no other items)
+            if self.collection.get('bounds min') and self.collection.get('bounds max'):
+                bounds_found = True
+                self.coll.bounds = [self.collection['bounds min'], self.collection['bounds max']]
 
         total_objects = 0
         for obj in objects:
@@ -267,7 +272,7 @@ class col_exporter:
         self._convert_bounds()
         
         if self.memory:
-            if total_objects > 0:
+            if total_objects > 0 or bounds_found:
                 return col.coll(self.coll).write_memory()
             return b''
 
