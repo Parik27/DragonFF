@@ -286,6 +286,7 @@ class dff_exporter:
     collection = None
     export_coll = False
     exclude_geo_faces = False
+    from_outliner = False
 
     #######################################################
     @staticmethod
@@ -973,9 +974,14 @@ class dff_exporter:
             collections = [bpy.data]
 
         else:
-            root_collection = bpy.context.scene.collection
-            collections = root_collection.children.values() + [root_collection]
-            
+            if self.from_outliner:
+                collections = [bpy.context.view_layer.objects.active.users_collection[0]]
+            else:
+                collections = []
+                for collection in bpy.data.collections:
+                    if collection.name.endswith(".dff"):
+                        collections.append(collection)
+
         for collection in collections:
             for obj in collection.objects:
                     
@@ -1008,5 +1014,6 @@ def export_dff(options):
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
     dff_exporter.export_coll        = options['export_coll']
+    dff_exporter.from_outliner      = options['from_outliner']
 
     dff_exporter.export_dff(options['file_name'])

@@ -178,8 +178,9 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
     bl_label = "DragonFF"
 
     def draw(self, context):
-        self.layout.operator(EXPORT_OT_dff.bl_idname,
+        op = self.layout.operator(EXPORT_OT_dff.bl_idname,
                              text="DragonFF DFF (.dff)")
+        op.from_outliner = False
         op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
         op.use_active_collection = False
@@ -194,7 +195,14 @@ def export_dff_func(self, context):
     self.layout.menu("DFF_MT_ExportChoice", text="DragonFF")
 
 #######################################################
-def export_col_func(self, context):
+def export_dff_outliner(self, context):
+    self.layout.separator()
+    self.layout.operator_context = 'INVOKE_DEFAULT'
+    op = self.layout.operator(EXPORT_OT_dff.bl_idname, text="Export object as DFF (.dff)")
+    op.from_outliner = True
+
+#######################################################
+def export_col_outliner(self, context):
     self.layout.separator()
     self.layout.operator_context = 'INVOKE_DEFAULT'
     op = self.layout.operator(EXPORT_OT_col.bl_idname, text="Export collection as collision container (.col)")

@@ -73,6 +73,11 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         default="",
         name = "Custom Version")
 
+    from_outliner       : bpy.props.BoolProperty(
+        name="Was invoked from the Outliner context menu",
+        default=False
+    )
+
     #######################################################
     def verify_rw_version(self):
         if len(self.custom_version) != 7:
@@ -90,17 +95,22 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     def draw(self, context):
         layout = self.layout
 
-        layout.prop(self, "mass_export")
+        # Exporting from the Outliner context menu indicates just the active object, so hide these options for clarity
+        if not self.from_outliner:
+            layout.prop(self, "mass_export")
 
-        if self.mass_export:
-            box = layout.box()
-            row = box.row()
-            row.label(text="Mass Export:")
+            if self.mass_export:
+                box = layout.box()
+                row = box.row()
+                row.label(text="Mass Export:")
 
-            row = box.row()
-            row.prop(self, "preserve_positions")
+                row = box.row()
+                row.prop(self, "preserve_positions")
 
-        layout.prop(self, "only_selected")
+            layout.prop(self, "only_selected")
+        else:
+            layout.prop(self, "preserve_positions")
+
         layout.prop(self, "export_coll")
         layout.prop(self, "export_frame_names")
         layout.prop(self, "exclude_geo_faces")
@@ -142,13 +152,14 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 {
                     "file_name"          : self.filepath,
                     "directory"          : self.directory,
-                    "selected"           : self.only_selected,
-                    "mass_export"        : self.mass_export,
+                    "selected"           : False if self.from_outliner else self.only_selected,
+                    "mass_export"        : False if self.from_outliner else self.mass_export,
                     "preserve_positions" : self.preserve_positions,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
                     "export_frame_names" : self.export_frame_names,
-                    "exclude_geo_faces"  : self.exclude_geo_faces
+                    "exclude_geo_faces"  : self.exclude_geo_faces,
+                    "from_outliner"      : self.from_outliner
                 }
             )
             self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
@@ -164,6 +175,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
 
     #######################################################
     def invoke(self, context, event):
+        # Set good defaults for when invoked from Outliner context menu (probably used with a map edit in mind)
+        if self.from_outliner:
+            self.filepath = bpy.context.view_layer.objects.active.name
+            self.export_coll = False
+            self.preserve_positions = False
+
         if 'dragonff_imported_version' in context.scene:
             self.export_version = context.scene['dragonff_imported_version']
         if 'dragonff_custom_version' in context.scene:
