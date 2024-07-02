@@ -916,6 +916,13 @@ class dff_exporter:
         
         for obj in objects:
 
+            # Skip collision objects in the base collection. These are inside their own nested collection for singularly
+            # imported DFFs, but the map importer will put collision meshes inside the same collection as the map mesh
+            # object they represent. We can just ignore collision meshes here as the DFF exporter will still look for
+            # them in their own nested collection later if export_coll is true.
+            if obj.dff.type == 'COL':
+                continue
+
             # create atomic in this case
             if obj.type == "MESH":
                 self.populate_atomic(obj)

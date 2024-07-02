@@ -137,6 +137,7 @@ class Map_Import_Operator(bpy.types.Operator):
         for obj in bpy.data.objects:
             if obj.dff.type == 'COL' and obj.name.endswith("%s.ColMesh" % name):
                 new_obj = bpy.data.objects.new(obj.name, obj.data)
+                new_obj.dff.type = 'COL'
                 new_obj.location = obj.location
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.scale = obj.scale
