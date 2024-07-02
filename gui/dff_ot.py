@@ -51,10 +51,10 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         default         = False
     )
     
-    reset_positions     : bpy.props.BoolProperty(
+    preserve_positions     : bpy.props.BoolProperty(
         name            = "Preserve Positions",
         description     = "Don't set object positions to (0,0,0)",
-        default         = False
+        default         = True
     )
     
     export_version      : bpy.props.EnumProperty(
@@ -98,7 +98,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             row.label(text="Mass Export:")
 
             row = box.row()
-            row.prop(self, "reset_positions")
+            row.prop(self, "preserve_positions")
 
         layout.prop(self, "only_selected")
         layout.prop(self, "export_coll")
@@ -144,6 +144,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "directory"          : self.directory,
                     "selected"           : self.only_selected,
                     "mass_export"        : self.mass_export,
+                    "preserve_positions" : self.preserve_positions,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
                     "export_frame_names" : self.export_frame_names,

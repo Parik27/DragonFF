@@ -276,6 +276,7 @@ class dff_exporter:
 
     selected = False
     mass_export = False
+    preserve_positions = True
     file_name = ""
     dff = None
     version = None
@@ -321,7 +322,7 @@ class dff_exporter:
 
         frame.creation_flags  =  0
         frame.parent          = -1
-        frame.position        = matrix.to_translation()
+        frame.position        = matrix.to_translation() if self.preserve_positions else (0, 0, 0)
         frame.rotation_matrix = dff.Matrix._make(
             matrix.to_3x3().transposed()
         )
@@ -1003,6 +1004,7 @@ def export_dff(options):
     dff_exporter.export_frame_names = options['export_frame_names']
     dff_exporter.exclude_geo_faces  = options['exclude_geo_faces']
     dff_exporter.mass_export        = options['mass_export']
+    dff_exporter.preserve_positions = options['preserve_positions']
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
     dff_exporter.export_coll        = options['export_coll']
