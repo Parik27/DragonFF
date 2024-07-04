@@ -205,7 +205,7 @@ class Map_Import_Operator(bpy.types.Operator):
             else:
                 # As the number of objects increases, loading performance starts to get crushed by scene updates, so
                 # we try to keep loading at least 5% of the total scene object count on each timer pulse.
-                num_objects_at_once = max(1, int(0.05 * len(bpy.data.objects)))
+                num_objects_at_once = max(10, int(0.05 * len(bpy.data.objects)))
 
                 # Now load the actual objects
                 for x in range(num_objects_at_once):
