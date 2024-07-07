@@ -61,6 +61,7 @@ def register():
         bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
         bpy.types.OUTLINER_MT_collection.append(gui.export_col_outliner)
         bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
+        bpy.types.SpaceView3D.draw_handler_add(gui.DFFSceneProps.draw_fg, (), 'WINDOW', 'POST_VIEW')
 
     
 
