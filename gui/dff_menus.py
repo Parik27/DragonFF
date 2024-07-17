@@ -309,7 +309,8 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         elif settings.type == 'COL':
             if context.object.type == 'EMPTY':
                 self.draw_col_menu(context)
-            layout.operator(OBJECT_OT_facegoups_col.bl_idname, text=OBJECT_OT_facegoups_col.bl_label)
+            if context.object.type == 'MESH':
+                layout.operator(OBJECT_OT_facegoups_col.bl_idname, text=OBJECT_OT_facegoups_col.bl_label)
     
     #######################################################
     def draw(self, context):
