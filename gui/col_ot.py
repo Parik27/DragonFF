@@ -1,6 +1,8 @@
 import bpy
 from bpy_extras.io_utils import ExportHelper
 from ..ops import col_exporter
+import bmesh
+from mathutils import Vector
 
 #######################################################
 class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
@@ -75,3 +77,77 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
         
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+#######################################################
+class OBJECT_OT_facegoups_col(bpy.types.Operator):
+    bl_idname      = "generate_facegroups.col"
+    bl_description = "Generate Face Groups for GTA III/VC/SA Collision File"
+    bl_label       = "Generate Face Groups"
+
+    def execute(self, context):
+        obj = context.active_object
+        if not (obj and obj.type == 'MESH' and obj.dff.type == 'COL'):
+            return {'CANCELLED'}
+
+        mesh = obj.data
+
+        # Set min/max to object bound_box with a small margin
+        mn = Vector(obj.bound_box[0]) - Vector((1, 1, 1))
+        mx = Vector(obj.bound_box[6]) + Vector((1, 1, 1))
+        big_groups = []
+        lil_groups = []
+        big_groups.append({'min': mn, 'max': mx, 'indices': [f.index for f in mesh.polygons]})
+        while len(big_groups):
+            # Group is done if under 50 tris
+            grp = big_groups.pop()
+            if len(grp['indices']) <= 50:
+                lil_groups.append(grp)
+                continue
+
+            # Otherwise, split the bounds in half along the longest axis and create 2 sub-groups
+            mn = grp['min'].copy()
+            mx = grp['max'].copy()
+            dims = mx-mn
+            axis = list(dims).index(max(dims, key=abs))
+            cen = 0.5 * (mn + mx)
+            mn1 = mn.copy()
+            mx1 = mx.copy()
+            mx1[axis] = cen[axis]
+            mn2 = mn.copy()
+            mn2[axis] = cen[axis]
+            mx2 = mx.copy()
+
+            # Stuff the faces into their corresponding sub-group bounds
+            inds1 = []
+            inds2 = []
+            for idx in grp['indices']:
+                face = mesh.polygons[idx]
+                c = face.center
+                if mn1.x < c.x < mx1.x and mn1.y < c.y < mx1.y and mn1.z < c.z < mx1.z:
+                    inds1.append(idx)
+                else:
+                    inds2.append(idx)
+            if len(inds1) > 0:
+                big_groups.append({'min': mn1, 'max': mx1, 'indices': inds1})
+            if len(inds2) > 0:
+                big_groups.append({'min': mn2, 'max': mx2, 'indices': inds2})
+
+        if len(lil_groups):
+            # Create a face groups attribute for the mesh if there isn't one already
+            if not mesh.attributes.get("face group"):
+                mesh.attributes.new(name="face group", type="INT", domain="FACE")
+
+            # Sort the face list by face group index
+            bm = bmesh.new()
+            bm.from_mesh(mesh)
+            bm.faces.ensure_lookup_table()
+            layer = bm.faces.layers.int.get("face group")
+            for fg, grp in enumerate(lil_groups):
+                for idx in grp['indices']:
+                    bm.faces[idx][layer] = fg
+            bm.faces.sort(key=lambda f: f[layer])
+
+            bm.to_mesh(mesh)
+            bpy.ops.ed.undo_push()
+
+        return {'FINISHED'}

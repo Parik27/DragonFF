@@ -36,6 +36,7 @@ _classes = [
     gui.IMPORT_OT_dff,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
+    gui.OBJECT_OT_facegoups_col,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.DFFMaterialProps,
