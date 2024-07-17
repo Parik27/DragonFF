@@ -71,8 +71,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         if not bpy.context.scene.dff.draw_facegroups:
             return
         o = bpy.context.active_object
-        if o and o.type == 'MESH' and o.data.attributes.get('face group'):
+        if o and o.select_get() and o.type == 'MESH' and o.data.attributes.get('face group'):
             mesh = bpy.context.active_object.data
+            attr = mesh.attributes['face group'].data
+            if len(attr) == 0:
+                return
             mesh.calc_loop_triangles()
 
             # As the face groups are stored as face attributes, we'll generate unique vertices across the whole overlay
@@ -88,7 +91,6 @@ class DFFSceneProps(bpy.types.PropertyGroup):
             color = []
             grp = -1
             idx = 0
-            attr = mesh.attributes['face group'].data
             for i, face in enumerate(mesh.loop_triangles):
                 vertices[idx  ] = mesh.vertices[face.vertices[0]].co
                 vertices[idx+1] = mesh.vertices[face.vertices[1]].co
