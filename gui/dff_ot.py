@@ -167,7 +167,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             self.export_version = context.scene['dragonff_imported_version']
         if 'dragonff_custom_version' in context.scene:
             self.custom_version = context.scene['dragonff_custom_version']
-        
+
+        if not self.filepath:
+            if context.blend_data.filepath:
+                self.filepath = context.blend_data.filepath
+            else:
+                self.filepath = "untitled"
+
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
