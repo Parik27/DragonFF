@@ -89,6 +89,9 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
         if not (obj and obj.type == 'MESH' and obj.dff.type == 'COL'):
             return {'CANCELLED'}
 
+        avoid_smalls = context.scene.dff.face_group_avoid_smalls
+        min_size = max(5, context.scene.dff.face_group_min)
+        max_size = max(min_size, context.scene.dff.face_group_max)
         mesh = obj.data
 
         # Set min/max to object bound_box with a small margin
@@ -98,9 +101,9 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
         lil_groups = []
         big_groups.append({'min': mn, 'max': mx, 'indices': [f.index for f in mesh.polygons]})
         while len(big_groups):
-            # Group is done if under 50 tris
+            # Group is done if under max_size
             grp = big_groups.pop()
-            if len(grp['indices']) <= 50:
+            if len(grp['indices']) <= max_size:
                 lil_groups.append(grp)
                 continue
 
@@ -127,12 +130,18 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
                     inds1.append(idx)
                 else:
                     inds2.append(idx)
-            if len(inds1) > 0:
-                big_groups.append({'min': mn1, 'max': mx1, 'indices': inds1})
-            if len(inds2) > 0:
-                big_groups.append({'min': mn2, 'max': mx2, 'indices': inds2})
 
-        if len(lil_groups):
+            # Avoid making overly small face groups by combining them with their neighbor
+            if avoid_smalls and len(grp['indices']) < max_size + min_size and (len(inds1) < min_size or len(inds2) < min_size):
+                lil_groups.append(grp)
+            else:
+                if len(inds1) > 0:
+                    big_groups.append({'min': mn1, 'max': mx1, 'indices': inds1})
+                if len(inds2) > 0:
+                    big_groups.append({'min': mn2, 'max': mx2, 'indices': inds2})
+
+        # No reason to generate face groups if there's only 1 group
+        if len(lil_groups) > 1:
             # Create a face groups attribute for the mesh if there isn't one already
             if not mesh.attributes.get("face group"):
                 mesh.attributes.new(name="face group", type="INT", domain="FACE")
@@ -148,6 +157,15 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
             bm.faces.sort(key=lambda f: f[layer])
 
             bm.to_mesh(mesh)
-            bpy.ops.ed.undo_push()
+
+        # Delete face groups if extant on 
+        elif mesh.attributes.get("face group"):
+            mesh.attributes.remove(mesh.attributes.get("face group"))
+
+        # Make an undo and force a redraw of the viewport
+        bpy.ops.ed.undo_push()
+        for area in bpy.context.window.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
 
         return {'FINISHED'}

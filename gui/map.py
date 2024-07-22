@@ -67,6 +67,25 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     #     subtype = 'DIR_PATH'
     #     )
 
+    face_group_min : bpy.props.IntProperty(
+        name = 'Face Group Minimum Size',
+        default = 20,
+        min = 5,
+        max = 200
+    )
+
+    face_group_max : bpy.props.IntProperty(
+        name = 'Face Group Maximum Size',
+        default = 50,
+        min = 5,
+        max = 200
+    )
+
+    face_group_avoid_smalls : bpy.props.BoolProperty(
+        name = "Avoid overly small groups",
+        default = True
+    )
+
     def draw_fg():
         if not bpy.context.scene.dff.draw_facegroups:
             return

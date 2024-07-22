@@ -310,6 +310,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
             if context.object.type == 'EMPTY':
                 self.draw_col_menu(context)
             if context.object.type == 'MESH':
+                layout.prop(context.scene.dff, 'face_group_min', slider=True)
+                layout.prop(context.scene.dff, 'face_group_max', slider=True)
+                layout.prop(context.scene.dff, 'face_group_avoid_smalls')
                 layout.operator(OBJECT_OT_facegoups_col.bl_idname, text=OBJECT_OT_facegoups_col.bl_label)
     
     #######################################################
