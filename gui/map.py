@@ -67,8 +67,15 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     #     subtype = 'DIR_PATH'
     #     )
 
+    draw_facegroups : bpy.props.BoolProperty(
+        name="Draw Face Groups",
+        description="Display the Face Groups of the active object (if they exist) in the viewport",
+        default=False
+    )
+
     face_group_min : bpy.props.IntProperty(
         name = 'Face Group Minimum Size',
+        description="Don't generate groups below this size",
         default = 20,
         min = 5,
         max = 200
@@ -76,6 +83,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
 
     face_group_max : bpy.props.IntProperty(
         name = 'Face Group Maximum Size',
+        description="Don't generate groups above this size (minimum size overrides this if larger)",
         default = 50,
         min = 5,
         max = 200
@@ -83,6 +91,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
 
     face_group_avoid_smalls : bpy.props.BoolProperty(
         name = "Avoid overly small groups",
+        description="Combine really small groups with their neighbor to avoid pointless isolated groups",
         default = True
     )
 
@@ -140,12 +149,6 @@ class DFFSceneProps(bpy.types.PropertyGroup):
             gpu.matrix.pop()
             gpu.state.depth_mask_set(False)
 
-    draw_facegroups : bpy.props.BoolProperty(
-        name="Draw Face Groups",
-        description="Display the Face Groups of the active object (if found)",
-        default=False
-    )
-
     #######################################################
     def register():
         bpy.types.Scene.dff = bpy.props.PointerProperty(type=DFFSceneProps)
@@ -185,6 +188,3 @@ class MapImportPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("scene.dragonff_map_import")
-
-        layout.separator()
-        layout.prop(settings, "draw_facegroups", text="Display Face Groups")

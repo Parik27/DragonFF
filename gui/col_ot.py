@@ -158,7 +158,7 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
 
             bm.to_mesh(mesh)
 
-        # Delete face groups if extant on 
+        # Delete face groups if they exist now but the generation found them unnecessary
         elif mesh.attributes.get("face group"):
             mesh.attributes.remove(mesh.attributes.get("face group"))
 
