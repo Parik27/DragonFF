@@ -151,9 +151,18 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
             bm.from_mesh(mesh)
             bm.faces.ensure_lookup_table()
             layer = bm.faces.layers.int.get("face group")
+            min_size = max_size = len(lil_groups[0]['indices'])
+            avg_size = 0
             for fg, grp in enumerate(lil_groups):
+                grp_size = len(grp['indices'])
+                min_size = min(min_size, grp_size)
+                max_size = max(max_size, grp_size)
+                avg_size += grp_size
                 for idx in grp['indices']:
                     bm.faces[idx][layer] = fg
+            avg_size /= float(len(lil_groups))
+            print("Generated %i face groups with minimum size of %i, a maximum size of %i and an average size of %f "
+                  "faces." % (len(lil_groups), min_size, max_size, avg_size))
             bm.faces.sort(key=lambda f: f[layer])
 
             bm.to_mesh(mesh)
@@ -161,6 +170,7 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
         # Delete face groups if they exist now but the generation found them unnecessary
         elif mesh.attributes.get("face group"):
             mesh.attributes.remove(mesh.attributes.get("face group"))
+            print("No face groups were generated with the current settings.")
 
         # Make an undo and force a redraw of the viewport
         bpy.ops.ed.undo_push()
