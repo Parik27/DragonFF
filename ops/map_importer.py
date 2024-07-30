@@ -17,7 +17,8 @@
 import bpy
 import os
 from ..gtaLib import map as map_utilites
-from ..ops import dff_importer
+from ..ops import dff_importer, col_importer
+from .importer_common import (hide_object)
 
 #######################################################
 class Map_Import_Operator(bpy.types.Operator):
@@ -33,6 +34,13 @@ class Map_Import_Operator(bpy.types.Operator):
     _object_instances = []
     _object_data = []
     _model_cache = {}
+    _col_files_all = set()
+    _col_files = []
+    _col_index = 0
+    _check_collisions = True
+    _mesh_collection = None
+    _collision_collection = None
+    _ipl_collection = None
 
     settings = None
 
@@ -116,10 +124,32 @@ class Map_Import_Operator(bpy.types.Operator):
                     importer.objects[0], inst
                 )
 
+            # Move dff collection to a top collection named for the file it came from
+            context.scene.collection.children.unlink(importer.current_collection)
+            self._ipl_collection.children.link(importer.current_collection)
+
             # Save into buffer
             self._model_cache[inst.id] = importer.objects
             print(str(inst.id) + ' loaded new')
     
+        # Look for collision mesh
+        name = self._model_cache[inst.id][0].name
+        for obj in bpy.data.objects:
+            if obj.dff.type == 'COL' and obj.name.endswith("%s.ColMesh" % name):
+                new_obj = bpy.data.objects.new(obj.name, obj.data)
+                new_obj.dff.type = 'COL'
+                new_obj.location = obj.location
+                new_obj.rotation_quaternion = obj.rotation_quaternion
+                new_obj.scale = obj.scale
+                Map_Import_Operator.apply_transformation_to_object(
+                    new_obj, inst
+                )
+                if '{}.dff'.format(name) in bpy.data.collections:
+                    bpy.data.collections['{}.dff'.format(name)].objects.link(
+                        new_obj
+                    )
+                hide_object(new_obj)
+
     #######################################################
     def modal(self, context, event):
 
@@ -129,17 +159,66 @@ class Map_Import_Operator(bpy.types.Operator):
 
         if event.type == 'TIMER' and not self._updating:
             self._updating = True
+            num = 0
 
-            for x in range(10):
-                try:
-                    self.import_object(context)
-                except:
-                    print("Can`t import model... skipping")
+            # First run through all instances and determine which .col files to load
+            if self.settings.load_collisions and self._check_collisions:
+                for i in range(len(self._object_instances)):
+                    id = self._object_instances[i].id
+                    # Deleted objects that Rockstar forgot to remove?
+                    if id not in self._object_data:
+                        continue
+                    objdata = self._object_data[id]
+                    if not hasattr(objdata, 'filename'):
+                        continue
+                    prefix = objdata.filename.split('/')[-1][:-4].lower()
+                    for filename in self._col_files_all:
+                        if filename.startswith(prefix):
+                            if not bpy.data.collections.get(filename) and filename not in self._col_files:
+                                self._col_files.append(filename)
+                self._check_collisions = False
 
-            # Update cursor progress indicator if something needs to be loaded
-            num = (
-                float(self._inst_index) / float(len(self._object_instances)
-                )) if self._object_instances else 0
+            # Load collision files first if there are any left to load
+            elif len(self._col_files) > 0:
+                filename = self._col_files[self._col_index]
+                self._col_index += 1
+                if self._col_index >= len(self._col_files):
+                    self._col_files.clear()
+                collection = bpy.data.collections.new(filename)
+                self._collision_collection.children.link(collection)
+                col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
+                # Move all collisions to a top collection named for the file they came from
+                for c in col_list:
+                    context.scene.collection.children.unlink(c)
+                    collection.children.link(c)
+
+                # Hide this collection in the viewport (individual collision meshes will be linked and transformed
+                # as needed to their respective map sections, this collection is just for export)
+                context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
+                context.view_layer.active_layer_collection.hide_viewport = True
+
+                # Update cursor progress indicator if something needs to be loaded
+                num = (
+                        float(self._col_index) / float(len(self._col_files))
+                ) if self._col_files else 0
+
+            else:
+                # As the number of objects increases, loading performance starts to get crushed by scene updates, so
+                # we try to keep loading at least 5% of the total scene object count on each timer pulse.
+                num_objects_at_once = max(10, int(0.05 * len(bpy.data.objects)))
+
+                # Now load the actual objects
+                for x in range(num_objects_at_once):
+                    try:
+                        self.import_object(context)
+                    except:
+                        print("Can`t import model... skipping")
+
+                # Update cursor progress indicator if something needs to be loaded
+                num = (
+                    float(self._inst_index) / float(len(self._object_instances))
+                ) if self._object_instances else 0
+
             bpy.context.window_manager.progress_update(num)
 
             # Update dependency graph
@@ -169,6 +248,31 @@ class Map_Import_Operator(bpy.types.Operator):
         
         self._object_instances = map_data['object_instances']
         self._object_data = map_data['object_data']
+
+        # Create collections to organize the scene between geometry and collision
+        meshcollname = '%s Meshes' % self.settings.game_version_dropdown
+        collcollname = '%s Collisions' % self.settings.game_version_dropdown
+        self._mesh_collection = bpy.data.collections.get(meshcollname)
+        if not self._mesh_collection:
+            self._mesh_collection = bpy.data.collections.new(meshcollname)
+            context.scene.collection.children.link(self._mesh_collection)
+        self._collision_collection = bpy.data.collections.get(collcollname)
+        if not self._collision_collection:
+            self._collision_collection = bpy.data.collections.new(collcollname)
+            context.scene.collection.children.link(self._collision_collection)
+
+        # Hide Collision collection
+        context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
+        context.view_layer.active_layer_collection.hide_viewport = True
+
+        # Create a new collection in Mesh to hold all the subsequent dffs loaded from this map section
+        self._ipl_collection = bpy.data.collections.new(self.settings.map_sections)
+        self._mesh_collection.children.link(self._ipl_collection)
+
+        # Get a list of the .col files available
+        for filename in os.listdir(self.settings.dff_folder):
+            if filename.endswith(".col"):
+                self._col_files_all.add(filename)
 
         wm = context.window_manager
         wm.progress_begin(0, 100.0)

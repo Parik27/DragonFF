@@ -36,6 +36,7 @@ _classes = [
     gui.IMPORT_OT_dff,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
+    gui.OBJECT_OT_facegoups_col,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.DFFMaterialProps,
@@ -59,7 +60,10 @@ def register():
     else:
         bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
         bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
-        
+        bpy.types.OUTLINER_MT_collection.append(gui.export_col_outliner)
+        bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
+        bpy.types.SpaceView3D.draw_handler_add(gui.DFFSceneProps.draw_fg, (), 'WINDOW', 'POST_VIEW')
+
     
 
 #######################################################
@@ -72,7 +76,9 @@ def unregister():
     else:
         bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
         bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
-    
+        bpy.types.OUTLINER_MT_collection.remove(gui.export_col_outliner)
+        bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
+
     # Unregister all the classes
     for cls in _classes:
         unregister_class(cls)      

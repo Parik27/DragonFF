@@ -276,6 +276,7 @@ class dff_exporter:
 
     selected = False
     mass_export = False
+    preserve_positions = True
     file_name = ""
     dff = None
     version = None
@@ -285,6 +286,7 @@ class dff_exporter:
     collection = None
     export_coll = False
     exclude_geo_faces = False
+    from_outliner = False
 
     #######################################################
     @staticmethod
@@ -321,7 +323,7 @@ class dff_exporter:
 
         frame.creation_flags  =  0
         frame.parent          = -1
-        frame.position        = matrix.to_translation()
+        frame.position        = matrix.to_translation() if self.preserve_positions else (0, 0, 0)
         frame.rotation_matrix = dff.Matrix._make(
             matrix.to_3x3().transposed()
         )
@@ -916,6 +918,13 @@ class dff_exporter:
         
         for obj in objects:
 
+            # Skip collision objects in the base collection. These are inside their own nested collection for singularly
+            # imported DFFs, but the map importer will put collision meshes inside the same collection as the map mesh
+            # object they represent. We can just ignore collision meshes here as the DFF exporter will still look for
+            # them in their own nested collection later if export_coll is true.
+            if obj.dff.type == 'COL':
+                continue
+
             # create atomic in this case
             if obj.type == "MESH":
                 self.populate_atomic(obj)
@@ -965,9 +974,14 @@ class dff_exporter:
             collections = [bpy.data]
 
         else:
-            root_collection = bpy.context.scene.collection
-            collections = root_collection.children.values() + [root_collection]
-            
+            if self.from_outliner:
+                collections = [bpy.context.view_layer.objects.active.users_collection[0]]
+            else:
+                collections = []
+                for collection in bpy.data.collections:
+                    if collection.name.endswith(".dff"):
+                        collections.append(collection)
+
         for collection in collections:
             for obj in collection.objects:
                     
@@ -996,8 +1010,10 @@ def export_dff(options):
     dff_exporter.export_frame_names = options['export_frame_names']
     dff_exporter.exclude_geo_faces  = options['exclude_geo_faces']
     dff_exporter.mass_export        = options['mass_export']
+    dff_exporter.preserve_positions = options['preserve_positions']
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
     dff_exporter.export_coll        = options['export_coll']
+    dff_exporter.from_outliner      = options['from_outliner']
 
     dff_exporter.export_dff(options['file_name'])
