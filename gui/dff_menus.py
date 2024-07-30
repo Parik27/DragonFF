@@ -1,6 +1,6 @@
 import bpy
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff
-from .col_ot import EXPORT_OT_col
+from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
 
 #######################################################
 class MATERIAL_PT_dffMaterials(bpy.types.Panel):
@@ -178,19 +178,36 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
     bl_label = "DragonFF"
 
     def draw(self, context):
-        self.layout.operator(EXPORT_OT_dff.bl_idname,
+        op = self.layout.operator(EXPORT_OT_dff.bl_idname,
                              text="DragonFF DFF (.dff)")
-        self.layout.operator(EXPORT_OT_col.bl_idname,
+        op.from_outliner = False
+        op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
-            
-        
-#######################################################
+        op.use_active_collection = False
+
+
+    #######################################################
 def import_dff_func(self, context):
-    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff)")
+    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff, col)")
 
 #######################################################
 def export_dff_func(self, context):
     self.layout.menu("DFF_MT_ExportChoice", text="DragonFF")
+
+#######################################################
+def export_dff_outliner(self, context):
+    self.layout.separator()
+    self.layout.operator_context = 'INVOKE_DEFAULT'
+    op = self.layout.operator(EXPORT_OT_dff.bl_idname, text="Export object as DFF (.dff)")
+    op.from_outliner = True
+
+#######################################################
+def export_col_outliner(self, context):
+    self.layout.separator()
+    self.layout.operator_context = 'INVOKE_DEFAULT'
+    op = self.layout.operator(EXPORT_OT_col.bl_idname, text="Export collection as collision container (.col)")
+    op.use_active_collection = True
+    op.filepath = context.collection.name
 
 #######################################################
 class OBJECT_PT_dffObjects(bpy.types.Panel):
@@ -292,7 +309,16 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         elif settings.type == 'COL':
             if context.object.type == 'EMPTY':
                 self.draw_col_menu(context)
-    
+            if context.object.type == 'MESH':
+                settings = context.scene.dff
+                box = layout.box()
+                box.prop(settings, "draw_facegroups", text="Display Face Groups")
+                box.label(text="Face Group Generation:")
+                box.prop(settings, 'face_group_min', slider=True)
+                box.prop(settings, 'face_group_max', slider=True)
+                box.prop(settings, 'face_group_avoid_smalls')
+                box.operator(OBJECT_OT_facegoups_col.bl_idname, text=OBJECT_OT_facegoups_col.bl_label)
+
     #######################################################
     def draw(self, context):
 
