@@ -979,7 +979,7 @@ class dff_exporter:
             else:
                 collections = []
                 for collection in bpy.data.collections:
-                    if collection.name.endswith(".dff"):
+                    if collection.name.lower().endswith(".dff"):
                         collections.append(collection)
 
         for collection in collections:
