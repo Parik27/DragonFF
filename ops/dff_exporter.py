@@ -918,11 +918,9 @@ class dff_exporter:
         
         for obj in objects:
 
-            # Skip collision objects in the base collection. These are inside their own nested collection for singularly
-            # imported DFFs, but the map importer will put collision meshes inside the same collection as the map mesh
-            # object they represent. We can just ignore collision meshes here as the DFF exporter will still look for
+            # We can just ignore collision meshes here as the DFF exporter will still look for
             # them in their own nested collection later if export_coll is true.
-            if obj.dff.type == 'COL':
+            if obj.dff.type == 'COL' or obj.dff.type == 'SHA':
                 continue
 
             # create atomic in this case
@@ -946,12 +944,15 @@ class dff_exporter:
             })
 
             if len(mem) != 0:
-               self.dff.collisions = [mem] 
+                self.dff.collisions = [mem]
 
         if name is None:
             self.dff.write_file(self.file_name, self.version )
         else:
-            self.dff.write_file("%s/%s" % (self.path, name), self.version)
+            filename = "%s/%s" % (self.path, name)
+            if not filename.endswith('.dff'):
+                filename += '.dff'
+            self.dff.write_file(filename, self.version)
 
     #######################################################
     @staticmethod
@@ -977,10 +978,7 @@ class dff_exporter:
             if self.from_outliner:
                 collections = [bpy.context.view_layer.objects.active.users_collection[0]]
             else:
-                collections = []
-                for collection in bpy.data.collections:
-                    if collection.name.lower().endswith(".dff"):
-                        collections.append(collection)
+                collections = [c for c in bpy.data.collections]
 
         for collection in collections:
             for obj in collection.objects:
