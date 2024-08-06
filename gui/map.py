@@ -34,6 +34,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    load_txd: bpy.props.BoolProperty(
+        name        = "Load TXD files",
+        default     = False
+    )
+
     read_mat_split  :  bpy.props.BoolProperty(
         name        = "Read Material Split",
         description = "Whether to read material split for loading triangles",
@@ -178,6 +183,7 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "map_sections", text="Map segment")
         col.separator()
         col.prop(settings, "skip_lod", text="Skip LOD objects")
+        col.prop(settings, "load_txd", text="Load TXD files")
         col.prop(settings, "read_mat_split", text="Read Material Split")
         col.prop(settings, "load_collisions", text="Load Map Collisions")
 
