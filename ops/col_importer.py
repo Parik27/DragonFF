@@ -16,6 +16,7 @@
 
 import bpy
 import bmesh
+import mathutils
 
 from ..gtaLib import col
 from ..data import col_materials as mats
@@ -50,12 +51,13 @@ class col_importer:
     def __add_spheres(self, collection, array):
 
         for index, entity in enumerate(array):
-            name = collection.name + ".Sphere.%d" % (index)
+            name = collection.name + ".ColSphere.%d" % index
         
-            obj  = bpy.data.objects.new(name, None)
-            
+            obj = bpy.data.objects.new(name, None)
+
             obj.location = entity.center
             obj.scale = [entity.radius] * 3
+
             if (2, 80, 0) > bpy.app.version:
                 obj.empty_draw_type = 'SPHERE'
             else:
@@ -67,6 +69,33 @@ class col_importer:
             obj.dff.col_brightness = entity.surface.brightness
             obj.dff.col_light = entity.surface.light
             
+            link_object(obj, collection)
+
+    #######################################################
+    def __add_boxes(self, collection, array):
+
+        for index, entity in enumerate(array):
+            name = collection.name + ".ColBox.%d" % index
+
+            obj = bpy.data.objects.new(name, None)
+
+            mn = mathutils.Vector(entity.min)
+            mx = mathutils.Vector(entity.max)
+            half = 0.5 * (mx - mn)
+            obj.location = mn + half
+            obj.scale = half
+
+            if (2, 80, 0) > bpy.app.version:
+                obj.empty_draw_type = 'CUBE'
+            else:
+                obj.empty_display_type = 'CUBE'
+
+            obj.dff.type = 'COL'
+            obj.dff.col_material = entity.surface.material
+            obj.dff.col_flags = entity.surface.flags
+            obj.dff.col_brightness = entity.surface.brightness
+            obj.dff.col_light = entity.surface.light
+
             link_object(obj, collection)
 
     #######################################################
@@ -108,7 +137,7 @@ class col_importer:
             object.data.materials.append(helper.material)
             
     #######################################################
-    def __add_mesh(self, collection, name, verts, faces, shadow=False):
+    def __add_mesh(self, collection, name, verts, faces, face_groups, shadow=False):
 
         mesh      = bpy.data.meshes.new(name)
         materials = {}
@@ -142,8 +171,17 @@ class col_importer:
             except Exception as e:
                 print(e)
                 
-            bm.to_mesh(mesh)
+        bm.to_mesh(mesh)
         
+        # Face groups get stored in a face attribute on the mesh, each face storing the index of its group
+        if face_groups:
+            attribute = mesh.attributes.new(name="face group", type="INT", domain="FACE")
+            for fg_idx, fg in enumerate(face_groups):
+                for face_idx in range(fg.start, fg.end+1):
+                    if face_idx >= len(bm.faces):
+                        break
+                    attribute.data[face_idx].value = fg_idx
+
         obj = bpy.data.objects.new(name, mesh)
         obj.dff.type = 'SHA' if shadow else 'COL'
         
@@ -162,19 +200,27 @@ class col_importer:
                                                            model.model_name),
                                            link
             )            
+
+            # Store the import bounds as a custom property of the collection
+            collection['bounds min'] = model.bounds[0]
+            collection['bounds max'] = model.bounds[1]
+
             self.__add_spheres(collection, model.spheres)
+            self.__add_boxes(collection, model.boxes)
 
             if len(model.mesh_verts) > 0:
                 self.__add_mesh(collection,
                                 collection.name + ".ColMesh",
                                 model.mesh_verts,
-                                model.mesh_faces)
+                                model.mesh_faces,
+                                model.face_groups if model.flags & 8 else None)
 
             if len(model.shadow_verts) > 0:
                 self.__add_mesh(collection,
                                 collection.name + ".ShadowMesh",
                                 model.shadow_verts,
                                 model.shadow_faces,
+                                None,
                                 True)
                         
             collection_list.append(collection)

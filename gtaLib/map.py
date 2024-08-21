@@ -14,7 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import os
 from ..data import map_data
+from ..ops.importer_common import game_version
 from collections import namedtuple
 import struct
 
@@ -38,6 +40,11 @@ class GenericSectionUtility:
 
             # Split line and trim individual elements
             lineParams = [e.strip() for e in line.split(",")]
+
+            # Append filename for IDEs (needed for collision lookups)
+            fname = os.path.basename(fileStream.name)
+            if fname.lower().endswith('.ide'):
+                lineParams.append(fname)
 
             # Get the correct data structure for this section entry
             dataStructure = self.getDataStructure(lineParams)
@@ -78,13 +85,13 @@ class GenericSectionUtility:
 class OBJSSectionUtility(GenericSectionUtility):
     def getDataStructure(self, lineParams):
 
-        if(len(lineParams) == 5):
+        if(len(lineParams) == 6):
             dataStructure = self.dataStructures["objs_1"]
-        elif(len(lineParams) == 6):
-            dataStructure = self.dataStructures["objs_2"]
         elif(len(lineParams) == 7):
-            dataStructure = self.dataStructures["objs_3"]
+            dataStructure = self.dataStructures["objs_2"]
         elif(len(lineParams) == 8):
+            dataStructure = self.dataStructures["objs_3"]
+        elif(len(lineParams) == 9):
             dataStructure = self.dataStructures["objs_4"]
         else:
             print(type(self).__name__ + " error: Unknown number of line parameters")
@@ -96,13 +103,13 @@ class OBJSSectionUtility(GenericSectionUtility):
 class TOBJSectionUtility(GenericSectionUtility):
     def getDataStructure(self, lineParams):
 
-        if(len(lineParams) == 7):
+        if(len(lineParams) == 8):
             dataStructure = self.dataStructures["tobj_1"]
-        elif(len(lineParams) == 8):
-            dataStructure = self.dataStructures["tobj_2"]
         elif(len(lineParams) == 9):
-            dataStructure = self.dataStructures["tobj_3"]
+            dataStructure = self.dataStructures["tobj_2"]
         elif(len(lineParams) == 10):
+            dataStructure = self.dataStructures["tobj_3"]
+        elif(len(lineParams) == 11):
             dataStructure = self.dataStructures["tobj_4"]
         else:
             print(type(self).__name__ + " error: Unknown number of line parameters")
@@ -225,8 +232,20 @@ class MapDataUtility:
     ########################################################################
     def getMapData(gameID, gameRoot, iplSection):
         
-        # TODO: choose correct IDE/IPL files dict
-        data = map_data.data[gameID]
+        data = map_data.data[gameID].copy()
+
+        # Prune IDEs unrelated to current IPL section (SA only). First, make IDE_paths a mutable list, then iterate
+        # over a copy so we can remove elements during iteration. This is a naive pruning which keeps all ides with a
+        # few generic keywords in their name and culls anything else with a prefix different from the given iplSection
+        if gameID == game_version.SA:
+            data['IDE_paths'] = list(data['IDE_paths'])
+            for p in data['IDE_paths'].copy():
+                if p.startswith('DATA/MAPS/generic/') or p.startswith('DATA/MAPS/leveldes/') or 'xref' in p:
+                    continue
+                ide_prefix = p.split('/')[-1].lower()
+                ipl_prefix = iplSection.split('/')[-1].lower()[:3]
+                if not ide_prefix.startswith(ipl_prefix):
+                    data['IDE_paths'].remove(p)
 
         ide = {}
 

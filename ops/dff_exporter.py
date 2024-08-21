@@ -276,6 +276,7 @@ class dff_exporter:
 
     selected = False
     mass_export = False
+    preserve_positions = True
     file_name = ""
     dff = None
     version = None
@@ -286,6 +287,7 @@ class dff_exporter:
     collection = None
     export_coll = False
     exclude_geo_faces = False
+    from_outliner = False
 
     #######################################################
     @staticmethod
@@ -322,7 +324,7 @@ class dff_exporter:
 
         frame.creation_flags  =  0
         frame.parent          = -1
-        frame.position        = matrix.to_translation()
+        frame.position        = matrix.to_translation() if self.preserve_positions else (0, 0, 0)
         frame.rotation_matrix = dff.Matrix._make(
             matrix.to_3x3().transposed()
         )
@@ -955,6 +957,11 @@ class dff_exporter:
 
         for obj in objects:
 
+            # We can just ignore collision meshes here as the DFF exporter will still look for
+            # them in their own nested collection later if export_coll is true.
+            if obj.dff.type == 'COL' or obj.dff.type == 'SHA':
+                continue
+
             # create atomic in this case
             if obj.type == "MESH":
                 meshes.append(obj)
@@ -984,12 +991,15 @@ class dff_exporter:
             })
 
             if len(mem) != 0:
-               self.dff.collisions = [mem] 
+                self.dff.collisions = [mem]
 
         if name is None:
             self.dff.write_file(self.file_name, self.version )
         else:
-            self.dff.write_file("%s/%s" % (self.path, name), self.version)
+            filename = "%s/%s" % (self.path, name)
+            if not filename.endswith('.dff'):
+                filename += '.dff'
+            self.dff.write_file(filename, self.version)
 
     #######################################################
     @staticmethod
@@ -1012,9 +1022,11 @@ class dff_exporter:
             collections = [bpy.data]
 
         else:
-            root_collection = bpy.context.scene.collection
-            collections = root_collection.children.values() + [root_collection]
-            
+            if self.from_outliner:
+                collections = [bpy.context.view_layer.objects.active.users_collection[0]]
+            else:
+                collections = [c for c in bpy.data.collections]
+
         for collection in collections:
             for obj in collection.objects:
                     
@@ -1043,8 +1055,10 @@ def export_dff(options):
     dff_exporter.export_frame_names = options['export_frame_names']
     dff_exporter.exclude_geo_faces  = options['exclude_geo_faces']
     dff_exporter.mass_export        = options['mass_export']
+    dff_exporter.preserve_positions = options['preserve_positions']
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
     dff_exporter.export_coll        = options['export_coll']
+    dff_exporter.from_outliner      = options['from_outliner']
 
     dff_exporter.export_dff(options['file_name'])
