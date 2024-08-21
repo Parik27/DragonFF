@@ -101,7 +101,7 @@ class dff_importer:
         self.dff = None
         self.meshes = {}
         self.delta_morph = {}
-        self.objects = []
+        self.objects = {}
         self.file_name = ""
         self.skin_data = {}
         self.bones = {}
@@ -639,15 +639,10 @@ class dff_importer:
 
         set_object_mode(obj, "OBJECT")
 
-        if skinned_obj_data is not None:
-            # Set parent to skinned object
-            for skinned_obj in self.meshes[skinned_obj_index]:
-                skinned_obj.parent = obj
-
-            # Add Armature modifier to skinned object
-            for skinned_obj in skinned_objs:
-                modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
-                modifier.object = obj
+        # Add Armature modifier to skinned object
+        for skinned_obj in skinned_objs:
+            modifier        = skinned_obj.modifiers.new("Armature", 'ARMATURE')
+            modifier.object = obj
 
         return (armature, obj)
 
@@ -789,9 +784,20 @@ class dff_importer:
 
             # set parent
             if frame.parent != -1:
-                obj.parent = self.objects[frame.parent]
+                if frame.parent in self.frame_bones:
+                    parent_bone = self.frame_bones[frame.parent]
+                    armature = parent_bone['armature']
+                    bone_name = parent_bone['name']
+                    obj.parent = armature
 
-            self.objects.append(obj)
+                    constraint = obj.constraints.new('COPY_TRANSFORMS')
+                    constraint.target = armature
+                    constraint.subtarget = bone_name
+
+                else:
+                    obj.parent = self.objects[frame.parent]
+
+            self.objects[index] = obj
 
             # Set a collision model used for export
             obj["gta_coll"] = self.dff.collisions
@@ -801,38 +807,6 @@ class dff_importer:
         if self.remove_doubles:
             self.remove_object_doubles()
 
-    #######################################################
-    def preprocess_atomics():
-        self = dff_importer
-
-        atomic_frames = []
-        to_be_preprocessed = [] #these will be assigned a new frame
-        
-        for index, atomic in enumerate(self.dff.atomic_list):
-
-            frame = self.dff.frame_list[atomic.frame]
-
-            # For GTA SA bones, which have the frame of the pedestrian
-            # (incorrectly?) set in the atomic to a bone
-            if frame.bone_data is not None and frame.bone_data.header.id != -1:
-                to_be_preprocessed.append(index)
-
-            atomic_frames.append(atomic.frame)
-
-        # Assign every atomic in the list a new (possibly valid) frame
-        for atomic in to_be_preprocessed:
-            
-            for index, frame in enumerate(self.dff.frame_list):
-
-                # Find an empty frame
-                if (frame.bone_data is None or frame.bone_data.header.id == -1) \
-                   and index not in atomic_frames:
-                    _atomic = list(self.dff.atomic_list[atomic])
-                    _atomic[0] = index # _atomic.frame = index
-                    self.dff.atomic_list[atomic] = dff.Atomic(*_atomic)
-                    break
-                    
-            
     #######################################################
     def import_dff(file_name):
         self = dff_importer
@@ -856,8 +830,6 @@ class dff_importer:
                     }
                 ).images
 
-        # self.preprocess_atomics()
-        
         # Create a new group/collection
         self.current_collection = create_collection(
             os.path.basename(file_name)
