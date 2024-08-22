@@ -2,6 +2,24 @@ import bpy
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff
 from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
 
+texture_filters_items = (
+    ("0", "Disabled", ""),
+    ("1", "Nearest", "Point sampled"),
+    ("2", "Linear", "Bilinear"),
+    ("3", "Mip Nearest", "Point sampled per pixel MipMap"),
+    ("4", "Mip Linear", "Bilinear per pixel MipMap"),
+    ("5", "Linear Mip Nearest", "MipMap interp point sampled"),
+    ("6", "Linear Mip Linear", "Trilinear")
+)
+
+texture_uv_addressing_items = (
+    ("0", "Disabled", ""),
+    ("1", "Wrap", ""),
+    ("2", "Mirror", ""),
+    ("3", "Clamp", ""),
+    ("4", "Border", "")
+)
+
 #######################################################
 class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
@@ -50,6 +68,17 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
                 box.row(), settings, ["env_map_coef"], "Coefficient")
             self.draw_labelled_prop(
                 box.row(), settings, ["env_map_fb_alpha"], "Use FB Alpha")
+
+    #######################################################
+    def draw_texture_prop_box(self, context, box):
+
+        settings = context.material.dff
+
+        box.label(text="Texture properties")
+
+        box.prop(settings, "tex_filters", text="Filters")
+        self.draw_labelled_prop(
+            box.row(), settings, ["tex_u_addr", "tex_v_addr"], "UV addressing")
 
     #######################################################
     def draw_bump_map_box(self, context, box):
@@ -136,13 +165,14 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             
         except Exception:
             pass
-                
-        
-        self.draw_env_map_box  (context, layout.box())
-        self.draw_bump_map_box (context, layout.box())
-        self.draw_refl_box     (context, layout.box())
-        self.draw_specl_box    (context, layout.box())
-        self.draw_uv_anim_box  (context, layout.box())
+
+
+        self.draw_texture_prop_box (context, layout.box())
+        self.draw_env_map_box      (context, layout.box())
+        self.draw_bump_map_box     (context, layout.box())
+        self.draw_refl_box         (context, layout.box())
+        self.draw_specl_box        (context, layout.box())
+        self.draw_uv_anim_box      (context, layout.box())
 
     #######################################################
     # Callback function from preset_mat_cols enum
@@ -332,7 +362,10 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 class DFFMaterialProps(bpy.types.PropertyGroup):
 
     ambient           : bpy.props.FloatProperty  (name="Ambient Shading", default=1)
-    
+    tex_filters       : bpy.props.EnumProperty  (items=texture_filters_items, default="0")
+    tex_u_addr        : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
+    tex_v_addr        : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
+
     # Environment Map
     export_env_map    : bpy.props.BoolProperty   (name="Environment Map")
     env_map_tex       : bpy.props.StringProperty ()

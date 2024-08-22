@@ -80,8 +80,8 @@ class material_helper:
             self.material.alpha = color[3] / 255
 
     #######################################################
-    def set_texture(self, image, label=""):
-        
+    def set_texture(self, image, label="", filters=0, uv_addressing=0):
+
         if self.principled:
             self.principled.base_color_texture.node_image.label = label
             self.principled.base_color_texture.image  = image
@@ -94,7 +94,7 @@ class material_helper:
 
             node_tree.links.new(image_node.outputs["Alpha"],
                                 principled_node.inputs["Alpha"])
-            
+
         else:
             slot               = self.material.texture_slots.add()
             slot.texture       = bpy.data.textures.new(
@@ -102,6 +102,10 @@ class material_helper:
                 type           = "IMAGE"
             )
             slot.texture.image = image
+
+        self.material.dff.tex_filters = str(filters)
+        self.material.dff.tex_u_addr  = str((uv_addressing >> 4) & 0xF)
+        self.material.dff.tex_v_addr  = str(uv_addressing & 0xF)
 
     #######################################################
     def set_surface_properties(self, props):

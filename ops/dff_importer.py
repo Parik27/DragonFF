@@ -393,19 +393,19 @@ class dff_importer:
                     path    = os.path.dirname(self.file_name)
                     image_name = "%s.%s" % (texture.name, self.image_ext)
 
-                    # name.None shouldn't exist, lol / Share loaded images among imported materials
-                    if (image_name in bpy.data.images and
-                            path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                        image = bpy.data.images[image_name]
-                    else:
-                        image = load_image(image_name,
-                                        path,
-                                        recursive=False,
-                                        place_holder=True,
-                                        check_existing=True
-                                        )
-                helper.set_texture(image, texture.name)
-                
+                # name.None shouldn't exist, lol / Share loaded images among imported materials
+                if (image_name in bpy.data.images and
+                        path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
+                    image = bpy.data.images[image_name]
+                else:
+                    image = load_image(image_name,
+                                       path,
+                                       recursive=False,
+                                       place_holder=True,
+                                       check_existing=True
+                                       )
+                helper.set_texture(image, texture.name, texture.filters, texture.uv_addressing)
+
             # Normal Map
             if 'bump_map' in material.plugins:
                 mat.dff.export_bump_map = True
