@@ -52,8 +52,9 @@ class material_helper:
     def get_texture(self):
 
         texture = dff.Texture()
-        texture.filters = 0 # <-- find a way to store this in Blender
-        
+        texture.filters = int(self.material.dff.tex_filters)
+        texture.uv_addressing = int(self.material.dff.tex_u_addr) << 4 | int(self.material.dff.tex_v_addr)
+
         # 2.8         
         if self.principled:
             if self.principled.base_color_texture.image is not None:
