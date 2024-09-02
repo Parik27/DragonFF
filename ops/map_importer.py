@@ -112,9 +112,7 @@ class Map_Import_Operator(bpy.types.Operator):
                         self.settings.dff_folder, model
                     ),
                     'load_txd'       : self.settings.load_txd,
-                    'txd_file_name'  : "%s/%s.txd" % (
-                        self.settings.dff_folder, txd
-                    ),
+                    'txd_filename'   : "%s.txd" % txd,
                     'skip_mipmaps'   : True,
                     'image_ext'      : 'PNG',
                     'connect_bones'  : False,
