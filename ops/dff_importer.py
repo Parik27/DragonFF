@@ -65,7 +65,7 @@ class ext_2dfx_importer:
 class dff_importer:
 
     load_txd           = False
-    txd_file_name      = ""
+    txd_filename       = ""
     skip_mipmaps       = True
     image_ext          = "png"
     use_bone_connect   = False
@@ -820,8 +820,10 @@ class dff_importer:
         # Load the TXD
         if self.load_txd:
             # Import txd from a file if file exists
-            txd_path = self.txd_file_name if self.txd_file_name \
-                else file_name[:-4] + ".txd"
+            base_path = os.path.dirname(file_name)
+            txd_filename = self.txd_filename if self.txd_filename \
+                else os.path.basename(file_name)[:-4] + ".txd"
+            txd_path = os.path.join(base_path, txd_filename)
             if os.path.isfile(txd_path):
                 self.txd_images = txd_importer.import_txd(
                     {
@@ -858,7 +860,7 @@ def import_dff(options):
 
     # Shadow function
     dff_importer.load_txd         = options['load_txd']
-    dff_importer.txd_file_name    = options['txd_file_name']
+    dff_importer.txd_filename     = options['txd_filename']
     dff_importer.skip_mipmaps     = options['skip_mipmaps']
     dff_importer.image_ext        = options['image_ext']
     dff_importer.use_bone_connect = options['connect_bones']

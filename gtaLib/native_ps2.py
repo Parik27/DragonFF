@@ -16,8 +16,9 @@
 
 from struct import unpack_from, calcsize, pack
 
-from .dff import RGBA, Sections, TexCoords, Triangle, Vector
+from .dff import Chunk, RGBA, Sections, TexCoords, Triangle, Vector
 from .dff import ExtraVertColorExtension
+from .txd import TextureNative, RasterFormat
 
 # geometry flags
 rpGEOMETRYTRISTRIP              = 0x00000001
@@ -410,3 +411,138 @@ class NativePS2Geometry:
                             indices[i+2]
                         )
                     geometry.triangles.append(triangle)
+
+#######################################################
+class NativePS2Texture(TextureNative):
+
+    #######################################################
+    @staticmethod
+    def from_mem(data):
+        self = NativePS2Texture()
+        self.pos = 0
+        self.data = data
+
+        (
+            self._platform_id, self._filter_mode, self.uv_addressing
+        ) = unpack_from("<IHH", self.data, self._read(8))
+
+        str_chunk = self._read_chunk()
+        self.name = self._read_raw(str_chunk.size)
+        self.name = self.name.decode("utf-8").replace('\0', '')
+
+        str_chunk = self._read_chunk()
+        self.mask = self._read_raw(str_chunk.size)
+        self.mask = self.mask.decode("utf-8").replace('\0', '')
+
+        native_chunk = self._read_chunk()
+        raster_chunk = self._read_chunk()
+
+        (
+            self.width, self.height, self.depth, self.raster_format,
+            tex0_gs_reg, tex1_gs_reg, miptbp1_gs_reg, miptbp2_gs_reg,
+            pixels_size, palette_size, gpu_data_aligned_size, sky_mipmap_val
+        ) = unpack_from("<4I4Q4I", self.data, self._read(raster_chunk.size))
+
+        texture_chunk = self._read_chunk()
+
+        palette_format = self.raster_format & 0xf000
+        pixels_format = (self.raster_format >> 8) & 0x0f
+
+        if pixels_format == RasterFormat.RASTER_8888:
+            if palette_size > 0:
+                pixels_size -= 80
+                palette_size -= 80
+
+                self._read(80) # skip pixels header
+                pixels = self._read_raw(pixels_size)
+
+                self._read(80) # skip palette header
+                if palette_format == 0x2000:
+                    self.palette = self._read_palette(1024)
+                elif palette_format == 0x4000:
+                    self.palette = self._read_palette(64)
+                    self._read(palette_size - 64) # skip padding
+
+                if self.depth == 8:
+                    self.palette = NativePS2Texture.unswizzle_palette(self.palette)
+                    pixels = NativePS2Texture.unswizzle8(pixels, self.width, self.height)
+                elif self.depth == 4:
+                    pixels = NativePS2Texture.unswizzle4(pixels, self.width, self.height)
+
+                self.pixels.append(pixels)
+
+            elif self.depth == 32:
+                pixels = self._read_raw(pixels_size)
+                self.pixels.append(pixels)
+
+        return self
+
+    #######################################################
+    @staticmethod
+    def unswizzle8(data, width, height):
+        res = bytearray(width * height)
+        for y in range(height):
+            for x in range(width):
+                block_location = (y & (~0xf)) * width + (x & (~0xf)) * 2
+                swap_selector = (((y + 2) >> 2) & 0x1) * 4
+                posY = (((y & (~3)) >> 1) + (y & 1)) & 0x7
+                column_location = posY * width * 2 + ((x + swap_selector) & 0x7) * 4
+                byte_num = ((y >> 1) & 1) + ((x >> 2) & 2)
+                swizzleid = block_location + column_location + byte_num
+                res[y * width + x] = data[swizzleid]
+        return res
+
+    #######################################################
+    @staticmethod
+    def unswizzle4(data, width, height):
+        pixels = bytearray(width * height)
+        for i in range(width * height // 2):
+            index = data[i]
+            id2 = (index >> 4) & 0xf
+            id1 = index & 0xf
+            pixels[i*2] = id1
+            pixels[i*2+1] = id2
+
+        pixels = NativePS2Texture.unswizzle8(pixels, width, height)
+        res = bytearray(width * height)
+        for i in range(width * height // 2):
+            idx1 = pixels[i*2+0]
+            idx2 = pixels[i*2+1]
+            idx = ((idx2 << 4) | idx1) & 0xff
+            res[i] = idx
+        return res
+
+    #######################################################
+    @staticmethod
+    def unswizzle_palette(data):
+        palette = bytearray(1024)
+        for p in range(256):
+            pos = ((p & 231) + ((p & 8) << 1) + ((p & 16) >> 1))
+            palette[pos*4:pos*4+4] = data[p*4:p*4+4]
+        return bytes(palette)
+
+    #######################################################
+    def _read_palette(self, size):
+        palette = bytearray(size)
+        data = self._read_raw(size)
+        for i in range(0, size, 4):
+            palette[i:i+3] = data[i:i+3]
+            palette[i+3] = min((data[i+3] & 0xFF) * 2, 255)
+        return bytes(palette)
+
+    #######################################################
+    def _read(self, size):
+        current_pos = self.pos
+        self.pos += size
+
+        return current_pos
+
+    #######################################################
+    def _read_raw(self, size):
+        offset = self._read(size)
+        return self.data[offset:offset+size]
+
+    #######################################################
+    def _read_chunk(self):
+        chunk = Sections.read(Chunk, self.data, self._read(12))
+        return chunk

@@ -267,29 +267,31 @@ class ImageDecoder:
 #######################################################
 class TextureNative:
 
-    # Header
-    _platform_id = 0
-    _filter_mode = 0
+    #######################################################
+    def __init__(self):
+        # Header
+        self._platform_id = 0
+        self._filter_mode = 0
 
-    uv_addressing = 0
+        self.uv_addressing = 0
 
-    name = ""
-    mask = ""
+        self.name = ""
+        self.mask = ""
 
-    raster_format = 0
-    width         = 0
-    height        = 0
-    depth         = 0
-    num_levels    = 0
-    raster_type   = 0
+        self.raster_format = 0
+        self.width         = 0
+        self.height        = 0
+        self.depth         = 0
+        self.num_levels    = 1
+        self.raster_type   = 0
 
-    image_properties = None
+        self.image_properties = None
 
-    # Palette
-    palette = b''
+        # Palette
+        self.palette = b''
 
-    # Raster Data
-    pixels = b''
+        # Raster Data
+        self.pixels = []
 
     #######################################################
     def to_rgba(self, level=0):
@@ -527,19 +529,29 @@ class txd:
             # STRUCT
             if chunk.type == types["Struct"]:
                 platform_id = unpack_from("<I", self.data, self.pos)[0]
+                texture = None
 
-                # TODO: PS2
                 if self.device_id == 0:
                     if platform_id in (NativePlatformType.XBOX, NativePlatformType.D3D8, NativePlatformType.D3D9):
                         texture = TextureNative.from_mem(
                                 self.data[self.pos:self.pos+chunk.size]
                         )
-                        self.native_textures.append(texture)
+                    elif platform_id == NativePlatformType.PS2FOURCC:
+                        from .native_ps2 import NativePS2Texture
+                        texture = NativePS2Texture.from_mem(self.data[self.pos:])
+                        self._read(texture.pos - chunk.size)
 
                 elif self.device_id in (1, 2):
                     texture = TextureNative.from_mem(
                             self.data[self.pos:self.pos+chunk.size]
                     )
+
+                elif self.device_id == 6:
+                    from .native_ps2 import NativePS2Texture
+                    texture = NativePS2Texture.from_mem(self.data[self.pos:])
+                    self._read(texture.pos - chunk.size)
+
+                if texture:
                     self.native_textures.append(texture)
 
             elif chunk.type == types["Extension"]:

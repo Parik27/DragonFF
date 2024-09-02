@@ -230,6 +230,13 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         default     = False
     )
 
+    txd_filename :  bpy.props.StringProperty(
+        name        = "Custom TXD File Name",
+        description = "File name used for importing the TXD file. Leave blank if TXD name is same as DFF name",
+        maxlen      = 256,
+        default     = "",
+    )
+
     skip_mipmaps :  bpy.props.BoolProperty(
         name        = "Skip mipmaps",
         default     = True
@@ -289,6 +296,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         box.prop(self, "load_txd")
         if self.load_txd:
             box.prop(self, "skip_mipmaps")
+            box.prop(self, "txd_filename", text="File name")
 
         layout.prop(self, "connect_bones")
         
@@ -325,7 +333,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     {
                         'file_name'      : file,
                         'load_txd'       : self.load_txd,
-                        'txd_file_name'  : '',
+                        'txd_filename'   : self.txd_filename,
                         'skip_mipmaps'   : self.skip_mipmaps,
                         'image_ext'      : image_ext,
                         'connect_bones'  : self.connect_bones,
