@@ -52,8 +52,9 @@ class material_helper:
     def get_texture(self):
 
         texture = dff.Texture()
-        texture.filters = 0 # <-- find a way to store this in Blender
-        
+        texture.filters = int(self.material.dff.tex_filters)
+        texture.uv_addressing = int(self.material.dff.tex_u_addr) << 4 | int(self.material.dff.tex_v_addr)
+
         # 2.8         
         if self.principled:
             if self.principled.base_color_texture.image is not None:
@@ -918,11 +919,9 @@ class dff_exporter:
         
         for obj in objects:
 
-            # Skip collision objects in the base collection. These are inside their own nested collection for singularly
-            # imported DFFs, but the map importer will put collision meshes inside the same collection as the map mesh
-            # object they represent. We can just ignore collision meshes here as the DFF exporter will still look for
+            # We can just ignore collision meshes here as the DFF exporter will still look for
             # them in their own nested collection later if export_coll is true.
-            if obj.dff.type == 'COL':
+            if obj.dff.type == 'COL' or obj.dff.type == 'SHA':
                 continue
 
             # create atomic in this case
@@ -946,12 +945,15 @@ class dff_exporter:
             })
 
             if len(mem) != 0:
-               self.dff.collisions = [mem] 
+                self.dff.collisions = [mem]
 
         if name is None:
             self.dff.write_file(self.file_name, self.version )
         else:
-            self.dff.write_file("%s/%s" % (self.path, name), self.version)
+            filename = "%s/%s" % (self.path, name)
+            if not filename.endswith('.dff'):
+                filename += '.dff'
+            self.dff.write_file(filename, self.version)
 
     #######################################################
     @staticmethod
@@ -977,10 +979,7 @@ class dff_exporter:
             if self.from_outliner:
                 collections = [bpy.context.view_layer.objects.active.users_collection[0]]
             else:
-                collections = []
-                for collection in bpy.data.collections:
-                    if collection.name.endswith(".dff"):
-                        collections.append(collection)
+                collections = [c for c in bpy.data.collections]
 
         for collection in collections:
             for obj in collection.objects:

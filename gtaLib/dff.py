@@ -266,24 +266,27 @@ class Texture:
 
     __slots__ = [
         'filters',
+        'uv_addressing',
         'name',
         'mask'
     ]
-    
+
     def __init__(self):
         self.filters            = 0
+        self.uv_addressing      = 0
         self.name               = ""
         self.mask               = ""
-    
+
     #######################################################
     def from_mem(data):
 
         self = Texture()
-        
-        _Texture = namedtuple("_Texture", "filters unk")
-        _tex = _Texture._make(unpack_from("<2H", data))
- 
+
+        _Texture = namedtuple("_Texture", "filters uv_addressing unk")
+        _tex = _Texture._make(unpack_from("<2BH", data))
+
         self.filters = _tex.filters
+        self.uv_addressing = _tex.uv_addressing
 
         return self
 
@@ -291,7 +294,7 @@ class Texture:
     def to_mem(self):
 
         data = b''
-        data += pack("<H2x", self.filters)
+        data += pack("<2B2x", self.filters, self.uv_addressing)
 
         data  = Sections.write_chunk(data, types["Struct"])
         data += Sections.write_chunk(Sections.pad_string(self.name),
@@ -299,7 +302,7 @@ class Texture:
         data += Sections.write_chunk(Sections.pad_string(self.mask),
                                      types["String"])
         data += Sections.write_chunk(b'', types["Extension"])
-        
+
         return Sections.write_chunk(data, types["Texture"])
 
 #######################################################

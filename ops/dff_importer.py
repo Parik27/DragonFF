@@ -396,8 +396,8 @@ class dff_importer:
                                         place_holder=True,
                                         check_existing=True
                                         )
-                helper.set_texture(image, texture.name)
-                
+                helper.set_texture(image, texture.name, texture.filters, texture.uv_addressing)
+
             # Normal Map
             if 'bump_map' in material.plugins:
                 mat.dff.export_bump_map = True

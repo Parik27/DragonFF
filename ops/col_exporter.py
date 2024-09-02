@@ -255,7 +255,7 @@ class col_exporter:
 
         bounds_found = False
         objects = bpy.data.objects
-        if self.collection is not None:
+        if self.collection is not None and len(self.collection.objects) > 0:
             objects = self.collection.objects
             # Get original import bounds from collection (some collisions come in as just bounds with no other items)
             if self.collection.get('bounds min') and self.collection.get('bounds max'):
