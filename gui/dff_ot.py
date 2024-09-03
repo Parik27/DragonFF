@@ -365,3 +365,77 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+#######################################################
+class SCENE_OT_dff_frame_move(bpy.types.Operator):
+
+    bl_idname           = "scene.dff_frame_move"
+    bl_description      = "Move the active frame up/down in the list"
+    bl_label            = "Move Frame"
+
+    direction           : bpy.props.EnumProperty(
+        items =
+        (
+            ("UP", "", ""),
+            ("DOWN", "", "")
+        )
+    )
+
+    #######################################################
+    def execute(self, context):
+        scene_dff = context.scene.dff
+        active_frame = scene_dff.frames_active
+        frames_num = len(scene_dff.frames)
+
+        if frames_num < 2:
+            return {'FINISHED'}
+
+        step = -1 if self.direction == "UP" else 1
+        new_index = active_frame + step
+
+        if (0 <= new_index < frames_num):
+            dff_prop1 = scene_dff.frames[active_frame].obj.dff
+            dff_prop2 = scene_dff.frames[new_index].obj.dff
+            dff_prop1.frame_index, dff_prop2.frame_index \
+                = dff_prop2.frame_index, dff_prop1.frame_index
+            scene_dff.frames.move(active_frame, new_index)
+            scene_dff.frames_active = new_index
+
+        return {'FINISHED'}
+
+#######################################################
+class SCENE_OT_dff_atomic_move(bpy.types.Operator):
+
+    bl_idname           = "scene.dff_atomic_move"
+    bl_description      = "Move the active atomic up/down in the list"
+    bl_label            = "Move Atomic"
+
+    direction           : bpy.props.EnumProperty(
+        items =
+        (
+            ("UP", "", ""),
+            ("DOWN", "", "")
+        )
+    )
+
+    #######################################################
+    def execute(self, context):
+        scene_dff = context.scene.dff
+        active_atomic = scene_dff.atomics_active
+        atomics_num = len(scene_dff.atomics)
+
+        if atomics_num < 2:
+            return {'FINISHED'}
+
+        step = -1 if self.direction == "UP" else 1
+        new_index = active_atomic + step
+
+        if (0 <= new_index < atomics_num):
+            dff_prop1 = scene_dff.atomics[active_atomic].obj.dff
+            dff_prop2 = scene_dff.atomics[new_index].obj.dff
+            dff_prop1.atomic_index, dff_prop2.atomic_index \
+                = dff_prop2.atomic_index, dff_prop1.atomic_index
+            scene_dff.atomics.move(active_atomic, new_index)
+            scene_dff.atomics_active = new_index
+
+        return {'FINISHED'}

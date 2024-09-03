@@ -985,7 +985,11 @@ class dff_exporter:
             for obj in collection.objects:
                     
                 if not self.selected or obj.select_get():
-                    objects[obj] = self.calculate_parent_depth(obj)
+                    objects[obj] = (
+                        self.calculate_parent_depth(obj),
+                        obj.dff.frame_index,
+                        obj.dff.atomic_index
+                    )
 
             if self.mass_export:
                 objects = sorted(objects, key=objects.get)
