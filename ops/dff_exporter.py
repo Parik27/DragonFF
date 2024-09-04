@@ -974,7 +974,7 @@ class dff_exporter:
             elif obj.type == "ARMATURE":
                 self.export_armature(obj)
 
-        meshes = sorted(meshes, key=lambda o: o.name)
+        meshes = sorted(meshes, key=lambda ob: ob.dff.atomic_index)
 
         for mesh in meshes:
             self.populate_atomic(mesh)
@@ -1034,8 +1034,7 @@ class dff_exporter:
                 if not self.selected or obj.select_get():
                     objects[obj] = (
                         self.calculate_parent_depth(obj),
-                        obj.dff.frame_index,
-                        obj.dff.atomic_index
+                        obj.dff.frame_index
                     )
 
             if self.mass_export:
