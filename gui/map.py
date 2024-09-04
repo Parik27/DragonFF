@@ -283,13 +283,16 @@ class State(metaclass=_StateMeta):
         indexed_atomic_objects, unindexed_atomic_objects = [], []
 
         for ob in scene.objects:
+            if ob.dff.type != 'OBJ':
+                continue
+
             if ob.type in ('EMPTY', 'ARMATURE'):
                 if ob.dff.frame_index >= 0:
                     indexed_frame_objects.append(ob)
                 else:
                     unindexed_frame_objects.append(ob)
 
-            elif ob.type == 'MESH' and ob.dff.type == 'OBJ':
+            elif ob.type == 'MESH':
                 if ob.dff.atomic_index >= 0:
                     indexed_atomic_objects.append(ob)
                 else:
