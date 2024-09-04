@@ -1,5 +1,7 @@
 import bpy
+from .map import State
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff
+from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move
 from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
 
 texture_filters_items = (
@@ -437,6 +439,10 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
 #######################################################
 class DFFObjectProps(bpy.types.PropertyGroup):
 
+    #######################################################
+    def type_changed(self, context):
+        State.update_scene(context.scene)
+
     # Atomic Properties
     type : bpy.props.EnumProperty(
         items = (
@@ -444,7 +450,8 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('COL', 'Collision Object', 'Object is a collision object'),
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('NON', "Don't export", 'Object will NOT be exported.')
-        )
+        ),
+        update=type_changed
     )
 
     # Mesh properties
@@ -533,7 +540,97 @@ compatibiility with DFF Viewers"
         default = 0,
         description = "Light used for the Sphere/Cone"
     )
-    
+
+    frame_index : bpy.props.IntProperty(
+        default = -1,
+        options = {'SKIP_SAVE','HIDDEN'}
+    )
+
+    atomic_index : bpy.props.IntProperty(
+        default = -1,
+        options = {'SKIP_SAVE','HIDDEN'}
+    )
+
     #######################################################    
     def register():
         bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
+
+#######################################################
+class DFF_UL_FrameItems(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if item:
+            layout.label(text=item.obj.name, icon=item.icon)
+
+#######################################################
+class DFF_UL_AtomicItems(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if item:
+            layout.label(text=item.obj.name, icon='MESH_DATA')
+
+#######################################################
+class SCENE_PT_dffFrames(bpy.types.Panel):
+
+    bl_idname      = "SCENE_PT_dffFrames"
+    bl_label       = "DragonFF - Frames"
+    bl_space_type  = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context     = "scene"
+    bl_options     = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        scene_dff = context.scene.dff
+
+        layout = self.layout
+        row = layout.row()
+
+        col = row.column()
+        col.template_list(
+            "DFF_UL_FrameItems",
+            "",
+            scene_dff,
+            "frames",
+            scene_dff,
+            "frames_active",
+            rows=3,
+            maxrows=8,
+            sort_lock=True
+        )
+
+        if len(scene_dff.frames) > 1:
+            col = row.column(align=True)
+            col.operator(SCENE_OT_dff_frame_move.bl_idname, icon='TRIA_UP', text="").direction = 'UP'
+            col.operator(SCENE_OT_dff_frame_move.bl_idname, icon='TRIA_DOWN', text="").direction = 'DOWN'
+
+#######################################################
+class SCENE_PT_dffAtomics(bpy.types.Panel):
+
+    bl_idname      = "SCENE_PT_dffAtomics"
+    bl_label       = "DragonFF - Atomics"
+    bl_space_type  = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context     = "scene"
+    bl_options     = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        scene_dff = context.scene.dff
+
+        layout = self.layout
+        row = layout.row()
+
+        col = row.column()
+        col.template_list(
+            "DFF_UL_AtomicItems",
+            "",
+            scene_dff,
+            "atomics",
+            scene_dff,
+            "atomics_active",
+            rows=3,
+            maxrows=8,
+            sort_lock=True
+        )
+
+        if len(scene_dff.atomics) > 1:
+            col = row.column(align=True)
+            col.operator(SCENE_OT_dff_atomic_move.bl_idname, icon='TRIA_UP', text="").direction = 'UP'
+            col.operator(SCENE_OT_dff_atomic_move.bl_idname, icon='TRIA_DOWN', text="").direction = 'DOWN'

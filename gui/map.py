@@ -2,17 +2,63 @@ import bpy
 import gpu
 import numpy as np
 import random
+from bpy.app.handlers import depsgraph_update_post, load_post, persistent
 from gpu_extras.batch import batch_for_shader
 from ..data import map_data
 from ..ops.importer_common import game_version
 
 #######################################################
+class DFFFrameProps(bpy.types.PropertyGroup):
+	obj  : bpy.props.PointerProperty(type=bpy.types.Object)
+	icon : bpy.props.StringProperty()
+
+#######################################################
+class DFFAtomicProps(bpy.types.PropertyGroup):
+	obj : bpy.props.PointerProperty(type=bpy.types.Object)
+
+#######################################################
 class DFFSceneProps(bpy.types.PropertyGroup):
 
-    #######################################################    
+    #######################################################
     def update_map_sections(self, context):
         return map_data.data[self.game_version_dropdown]['IPL_paths']
-        
+
+    #######################################################
+    def frames_active_changed(self, context):
+        scene_dff = context.scene.dff
+
+        frames_num = len(scene_dff.frames)
+        if not frames_num:
+            return
+
+        if scene_dff.frames_active >= frames_num:
+            scene_dff.frames_active = frames_num - 1
+            return
+
+        frame_object = scene_dff.frames[scene_dff.frames_active].obj
+
+        for a in scene_dff.frames: a.obj.select_set(False)
+        frame_object.select_set(True)
+        context.view_layer.objects.active = frame_object
+
+    #######################################################
+    def atomics_active_changed(self, context):
+        scene_dff = context.scene.dff
+
+        atomics_num = len(scene_dff.atomics)
+        if not atomics_num:
+            return
+
+        if scene_dff.atomics_active >= atomics_num:
+            scene_dff.atomics_active = atomics_num - 1
+            return
+
+        atomic_object = scene_dff.atomics[scene_dff.atomics_active].obj
+
+        for a in scene_dff.atomics: a.obj.select_set(False)
+        atomic_object.select_set(True)
+        context.view_layer.objects.active = atomic_object
+
     game_version_dropdown : bpy.props.EnumProperty(
         name = 'Game',
         items = (
@@ -98,6 +144,30 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         name = "Avoid overly small groups",
         description="Combine really small groups with their neighbor to avoid pointless isolated groups",
         default = True
+    )
+
+    frames : bpy.props.CollectionProperty(
+        type=DFFFrameProps,
+        options={'SKIP_SAVE','HIDDEN'}
+    )
+
+    frames_active : bpy.props.IntProperty(
+        name = "Active frame",
+        default=0,
+        min=0,
+        update=frames_active_changed
+    )
+
+    atomics : bpy.props.CollectionProperty(
+        type=DFFAtomicProps,
+        options={'SKIP_SAVE','HIDDEN'}
+    )
+
+    atomics_active : bpy.props.IntProperty(
+        name = "Active atomic",
+        default=0,
+        min=0,
+        update=atomics_active_changed
     )
 
     def draw_fg():
@@ -194,3 +264,74 @@ class MapImportPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("scene.dragonff_map_import")
+
+#######################################################
+class _StateMeta(type):
+    def __init__(cls, *args, **kwargs):
+        cls._objects_count = 0
+
+    @property
+    def objects_count(cls): return cls._objects_count
+
+#######################################################
+class State(metaclass=_StateMeta):
+
+    # TODO: collections
+    @classmethod
+    def update_scene(cls, scene):
+        indexed_frame_objects, unindexed_frame_objects = [], []
+        indexed_atomic_objects, unindexed_atomic_objects = [], []
+
+        for ob in scene.objects:
+            if ob.type in ('EMPTY', 'ARMATURE'):
+                if ob.dff.frame_index >= 0:
+                    indexed_frame_objects.append(ob)
+                else:
+                    unindexed_frame_objects.append(ob)
+
+            elif ob.type == 'MESH' and ob.dff.type == 'OBJ':
+                if ob.dff.atomic_index >= 0:
+                    indexed_atomic_objects.append(ob)
+                else:
+                    unindexed_atomic_objects.append(ob)
+
+        indexed_frame_objects.sort(key=lambda ob: ob.dff.frame_index)
+        indexed_atomic_objects.sort(key=lambda ob: ob.dff.atomic_index)
+
+        scene.dff.frames.clear()
+        for i, ob in enumerate(indexed_frame_objects + unindexed_frame_objects):
+            frame_prop = scene.dff.frames.add()
+            frame_prop.obj = ob
+            frame_prop.icon = 'ARMATURE_DATA' if ob.type == 'ARMATURE' else 'EMPTY_DATA'
+            ob.dff.frame_index = i
+
+        scene.dff.atomics.clear()
+        for i, ob in enumerate(indexed_atomic_objects + unindexed_atomic_objects):
+            atomic_prop = scene.dff.atomics.add()
+            atomic_prop.obj = ob
+            ob.dff.atomic_index = i
+
+        cls._objects_count = len(scene.objects)
+
+    @staticmethod
+    @persistent
+    def _onDepsgraphUpdate(scene):
+        if len(scene.objects) != State.objects_count:
+            State.update_scene(scene)
+
+    @staticmethod
+    @persistent
+    def _onLoad(_):
+        State.update_scene(bpy.context.scene)
+
+    @classmethod
+    def hook_events(cls):
+        if not cls.update_scene in depsgraph_update_post:
+            depsgraph_update_post.append(cls._onDepsgraphUpdate)
+            load_post.append(cls._onLoad)
+
+    @classmethod
+    def unhook_events(cls):
+        if cls.update_scene in depsgraph_update_post:
+            depsgraph_update_post.remove(cls._onDepsgraphUpdate)
+            load_post.remove(cls._onLoad)
