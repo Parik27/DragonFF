@@ -116,7 +116,7 @@ class dff_importer:
         self = dff_importer
 
         # Import atomics (meshes)
-        for atomic in self.dff.atomic_list:
+        for atomic_index, atomic in enumerate(self.dff.atomic_list):
 
             frame = self.dff.frame_list[atomic.frame]
             geom = self.dff.geometry_list[atomic.geometry]
@@ -265,7 +265,9 @@ class dff_importer:
 
             if obj.dff.pipeline == 'CUSTOM':
                 obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
-                    
+
+            obj.dff.atomic_index = atomic_index
+
             # Delete temporary properties used earlier
             del mesh['dragon_pipeline'      ]
             del mesh['dragon_normals'       ]
@@ -796,6 +798,8 @@ class dff_importer:
 
                 else:
                     obj.parent = self.objects[frame.parent]
+
+            obj.dff.frame_index = index
 
             self.objects[index] = obj
 

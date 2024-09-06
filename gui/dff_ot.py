@@ -4,6 +4,7 @@ from bpy_extras.io_utils import ImportHelper, ExportHelper
 import time
 
 from ..ops import dff_exporter, dff_importer, col_importer
+from ..ops.state import State
 
 #######################################################
 class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
@@ -383,23 +384,50 @@ class SCENE_OT_dff_frame_move(bpy.types.Operator):
 
     #######################################################
     def execute(self, context):
+        State.update_scene(context.scene)
+
         scene_dff = context.scene.dff
-        active_frame = scene_dff.frames_active
+        active_index = scene_dff.frames_active
         frames_num = len(scene_dff.frames)
 
         if frames_num < 2:
-            return {'FINISHED'}
+            return {'CANCELLED'}
 
-        step = -1 if self.direction == "UP" else 1
-        new_index = active_frame + step
+        if self.direction == "UP":
+            obj1 = scene_dff.frames[active_index].obj
 
-        if (0 <= new_index < frames_num):
-            dff_prop1 = scene_dff.frames[active_frame].obj.dff
-            dff_prop2 = scene_dff.frames[new_index].obj.dff
-            dff_prop1.frame_index, dff_prop2.frame_index \
-                = dff_prop2.frame_index, dff_prop1.frame_index
-            scene_dff.frames.move(active_frame, new_index)
+            new_index = active_index - 1
+            if new_index < 0:
+                return {'CANCELLED'}
+
+            obj2 = scene_dff.frames[new_index].obj
+            if obj2 == obj1.parent:
+                return {'CANCELLED'}
+
+            obj1.dff.frame_index = new_index
+            obj2.dff.frame_index = active_index
+            scene_dff.frames.move(new_index, active_index)
             scene_dff.frames_active = new_index
+
+        else:
+            obj1 = scene_dff.frames[active_index].obj
+            children = obj1.children_recursive
+
+            new_index = active_index + 1
+            for frame in scene_dff.frames[new_index:]:
+                if frame.obj in children:
+                    new_index += 1
+                else:
+                    break
+
+            if new_index >= frames_num:
+                return {'CANCELLED'}
+
+            for frame in scene_dff.frames[active_index:new_index]:
+                frame.obj.dff.frame_index += 1
+            scene_dff.frames[new_index].obj.dff.frame_index = active_index
+            scene_dff.frames.move(new_index, active_index)
+            scene_dff.frames_active = active_index + 1
 
         return {'FINISHED'}
 
@@ -420,22 +448,27 @@ class SCENE_OT_dff_atomic_move(bpy.types.Operator):
 
     #######################################################
     def execute(self, context):
+        State.update_scene(context.scene)
+
         scene_dff = context.scene.dff
-        active_atomic = scene_dff.atomics_active
+        active_index = scene_dff.atomics_active
         atomics_num = len(scene_dff.atomics)
 
         if atomics_num < 2:
-            return {'FINISHED'}
+            return {'CANCELLED'}
 
         step = -1 if self.direction == "UP" else 1
-        new_index = active_atomic + step
+        new_index = active_index + step
 
-        if (0 <= new_index < atomics_num):
-            dff_prop1 = scene_dff.atomics[active_atomic].obj.dff
-            dff_prop2 = scene_dff.atomics[new_index].obj.dff
-            dff_prop1.atomic_index, dff_prop2.atomic_index \
-                = dff_prop2.atomic_index, dff_prop1.atomic_index
-            scene_dff.atomics.move(active_atomic, new_index)
-            scene_dff.atomics_active = new_index
+        if new_index < 0 or new_index >= atomics_num:
+            return {'CANCELLED'}
+
+        obj1 = scene_dff.atomics[active_index].obj
+        obj2 = scene_dff.atomics[new_index].obj
+
+        obj1.dff.atomic_index = new_index
+        obj2.dff.atomic_index = active_index
+        scene_dff.atomics.move(new_index, active_index)
+        scene_dff.atomics_active = new_index
 
         return {'FINISHED'}

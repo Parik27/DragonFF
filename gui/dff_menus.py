@@ -1,5 +1,4 @@
 import bpy
-from .map import State
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move
 from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
@@ -439,10 +438,6 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
 #######################################################
 class DFFObjectProps(bpy.types.PropertyGroup):
 
-    #######################################################
-    def type_changed(self, context):
-        State.update_scene(context.scene)
-
     # Atomic Properties
     type : bpy.props.EnumProperty(
         items = (
@@ -450,8 +445,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('COL', 'Collision Object', 'Object is a collision object'),
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('NON', "Don't export", 'Object will NOT be exported.')
-        ),
-        update=type_changed
+        )
     )
 
     # Mesh properties
@@ -542,13 +536,17 @@ compatibiility with DFF Viewers"
     )
 
     frame_index : bpy.props.IntProperty(
-        default = -1,
-        options = {'SKIP_SAVE','HIDDEN'}
+        default = 2**31-1,
+        min = 0,
+        max = 2**31-1,
+        options = {'SKIP_SAVE', 'HIDDEN'}
     )
 
     atomic_index : bpy.props.IntProperty(
-        default = -1,
-        options = {'SKIP_SAVE','HIDDEN'}
+        default = 2**31-1,
+        min = 0,
+        max = 2**31-1,
+        options = {'SKIP_SAVE', 'HIDDEN'}
     )
 
     #######################################################    

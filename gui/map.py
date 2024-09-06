@@ -2,19 +2,18 @@ import bpy
 import gpu
 import numpy as np
 import random
-from bpy.app.handlers import depsgraph_update_post, load_post, persistent
 from gpu_extras.batch import batch_for_shader
 from ..data import map_data
 from ..ops.importer_common import game_version
 
 #######################################################
 class DFFFrameProps(bpy.types.PropertyGroup):
-	obj  : bpy.props.PointerProperty(type=bpy.types.Object)
-	icon : bpy.props.StringProperty()
+    obj  : bpy.props.PointerProperty(type=bpy.types.Object)
+    icon : bpy.props.StringProperty()
 
 #######################################################
 class DFFAtomicProps(bpy.types.PropertyGroup):
-	obj : bpy.props.PointerProperty(type=bpy.types.Object)
+    obj : bpy.props.PointerProperty(type=bpy.types.Object)
 
 #######################################################
 class DFFSceneProps(bpy.types.PropertyGroup):
@@ -264,77 +263,3 @@ class MapImportPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("scene.dragonff_map_import")
-
-#######################################################
-class _StateMeta(type):
-    def __init__(cls, *args, **kwargs):
-        cls._objects_count = 0
-
-    @property
-    def objects_count(cls): return cls._objects_count
-
-#######################################################
-class State(metaclass=_StateMeta):
-
-    # TODO: collections
-    @classmethod
-    def update_scene(cls, scene):
-        indexed_frame_objects, unindexed_frame_objects = [], []
-        indexed_atomic_objects, unindexed_atomic_objects = [], []
-
-        for ob in scene.objects:
-            if ob.dff.type != 'OBJ':
-                continue
-
-            if ob.type in ('EMPTY', 'ARMATURE'):
-                if ob.dff.frame_index >= 0:
-                    indexed_frame_objects.append(ob)
-                else:
-                    unindexed_frame_objects.append(ob)
-
-            elif ob.type == 'MESH':
-                if ob.dff.atomic_index >= 0:
-                    indexed_atomic_objects.append(ob)
-                else:
-                    unindexed_atomic_objects.append(ob)
-
-        indexed_frame_objects.sort(key=lambda ob: ob.dff.frame_index)
-        indexed_atomic_objects.sort(key=lambda ob: ob.dff.atomic_index)
-
-        scene.dff.frames.clear()
-        for i, ob in enumerate(indexed_frame_objects + unindexed_frame_objects):
-            frame_prop = scene.dff.frames.add()
-            frame_prop.obj = ob
-            frame_prop.icon = 'ARMATURE_DATA' if ob.type == 'ARMATURE' else 'EMPTY_DATA'
-            ob.dff.frame_index = i
-
-        scene.dff.atomics.clear()
-        for i, ob in enumerate(indexed_atomic_objects + unindexed_atomic_objects):
-            atomic_prop = scene.dff.atomics.add()
-            atomic_prop.obj = ob
-            ob.dff.atomic_index = i
-
-        cls._objects_count = len(scene.objects)
-
-    @staticmethod
-    @persistent
-    def _onDepsgraphUpdate(scene):
-        if len(scene.objects) != State.objects_count:
-            State.update_scene(scene)
-
-    @staticmethod
-    @persistent
-    def _onLoad(_):
-        State.update_scene(bpy.context.scene)
-
-    @classmethod
-    def hook_events(cls):
-        if not cls.update_scene in depsgraph_update_post:
-            depsgraph_update_post.append(cls._onDepsgraphUpdate)
-            load_post.append(cls._onLoad)
-
-    @classmethod
-    def unhook_events(cls):
-        if cls.update_scene in depsgraph_update_post:
-            depsgraph_update_post.remove(cls._onDepsgraphUpdate)
-            load_post.remove(cls._onLoad)
