@@ -472,3 +472,16 @@ class SCENE_OT_dff_atomic_move(bpy.types.Operator):
         scene_dff.atomics_active = new_index
 
         return {'FINISHED'}
+
+#######################################################
+class SCENE_OT_dff_update(bpy.types.Operator):
+
+    bl_idname           = "scene.dff_update"
+    bl_description      = "Update the list of objects"
+    bl_label            = "Update Scene"
+
+
+    #######################################################
+    def execute(self, context):
+        State.update_scene(context.scene)
+        return {'FINISHED'}

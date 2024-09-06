@@ -1,6 +1,6 @@
 import bpy
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff
-from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move
+from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
 from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
 
 texture_filters_items = (
@@ -602,6 +602,13 @@ class SCENE_PT_dffFrames(bpy.types.Panel):
             col.operator(SCENE_OT_dff_frame_move.bl_idname, icon='TRIA_UP', text="").direction = 'UP'
             col.operator(SCENE_OT_dff_frame_move.bl_idname, icon='TRIA_DOWN', text="").direction = 'DOWN'
 
+        row = layout.row()
+        col = row.column()
+        col.prop(scene_dff, "real_time_update", toggle=True)
+        if not scene_dff.real_time_update:
+            col = row.column()
+            col.operator(SCENE_OT_dff_update.bl_idname, icon='FILE_REFRESH', text="")
+
 #######################################################
 class SCENE_PT_dffAtomics(bpy.types.Panel):
 
@@ -635,3 +642,10 @@ class SCENE_PT_dffAtomics(bpy.types.Panel):
             col = row.column(align=True)
             col.operator(SCENE_OT_dff_atomic_move.bl_idname, icon='TRIA_UP', text="").direction = 'UP'
             col.operator(SCENE_OT_dff_atomic_move.bl_idname, icon='TRIA_DOWN', text="").direction = 'DOWN'
+
+        row = layout.row()
+        col = row.column()
+        col.prop(scene_dff, "real_time_update", toggle=True)
+        if not scene_dff.real_time_update:
+            col = row.column()
+            col.operator(SCENE_OT_dff_update.bl_idname, icon='FILE_REFRESH', text="")

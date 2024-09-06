@@ -38,6 +38,7 @@ _classes = [
     gui.EXPORT_OT_col,
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
+    gui.SCENE_OT_dff_update,
     gui.OBJECT_OT_facegoups_col,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,

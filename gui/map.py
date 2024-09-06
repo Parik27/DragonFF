@@ -147,27 +147,33 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     )
 
     frames : bpy.props.CollectionProperty(
-        type=DFFFrameProps,
-        options={'SKIP_SAVE','HIDDEN'}
+        type    = DFFFrameProps,
+        options = {'SKIP_SAVE','HIDDEN'}
     )
 
     frames_active : bpy.props.IntProperty(
-        name = "Active frame",
-        default=0,
-        min=0,
-        update=frames_active_changed
+        name    = "Active frame",
+        default = 0,
+        min     = 0,
+        update  = frames_active_changed
     )
 
     atomics : bpy.props.CollectionProperty(
-        type=DFFAtomicProps,
-        options={'SKIP_SAVE','HIDDEN'}
+        type    = DFFAtomicProps,
+        options = {'SKIP_SAVE','HIDDEN'}
     )
 
     atomics_active : bpy.props.IntProperty(
-        name = "Active atomic",
-        default=0,
-        min=0,
-        update=atomics_active_changed
+        name    = "Active atomic",
+        default = 0,
+        min     = 0,
+        update  = atomics_active_changed
+    )
+
+    real_time_update :  bpy.props.BoolProperty(
+        name        = "Real Time Update",
+        description = "Update the list of objects in real time",
+        default     = True
     )
 
     def draw_fg():

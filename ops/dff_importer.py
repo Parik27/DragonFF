@@ -27,6 +27,7 @@ from .importer_common import (
     hide_object)
 from .col_importer import import_col_mem
 from ..ops import txd_importer
+from ..ops.state import State
 
 #######################################################
 class ext_2dfx_importer:
@@ -858,6 +859,8 @@ class dff_importer:
                     # Hide objects
                     for object in collection.objects:
                         hide_object(object)
+
+        State.update_scene()
 
 #######################################################
 def import_dff(options):

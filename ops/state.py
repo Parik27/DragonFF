@@ -7,9 +7,6 @@ class _StateMeta(type):
     def __init__(cls, *args, **kwargs):
         cls.last_export_refresh = 0
 
-    @property
-    def objects_count(cls): return cls._objects_count
-
 #######################################################
 class State(metaclass=_StateMeta):
 
@@ -73,8 +70,9 @@ class State(metaclass=_StateMeta):
     @staticmethod
     @persistent
     def _onDepsgraphUpdate(scene):
-        if scene == bpy.context.scene and time.time() - State.last_export_refresh > 0.3:
-            State.update_scene(scene)
+        if scene.dff.real_time_update:
+            if scene == bpy.context.scene and time.time() - State.last_export_refresh > 0.3:
+                State.update_scene(scene)
 
     @staticmethod
     @persistent
