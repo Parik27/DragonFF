@@ -56,6 +56,16 @@ class State(metaclass=_StateMeta):
         for i, ob in enumerate(atomic_objects):
             atomic_prop = scene.dff.atomics.add()
             atomic_prop.obj = ob
+
+            frame_obj = None
+            for modifier in ob.modifiers:
+                if modifier.type == 'ARMATURE':
+                    frame_obj = modifier.object
+                    break
+            if frame_obj is None:
+                frame_obj = ob.parent
+            atomic_prop.frame_obj = frame_obj
+
             ob.dff.atomic_index = i
 
         cls.last_export_refresh = time.time()

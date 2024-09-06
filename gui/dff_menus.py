@@ -563,7 +563,10 @@ class DFF_UL_FrameItems(bpy.types.UIList):
 class DFF_UL_AtomicItems(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         if item:
-            layout.label(text=item.obj.name, icon='MESH_DATA')
+            text = item.obj.name
+            if item.frame_obj:
+                text += " [%s]" % item.frame_obj.name
+            layout.label(text=text, icon='MESH_DATA')
 
 #######################################################
 class SCENE_PT_dffFrames(bpy.types.Panel):

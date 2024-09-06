@@ -13,7 +13,8 @@ class DFFFrameProps(bpy.types.PropertyGroup):
 
 #######################################################
 class DFFAtomicProps(bpy.types.PropertyGroup):
-    obj : bpy.props.PointerProperty(type=bpy.types.Object)
+    obj       : bpy.props.PointerProperty(type=bpy.types.Object)
+    frame_obj : bpy.props.PointerProperty(type=bpy.types.Object)
 
 #######################################################
 class DFFSceneProps(bpy.types.PropertyGroup):
