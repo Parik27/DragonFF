@@ -937,7 +937,7 @@ class dff_exporter:
         # Get frame index from constraint
         frame_index = None
         for constraint in obj.constraints:
-            if constraint.type != 'COPY_TRANSFORMS':
+            if constraint.type != 'CHILD_OF':
                 continue
 
             armature = constraint.target

@@ -731,8 +731,7 @@ class dff_importer:
                     frame.rotation_matrix.at
                 )
             )
-            
-            matrix.transpose()
+            matrix = self.multiply_matrix(mathutils.Matrix.Translation(frame.position), matrix.transposed().to_4x4())
 
             if frame.bone_data is not None:
                 
@@ -773,10 +772,9 @@ class dff_importer:
                 # Set empty display properties to something decent
                 self.set_empty_draw_properties(obj)
 
-                obj.rotation_mode       = 'QUATERNION'
-                obj.rotation_quaternion = matrix.to_quaternion()
-                obj.location            = frame.position
-                obj.scale               = matrix.to_scale()
+                obj.rotation_mode = 'QUATERNION'
+                obj.matrix_local  = matrix.copy()
+                obj.matrix_world  = obj.matrix_basis
 
             # Link mesh to frame
             for mesh in meshes:
@@ -789,13 +787,21 @@ class dff_importer:
                     armature = parent_bone['armature']
                     bone_name = parent_bone['name']
                     obj.parent = armature
+                    obj.matrix_world = self.multiply_matrix(
+                        self.multiply_matrix(armature.matrix_world, obj.matrix_parent_inverse),
+                        obj.matrix_basis)
 
-                    constraint = obj.constraints.new('COPY_TRANSFORMS')
+                    # Create a constraint to link the frame
+                    constraint = obj.constraints.new('CHILD_OF')
+                    constraint.inverse_matrix = armature.matrix_world.inverted()
                     constraint.target = armature
                     constraint.subtarget = bone_name
 
                 else:
                     obj.parent = self.objects[frame.parent]
+                    obj.matrix_world = self.multiply_matrix(
+                        self.multiply_matrix(obj.parent.matrix_world, obj.matrix_parent_inverse),
+                        obj.matrix_basis)
 
             self.objects[index] = obj
 
