@@ -281,10 +281,7 @@ class dff_exporter:
     file_name = ""
     dff = None
     version = None
-    frames = {}
     frame_objects = {}
-    bones = {}
-    parent_queue = {}
     collection = None
     export_coll = False
     exclude_geo_faces = False
@@ -313,12 +310,6 @@ class dff_exporter:
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
 
-        # Scan parent queue
-        for name in self.parent_queue:
-            if name == obj.name:
-                index = self.parent_queue[name]
-                self.dff.frame_list[index].parent = frame_index
-
         matrix = obj.matrix_local
         if is_bone and obj.parent is not None:
             matrix = self.multiply_matrix(obj.parent.matrix_local.inverted(), matrix)
@@ -333,18 +324,14 @@ class dff_exporter:
         if "dff_user_data" in obj:
             frame.user_data = dff.UserData.from_mem(obj["dff_user_data"])
 
-        id_array = self.bones if is_bone else self.frames
-        
         if set_parent and obj.parent is not None:
 
-            if obj.parent.name not in id_array:
+            if obj.parent not in self.frame_objects:
                 raise DffExportException(f"Failed to set parent for {obj.name} "
                                          f"to {obj.parent.name}.")
-            
-            parent_frame_idx = id_array[obj.parent.name]
-            frame.parent = parent_frame_idx
 
-        id_array[obj.name] = frame_index
+            parent_frame_idx = self.frame_objects[obj.parent]
+            frame.parent = parent_frame_idx
 
         if append:
             self.dff.frame_list.append(frame)
@@ -794,7 +781,7 @@ class dff_exporter:
 
         # Create new frame
         if frame_index is None:
-            self.create_frame(obj)
+            self.create_frame(obj, set_parent=False)
             frame_index = self.get_last_frame_index()
 
         # Create geometry
@@ -932,6 +919,36 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
+    def export_empty(obj):
+        self = dff_exporter
+
+        # Get frame index from constraint
+        frame_index = None
+        for constraint in obj.constraints:
+            if constraint.type != 'CHILD_OF':
+                continue
+
+            armature = constraint.target
+            if not armature:
+                continue
+
+            bone = armature.data.bones.get(constraint.subtarget)
+            if not bone:
+                continue
+
+            frame_index = self.frame_objects.get(bone)
+            if frame_index is not None:
+                break
+
+        # Get frame index from parent
+        if frame_index is None:
+            frame_index = self.frame_objects.get(obj.parent)
+
+        # Create new frame
+        self.create_frame(obj, set_parent=frame_index is not None)
+
+    #######################################################
+    @staticmethod
     def export_objects(objects, name=None):
         self = dff_exporter
 
@@ -956,7 +973,7 @@ class dff_exporter:
 
             # create an empty frame
             elif obj.type == "EMPTY":
-                self.create_frame(obj)
+                self.export_empty(obj)
 
             elif obj.type == "ARMATURE":
                 self.export_armature(obj)
@@ -1026,9 +1043,8 @@ class dff_exporter:
                 objects = sorted(objects, key=objects.get)
                 self.export_objects(objects,
                                     collection.name)
-                objects     = {}
-                self.frames = {}
-                self.bones  = {}
+                objects            = {}
+                self.frame_objects = {}
                 self.collection = collection
 
         if not self.mass_export:
