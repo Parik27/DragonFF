@@ -794,7 +794,7 @@ class dff_exporter:
 
         # Create new frame
         if frame_index is None:
-            self.create_frame(obj)
+            self.create_frame(obj, set_parent=False)
             frame_index = self.get_last_frame_index()
 
         # Create geometry
