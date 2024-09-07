@@ -384,6 +384,12 @@ class SCENE_OT_dff_frame_move(bpy.types.Operator):
 
     #######################################################
     def execute(self, context):
+
+        def append_children_recursive(ob):
+            for ch in ob.children:
+                children.append(ch)
+                append_children_recursive(ch)
+
         State.update_scene(context.scene)
 
         scene_dff = context.scene.dff
@@ -411,7 +417,11 @@ class SCENE_OT_dff_frame_move(bpy.types.Operator):
 
         else:
             obj1 = scene_dff.frames[active_index].obj
-            children = obj1.children_recursive
+            if (3, 1, 0) > bpy.app.version:
+                children = []
+                append_children_recursive(obj1)
+            else:
+                children = obj1.children_recursive
 
             new_index = active_index + 1
             for frame in scene_dff.frames[new_index:]:
