@@ -21,6 +21,7 @@ import os
 import os.path
 
 from ..gtaLib import dff
+from ..ops.state import State
 from .col_exporter import export_col
 
 #######################################################
@@ -836,19 +837,6 @@ class dff_exporter:
 
         self.dff.atomic_list.append(atomic)
 
-
-    #######################################################
-    @staticmethod
-    def calculate_parent_depth(obj):
-        parent = obj.parent
-        depth = 0
-        
-        while parent is not None:
-            parent = parent.parent
-            depth += 1
-
-        return depth        
-
     #######################################################
     @staticmethod
     def check_armature_parent(obj):
@@ -990,7 +978,7 @@ class dff_exporter:
             elif obj.type == "ARMATURE":
                 self.export_armature(obj)
 
-        meshes = sorted(meshes, key=lambda o: o.name)
+        meshes = sorted(meshes, key=lambda ob: ob.dff.atomic_index)
 
         for mesh in meshes:
             self.populate_atomic(mesh)
@@ -1031,9 +1019,10 @@ class dff_exporter:
         self = dff_exporter
 
         self.file_name = filename
-        
+
+        State.update_scene()
         objects = {}
-        
+
         # Export collections
         if bpy.app.version < (2, 80, 0):
             collections = [bpy.data]
@@ -1048,7 +1037,7 @@ class dff_exporter:
             for obj in collection.objects:
                     
                 if not self.selected or obj.select_get():
-                    objects[obj] = self.calculate_parent_depth(obj)
+                    objects[obj] = obj.dff.frame_index
 
             if self.mass_export:
                 objects = sorted(objects, key=objects.get)

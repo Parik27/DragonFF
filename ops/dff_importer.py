@@ -27,6 +27,7 @@ from .importer_common import (
     hide_object)
 from .col_importer import import_col_mem
 from ..ops import txd_importer
+from ..ops.state import State
 
 #######################################################
 class ext_2dfx_importer:
@@ -116,7 +117,7 @@ class dff_importer:
         self = dff_importer
 
         # Import atomics (meshes)
-        for atomic in self.dff.atomic_list:
+        for atomic_index, atomic in enumerate(self.dff.atomic_list):
 
             frame = self.dff.frame_list[atomic.frame]
             geom = self.dff.geometry_list[atomic.geometry]
@@ -265,7 +266,9 @@ class dff_importer:
 
             if obj.dff.pipeline == 'CUSTOM':
                 obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
-                    
+
+            obj.dff.atomic_index = atomic_index
+
             # Delete temporary properties used earlier
             del mesh['dragon_pipeline'      ]
             del mesh['dragon_normals'       ]
@@ -803,6 +806,8 @@ class dff_importer:
                         self.multiply_matrix(obj.parent.matrix_world, obj.matrix_parent_inverse),
                         obj.matrix_basis)
 
+            obj.dff.frame_index = index
+
             self.objects[index] = obj
 
             # Set a collision model used for export
@@ -860,6 +865,8 @@ class dff_importer:
                     # Hide objects
                     for object in collection.objects:
                         hide_object(object)
+
+        State.update_scene()
 
 #######################################################
 def import_dff(options):
