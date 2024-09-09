@@ -297,7 +297,7 @@ class dff_exporter:
     
     #######################################################
     @staticmethod
-    def create_frame(obj, append=True, set_parent=True):
+    def create_frame(obj, append=True, set_parent=True, matrix_local=None):
         self = dff_exporter
         
         frame       = dff.Frame()
@@ -310,7 +310,7 @@ class dff_exporter:
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
 
-        matrix = obj.matrix_local
+        matrix = matrix_local or obj.matrix_local
         if is_bone and obj.parent is not None:
             matrix = self.multiply_matrix(obj.parent.matrix_local.inverted(), matrix)
 
@@ -922,6 +922,8 @@ class dff_exporter:
     def export_empty(obj):
         self = dff_exporter
 
+        matrix_local = obj.matrix_local
+
         # Get frame index from constraint
         frame_index = None
         for constraint in obj.constraints:
@@ -938,6 +940,7 @@ class dff_exporter:
 
             frame_index = self.frame_objects.get(bone)
             if frame_index is not None:
+                matrix_local = obj.matrix_basis
                 break
 
         # Get frame index from parent
@@ -945,7 +948,9 @@ class dff_exporter:
             frame_index = self.frame_objects.get(obj.parent)
 
         # Create new frame
-        self.create_frame(obj, set_parent=frame_index is not None)
+        frame = self.create_frame(obj, set_parent=False, matrix_local=matrix_local)
+        if frame_index is not None:
+            frame.parent = frame_index
 
     #######################################################
     @staticmethod
