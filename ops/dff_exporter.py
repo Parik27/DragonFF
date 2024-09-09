@@ -294,10 +294,20 @@ class dff_exporter:
         if bpy.app.version < (2, 80, 0):
             return a * b
         return a @ b
-    
+
     #######################################################
     @staticmethod
-    def create_frame(obj, append=True, set_parent=True, matrix_local=None):
+    def get_object_parent(obj):
+        if type(obj) is bpy.types.Object and obj.parent_bone:
+            parent = obj.parent.data.bones.get(obj.parent_bone)
+            if parent:
+                return parent
+
+        return obj.parent
+
+    #######################################################
+    @staticmethod
+    def create_frame(obj, append=True, set_parent=True):
         self = dff_exporter
         
         frame       = dff.Frame()
@@ -310,7 +320,7 @@ class dff_exporter:
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
 
-        matrix = matrix_local or obj.matrix_local
+        matrix = obj.matrix_local
         if is_bone and obj.parent is not None:
             matrix = self.multiply_matrix(obj.parent.matrix_local.inverted(), matrix)
 
@@ -324,13 +334,14 @@ class dff_exporter:
         if "dff_user_data" in obj:
             frame.user_data = dff.UserData.from_mem(obj["dff_user_data"])
 
-        if set_parent and obj.parent is not None:
+        parent = self.get_object_parent(obj)
+        if set_parent and parent is not None:
 
-            if obj.parent not in self.frame_objects:
+            if parent not in self.frame_objects:
                 raise DffExportException(f"Failed to set parent for {obj.name} "
-                                         f"to {obj.parent.name}.")
+                                         f"to {parent.name}.")
 
-            parent_frame_idx = self.frame_objects[obj.parent]
+            parent_frame_idx = self.frame_objects[parent]
             frame.parent = parent_frame_idx
 
         if append:
@@ -749,23 +760,11 @@ class dff_exporter:
     def populate_atomic(obj):
         self = dff_exporter
 
-        # Get frame index from constraint
+        # Get frame index from parent
         frame_index = None
-        for constraint in obj.constraints:
-            if constraint.type != 'COPY_TRANSFORMS':
-                continue
-
-            armature = constraint.target
-            if not armature:
-                continue
-
-            bone = armature.data.bones.get(constraint.subtarget)
-            if not bone:
-                continue
-
-            frame_index = self.frame_objects.get(bone)
-            if frame_index is not None:
-                break
+        parent = self.get_object_parent(obj)
+        if parent:
+            frame_index = self.frame_objects.get(parent)
 
         # Get frame index from armature modifier
         if frame_index is None:
@@ -775,11 +774,7 @@ class dff_exporter:
                     if frame_index is not None:
                         break
 
-        # Get frame index from parent
-        if frame_index is None:
-            frame_index = self.frame_objects.get(obj.parent)
-
-        # Create new frame
+        # Create new frame if there is no parent
         if frame_index is None:
             self.create_frame(obj, set_parent=False)
             frame_index = self.get_last_frame_index()
@@ -922,35 +917,9 @@ class dff_exporter:
     def export_empty(obj):
         self = dff_exporter
 
-        matrix_local = obj.matrix_local
-
-        # Get frame index from constraint
-        frame_index = None
-        for constraint in obj.constraints:
-            if constraint.type != 'CHILD_OF':
-                continue
-
-            armature = constraint.target
-            if not armature:
-                continue
-
-            bone = armature.data.bones.get(constraint.subtarget)
-            if not bone:
-                continue
-
-            frame_index = self.frame_objects.get(bone)
-            if frame_index is not None:
-                matrix_local = obj.matrix_basis
-                break
-
-        # Get frame index from parent
-        if frame_index is None:
-            frame_index = self.frame_objects.get(obj.parent)
-
         # Create new frame
-        frame = self.create_frame(obj, set_parent=False, matrix_local=matrix_local)
-        if frame_index is not None:
-            frame.parent = frame_index
+        set_parent = self.get_object_parent(obj) in self.frame_objects
+        self.create_frame(obj, set_parent=set_parent)
 
     #######################################################
     @staticmethod

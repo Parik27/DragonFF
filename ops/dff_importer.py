@@ -749,21 +749,22 @@ class dff_importer:
                     for mesh in meshes:
                         armature = self.frame_bones[index]['armature']
                         bone_name = self.frame_bones[index]['name']
+                        mesh.parent = armature
+                        mesh.parent_bone = bone_name
 
-                        mesh.rotation_mode       = 'QUATERNION'
-                        mesh.matrix_local        = armature.pose.bones[bone_name].matrix.copy()
-                        mesh.parent              = armature
-
-                        # Create a constraint to link the frame
-                        constraint = mesh.constraints.new('COPY_TRANSFORMS')
-                        constraint.target = armature
-                        constraint.subtarget = bone_name
-
-                        # Disable constraint for skinned mesh
+                        is_skinned = False
                         for modifier in mesh.modifiers:
                             if modifier.type == 'ARMATURE' and modifier.object == armature:
-                                constraint.enabled = False
+                                is_skinned = True
                                 break
+
+                        # For skinned mesh use default parent_type, just change matrix_local
+                        # Otherwise it will break the animations
+                        if is_skinned:
+                            mesh.rotation_mode = 'QUATERNION'
+                            mesh.matrix_local = armature.pose.bones[bone_name].matrix.copy()
+                        else:
+                            mesh.parent_type = 'BONE'
 
                     continue
 
@@ -777,7 +778,6 @@ class dff_importer:
 
                 obj.rotation_mode = 'QUATERNION'
                 obj.matrix_local  = matrix.copy()
-                obj.matrix_world  = obj.matrix_basis
 
             # Link mesh to frame
             for mesh in meshes:
@@ -790,21 +790,11 @@ class dff_importer:
                     armature = parent_bone['armature']
                     bone_name = parent_bone['name']
                     obj.parent = armature
-                    obj.matrix_world = self.multiply_matrix(
-                        self.multiply_matrix(armature.matrix_world, obj.matrix_parent_inverse),
-                        obj.matrix_basis)
-
-                    # Create a constraint to link the frame
-                    constraint = obj.constraints.new('CHILD_OF')
-                    constraint.inverse_matrix = armature.matrix_world.inverted()
-                    constraint.target = armature
-                    constraint.subtarget = bone_name
+                    obj.parent_bone = bone_name
+                    obj.parent_type = 'BONE'
 
                 else:
                     obj.parent = self.objects[frame.parent]
-                    obj.matrix_world = self.multiply_matrix(
-                        self.multiply_matrix(obj.parent.matrix_world, obj.matrix_parent_inverse),
-                        obj.matrix_basis)
 
             obj.dff.frame_index = index
 
