@@ -734,7 +734,8 @@ class dff_importer:
                     frame.rotation_matrix.at
                 )
             )
-            matrix = self.multiply_matrix(mathutils.Matrix.Translation(frame.position), matrix.transposed().to_4x4())
+            matrix = self.multiply_matrix(mathutils.Matrix.Translation(frame.position),
+                                          matrix.transposed().to_4x4())
 
             if frame.bone_data is not None:
                 
@@ -747,24 +748,9 @@ class dff_importer:
 
                     # Link mesh to frame
                     for mesh in meshes:
-                        armature = self.frame_bones[index]['armature']
-                        bone_name = self.frame_bones[index]['name']
-                        mesh.parent = armature
-                        mesh.parent_bone = bone_name
-
-                        is_skinned = False
-                        for modifier in mesh.modifiers:
-                            if modifier.type == 'ARMATURE' and modifier.object == armature:
-                                is_skinned = True
-                                break
-
-                        # For skinned mesh use default parent_type, just change matrix_local
-                        # Otherwise it will break the animations
-                        if is_skinned:
-                            mesh.rotation_mode = 'QUATERNION'
-                            mesh.matrix_local = armature.pose.bones[bone_name].matrix.copy()
-                        else:
-                            mesh.parent_type = 'BONE'
+                        parent_bone = self.frame_bones[index]
+                        armature, bone_name = parent_bone['armature'], parent_bone['name']
+                        set_parent_bone(mesh, armature, bone_name)
 
                     continue
 
@@ -787,11 +773,8 @@ class dff_importer:
             if frame.parent != -1:
                 if frame.parent in self.frame_bones:
                     parent_bone = self.frame_bones[frame.parent]
-                    armature = parent_bone['armature']
-                    bone_name = parent_bone['name']
-                    obj.parent = armature
-                    obj.parent_bone = bone_name
-                    obj.parent_type = 'BONE'
+                    armature, bone_name = parent_bone['armature'], parent_bone['name']
+                    set_parent_bone(obj, armature, bone_name)
 
                 else:
                     obj.parent = self.objects[frame.parent]
@@ -857,6 +840,31 @@ class dff_importer:
                         hide_object(object)
 
         State.update_scene()
+
+#######################################################
+def set_parent_bone(obj, armature, bone_name):
+    bone = armature.data.bones.get(bone_name)
+    if not bone:
+        return
+
+    obj.parent = armature
+    obj.parent_bone = bone_name
+
+    is_skinned = False
+    if obj.type == 'MESH':
+        for modifier in obj.modifiers:
+            if modifier.type == 'ARMATURE' and modifier.object == armature:
+                is_skinned = True
+                break
+
+    # For skinned mesh use default parent_type, just change matrix_local
+    # Otherwise it will break the animations
+    if is_skinned:
+        obj.rotation_mode = 'QUATERNION'
+        obj.matrix_local = armature.pose.bones[bone_name].matrix.copy()
+    else:
+        obj.parent_type = 'BONE'
+        obj.matrix_parent_inverse = mathutils.Matrix.Translation((0, -bone.length, 0))
 
 #######################################################
 def import_dff(options):

@@ -495,3 +495,29 @@ class SCENE_OT_dff_update(bpy.types.Operator):
     def execute(self, context):
         State.update_scene(context.scene)
         return {'FINISHED'}
+
+#######################################################
+class OBJECT_OT_dff_set_parent_bone(bpy.types.Operator):
+
+    bl_idname           = "object.dff_set_parent_bone"
+    bl_description      = "Set the object's parenting (DragonFF)"
+    bl_label            = "Set Parent Bone (DragonFF)"
+
+    #######################################################
+    def execute(self, context):
+        objects = [obj for obj in context.selected_objects if obj.type in ("MESH", "EMPTY")]
+        if not objects:
+            return {'CANCELLED'}
+
+        armature = context.active_object
+        bone_name = context.active_bone.name
+
+        for obj in objects:
+            dff_importer.set_parent_bone(obj, armature, bone_name)
+
+        return {'FINISHED'}
+
+#######################################################
+def set_parent_bone_func(self, context):
+    self.layout.separator()
+    self.layout.operator(OBJECT_OT_dff_set_parent_bone.bl_idname, text="Set Parent To (DragonFF)")

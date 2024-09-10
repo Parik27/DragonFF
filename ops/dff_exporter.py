@@ -307,7 +307,7 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def create_frame(obj, append=True, set_parent=True):
+    def create_frame(obj, append=True, set_parent=True, matrix_local=None):
         self = dff_exporter
         
         frame       = dff.Frame()
@@ -320,7 +320,7 @@ class dff_exporter:
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
 
-        matrix = obj.matrix_local
+        matrix = matrix_local or obj.matrix_local
         if is_bone and obj.parent is not None:
             matrix = self.multiply_matrix(obj.parent.matrix_local.inverted(), matrix)
 
@@ -917,9 +917,16 @@ class dff_exporter:
     def export_empty(obj):
         self = dff_exporter
 
-        # Create new frame
-        set_parent = self.get_object_parent(obj) in self.frame_objects
-        self.create_frame(obj, set_parent=set_parent)
+        parent = self.get_object_parent(obj)
+        set_parent = False
+        matrix_local = None
+
+        if parent in self.frame_objects and obj.parent_type == "BONE":
+            set_parent = True
+            matrix_local = obj.matrix_basis
+
+        # Create new frame        
+        self.create_frame(obj, set_parent=set_parent, matrix_local=matrix_local)
 
     #######################################################
     @staticmethod
