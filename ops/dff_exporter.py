@@ -757,14 +757,14 @@ class dff_exporter:
         return mesh
     
     #######################################################
-    def populate_atomic(obj):
+    def populate_atomic(obj, frame_index=None):
         self = dff_exporter
 
         # Get frame index from parent
-        frame_index = None
-        parent = self.get_object_parent(obj)
-        if parent:
-            frame_index = self.frame_objects.get(parent)
+        if frame_index is None:
+            parent = self.get_object_parent(obj)
+            if parent:
+                frame_index = self.frame_objects.get(parent)
 
         # Get frame index from armature modifier
         if frame_index is None:
@@ -939,7 +939,7 @@ class dff_exporter:
         if len(objects) < 1:
             return
 
-        meshes = []
+        atomics_data = []
 
         for obj in objects:
 
@@ -950,7 +950,12 @@ class dff_exporter:
 
             # create atomic in this case
             if obj.type == "MESH":
-                meshes.append(obj)
+                frame_index = None
+                # create an empty frame
+                if obj.dff.is_frame:
+                    self.export_empty(obj)
+                    frame_index = self.get_last_frame_index()
+                atomics_data.append((obj, frame_index))
 
             # create an empty frame
             elif obj.type == "EMPTY":
@@ -959,10 +964,10 @@ class dff_exporter:
             elif obj.type == "ARMATURE":
                 self.export_armature(obj)
 
-        meshes = sorted(meshes, key=lambda ob: ob.dff.atomic_index)
+        atomics_data = sorted(atomics_data, key=lambda a: a[0].dff.atomic_index)
 
-        for mesh in meshes:
-            self.populate_atomic(mesh)
+        for mesh, frame_index in atomics_data:
+            self.populate_atomic(mesh, frame_index)
 
         # Collision
         if self.export_coll:

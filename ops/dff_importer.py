@@ -751,25 +751,36 @@ class dff_importer:
                         parent_bone = self.frame_bones[index]
                         armature, bone_name = parent_bone['armature'], parent_bone['name']
                         set_parent_bone(mesh, armature, bone_name)
+                        mesh.dff.is_frame = False
 
                     continue
 
             # Create and link the object to the scene
             if obj is None:
-                obj = bpy.data.objects.new(frame.name, None)
-                link_object(obj, dff_importer.current_collection)
+                if len(meshes) != 1:
+                    obj = bpy.data.objects.new(frame.name, None)
+                    link_object(obj, dff_importer.current_collection)
 
-                # Set empty display properties to something decent
-                self.set_empty_draw_properties(obj)
+                    # Set empty display properties to something decent
+                    self.set_empty_draw_properties(obj)
+
+                else:
+                    # Use a mesh as a frame object
+                    obj = meshes[0]
+                    obj.name = frame.name
 
                 obj.rotation_mode = 'QUATERNION'
                 obj.matrix_local  = matrix.copy()
 
             # Link mesh to frame
             for mesh in meshes:
-                mesh.parent = obj
+                if obj != mesh:
+                    mesh.parent = obj
+                    mesh.dff.is_frame = False
+                else:
+                    mesh.dff.is_frame = True
 
-            # set parent
+            # Set parent
             if frame.parent != -1:
                 if frame.parent in self.frame_bones:
                     parent_bone = self.frame_bones[frame.parent]
