@@ -108,10 +108,10 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 row = box.row()
                 row.prop(self, "preserve_positions")
 
-            layout.prop(self, "only_selected")
         else:
             layout.prop(self, "preserve_positions")
 
+        layout.prop(self, "only_selected")
         layout.prop(self, "export_coll")
         layout.prop(self, "export_frame_names")
         layout.prop(self, "exclude_geo_faces")
@@ -153,7 +153,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 {
                     "file_name"          : self.filepath,
                     "directory"          : self.directory,
-                    "selected"           : False if self.from_outliner else self.only_selected,
+                    "selected"           : self.only_selected,
                     "mass_export"        : False if self.from_outliner else self.mass_export,
                     "preserve_positions" : self.preserve_positions,
                     "version"            : self.get_selected_rw_version(),
@@ -178,7 +178,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     def invoke(self, context, event):
         # Set good defaults for when invoked from Outliner context menu (probably used with a map edit in mind)
         if self.from_outliner:
-            self.filepath = bpy.context.view_layer.objects.active.name
+            active_object = context.view_layer.objects.active
+            active_collection = active_object.users_collection[0]
+            if active_collection and active_collection != context.scene.collection:
+                self.filepath = active_collection.name
+
+            self.only_selected = False
             self.export_coll = False
             self.preserve_positions = False
 

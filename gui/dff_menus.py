@@ -229,7 +229,7 @@ def export_dff_func(self, context):
 def export_dff_outliner(self, context):
     self.layout.separator()
     self.layout.operator_context = 'INVOKE_DEFAULT'
-    op = self.layout.operator(EXPORT_OT_dff.bl_idname, text="Export object as DFF (.dff)")
+    op = self.layout.operator(EXPORT_OT_dff.bl_idname, text="Export collection objects as DFF (.dff)")
     op.from_outliner = True
 
 #######################################################
