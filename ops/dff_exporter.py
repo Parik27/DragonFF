@@ -921,11 +921,12 @@ class dff_exporter:
         set_parent = False
         matrix_local = None
 
-        if parent in self.frame_objects and obj.parent_type == "BONE":
+        if parent in self.frame_objects:
             set_parent = True
-            matrix_local = obj.matrix_basis
+            if obj.parent_type == "BONE":
+                matrix_local = obj.matrix_basis
 
-        # Create new frame        
+        # Create new frame
         self.create_frame(obj, set_parent=set_parent, matrix_local=matrix_local)
 
     #######################################################
@@ -1012,7 +1013,7 @@ class dff_exporter:
             if self.from_outliner:
                 collections = [bpy.context.view_layer.objects.active.users_collection[0]]
             else:
-                collections = [c for c in bpy.data.collections]
+                collections = [c for c in bpy.data.collections] + [bpy.context.scene.collection]
 
         for collection in collections:
             for obj in collection.objects:
