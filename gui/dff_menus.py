@@ -555,18 +555,58 @@ compatibiility with DFF Viewers"
 
 #######################################################
 class DFF_UL_FrameItems(bpy.types.UIList):
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        if item:
+        if item and item.obj:
             layout.label(text=item.obj.name, icon=item.icon)
+
+    def draw_filter(self, context, layout):
+        layout.prop(context.scene.dff, "filter_collection", toggle=True)
+
+    def filter_items(self, context, data, propname):
+        frames = context.scene.dff.frames
+        frames_num = len(frames)
+
+        flt_flags = [self.bitflag_filter_item | (1 << 0)] * frames_num
+
+        active_object = context.view_layer.objects.active
+        active_collections = {active_object.users_collection} if active_object else None
+
+        if active_collections and context.scene.dff.filter_collection:
+            for i, frame in enumerate(frames):
+                if not active_collections.issubset({frame.obj.users_collection}):
+                    flt_flags[i] &= ~self.bitflag_filter_item
+
+        return flt_flags, list(range(frames_num))
 
 #######################################################
 class DFF_UL_AtomicItems(bpy.types.UIList):
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        if item:
+        if item and item.obj:
             text = item.obj.name
             if item.frame_obj:
                 text += " [%s]" % item.frame_obj.name
             layout.label(text=text, icon='MESH_DATA')
+
+    def draw_filter(self, context, layout):
+        layout.prop(context.scene.dff, "filter_collection", toggle=True)
+
+    def filter_items(self, context, data, propname):
+        atomics = context.scene.dff.atomics
+        atomics_num = len(atomics)
+
+        flt_flags = [self.bitflag_filter_item | (1 << 0)] * atomics_num
+
+        active_object = context.view_layer.objects.active
+        active_collections = {active_object.users_collection} if active_object else None
+
+        if active_collections and context.scene.dff.filter_collection:
+            for i, atomic in enumerate(atomics):
+                if not active_collections.issubset({atomic.obj.users_collection}):
+                    flt_flags[i] &= ~self.bitflag_filter_item
+
+        return flt_flags, list(range(atomics_num))
 
 #######################################################
 class SCENE_PT_dffFrames(bpy.types.Panel):

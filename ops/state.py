@@ -10,7 +10,6 @@ class _StateMeta(type):
 #######################################################
 class State(metaclass=_StateMeta):
 
-    # TODO: collections
     @classmethod
     def update_scene(cls, scene=None):
 

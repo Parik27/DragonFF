@@ -170,9 +170,15 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         update  = atomics_active_changed
     )
 
-    real_time_update :  bpy.props.BoolProperty(
+    real_time_update : bpy.props.BoolProperty(
         name        = "Real Time Update",
         description = "Update the list of objects in real time",
+        default     = True
+    )
+
+    filter_collection : bpy.props.BoolProperty(
+        name        = "Filter Collection",
+        description = "Filter frames and atomics by active collection",
         default     = True
     )
 

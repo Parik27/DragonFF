@@ -387,59 +387,45 @@ class SCENE_OT_dff_frame_move(bpy.types.Operator):
 
         def append_children_recursive(ob):
             for ch in ob.children:
-                children.append(ch)
+                children.add(ch)
                 append_children_recursive(ch)
 
         State.update_scene(context.scene)
 
+        step = -1 if self.direction == "UP" else 1
         scene_dff = context.scene.dff
-        active_index = scene_dff.frames_active
+        old_index = scene_dff.frames_active
         frames_num = len(scene_dff.frames)
 
-        if frames_num < 2:
-            return {'CANCELLED'}
+        obj1 = scene_dff.frames[old_index].obj
+        active_collections = {obj1.users_collection}
 
-        if self.direction == "UP":
-            obj1 = scene_dff.frames[active_index].obj
-
-            new_index = active_index - 1
-            if new_index < 0:
-                return {'CANCELLED'}
-
-            obj2 = scene_dff.frames[new_index].obj
-            if obj2 == obj1.parent:
-                return {'CANCELLED'}
-
-            obj1.dff.frame_index = new_index
-            obj2.dff.frame_index = active_index
-            scene_dff.frames.move(new_index, active_index)
-            scene_dff.frames_active = new_index
-
+        if (3, 1, 0) > bpy.app.version:
+            children = set()
+            append_children_recursive(obj1)
         else:
-            obj1 = scene_dff.frames[active_index].obj
-            if (3, 1, 0) > bpy.app.version:
-                children = []
-                append_children_recursive(obj1)
+            children = {ch for ch in obj1.children_recursive}
+
+        new_index = old_index + step
+        while new_index >= 0 and new_index < frames_num:
+            obj2 = scene_dff.frames[new_index].obj
+            no_filter = not scene_dff.filter_collection or active_collections.issubset({obj2.users_collection})
+            if step < 0:
+                no_parent = obj1.parent != obj2
             else:
-                children = obj1.children_recursive
+                no_parent = obj2 not in children
 
-            new_index = active_index + 1
-            for frame in scene_dff.frames[new_index:]:
-                if frame.obj in children:
-                    new_index += 1
-                else:
-                    break
+            if no_filter and no_parent:
+                for idx in range(old_index, new_index, step):
+                    scene_dff.frames[idx].obj.dff.frame_index += step
+                obj2.dff.frame_index = old_index
+                scene_dff.frames.move(new_index, old_index)
+                scene_dff.frames_active = old_index + step
+                return {'FINISHED'}
 
-            if new_index >= frames_num:
-                return {'CANCELLED'}
+            new_index += step
 
-            for frame in scene_dff.frames[active_index:new_index]:
-                frame.obj.dff.frame_index += 1
-            scene_dff.frames[new_index].obj.dff.frame_index = active_index
-            scene_dff.frames.move(new_index, active_index)
-            scene_dff.frames_active = active_index + 1
-
-        return {'FINISHED'}
+        return {'CANCELLED'}
 
 #######################################################
 class SCENE_OT_dff_atomic_move(bpy.types.Operator):
@@ -460,28 +446,30 @@ class SCENE_OT_dff_atomic_move(bpy.types.Operator):
     def execute(self, context):
         State.update_scene(context.scene)
 
+        step = -1 if self.direction == "UP" else 1
         scene_dff = context.scene.dff
-        active_index = scene_dff.atomics_active
+        old_index = scene_dff.atomics_active
         atomics_num = len(scene_dff.atomics)
 
-        if atomics_num < 2:
-            return {'CANCELLED'}
+        obj1 = scene_dff.atomics[old_index].obj
+        active_collections = {obj1.users_collection}
 
-        step = -1 if self.direction == "UP" else 1
-        new_index = active_index + step
+        new_index = old_index + step
+        while new_index >= 0 and new_index < atomics_num:
+            obj2 = scene_dff.atomics[new_index].obj
+            no_filter = not scene_dff.filter_collection or active_collections.issubset({obj2.users_collection})
 
-        if new_index < 0 or new_index >= atomics_num:
-            return {'CANCELLED'}
+            if no_filter:
+                for idx in range(old_index, new_index, step):
+                    scene_dff.atomics[idx].obj.dff.atomic_index += step
+                obj2.dff.atomic_index = old_index
+                scene_dff.atomics.move(new_index, old_index)
+                scene_dff.atomics_active = old_index + step
+                return {'FINISHED'}
 
-        obj1 = scene_dff.atomics[active_index].obj
-        obj2 = scene_dff.atomics[new_index].obj
+            new_index += step
 
-        obj1.dff.atomic_index = new_index
-        obj2.dff.atomic_index = active_index
-        scene_dff.atomics.move(new_index, active_index)
-        scene_dff.atomics_active = new_index
-
-        return {'FINISHED'}
+        return {'CANCELLED'}
 
 #######################################################
 class SCENE_OT_dff_update(bpy.types.Operator):
