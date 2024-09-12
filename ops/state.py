@@ -28,6 +28,10 @@ class State(metaclass=_StateMeta):
 
             if ob.type == 'MESH':
                 atomic_objects.append(ob)
+                if not ob.dff.is_frame and (not ob.parent or ob.children):
+                    ob.dff.is_frame = True
+                if ob.dff.is_frame:
+                    frame_objects.append(ob)
 
             elif ob.type in ('EMPTY', 'ARMATURE'):
                 frame_objects.append(ob)

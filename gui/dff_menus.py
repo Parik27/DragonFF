@@ -289,8 +289,13 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "triangle_strip", text="Use Triangle Strip")
         box.prop(settings, "light", text="Enable Lighting")
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
-            
-        properties = [         
+
+        row = box.row()
+        if not context.object.parent or context.object.children:
+            row.enabled = False
+        row.prop(settings, "is_frame", text="Export As Frame")
+
+        properties = [
             ["day_cols", "Day Vertex Colours"],
             ["night_cols", "Night Vertex Colours"],
         ]
@@ -448,6 +453,11 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         )
     )
 
+    is_frame : bpy.props.BoolProperty(
+        default     = False,
+        description = "Object will be exported as a frame"
+    )
+
     # Mesh properties
     pipeline : bpy.props.EnumProperty(
         items = (
@@ -585,7 +595,7 @@ class DFF_UL_AtomicItems(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         if item and item.obj:
             text = item.obj.name
-            if item.frame_obj:
+            if item.frame_obj and not item.obj.dff.is_frame:
                 text += " [%s]" % item.frame_obj.name
             layout.label(text=text, icon='MESH_DATA')
 
