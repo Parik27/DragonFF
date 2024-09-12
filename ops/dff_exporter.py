@@ -19,9 +19,9 @@ import bmesh
 import mathutils
 import os
 import os.path
-from collections import defaultdict
 
 from ..gtaLib import dff
+from ..ops.state import State
 from .col_exporter import export_col
 
 #######################################################
@@ -281,9 +281,7 @@ class dff_exporter:
     file_name = ""
     dff = None
     version = None
-    frames = {}
-    bones = {}
-    parent_queue = {}
+    frame_objects = {}
     collection = None
     export_coll = False
     exclude_geo_faces = False
@@ -296,10 +294,20 @@ class dff_exporter:
         if bpy.app.version < (2, 80, 0):
             return a * b
         return a @ b
-    
+
     #######################################################
     @staticmethod
-    def create_frame(obj, append=True, set_parent=True):
+    def get_object_parent(obj):
+        if type(obj) is bpy.types.Object and obj.parent_bone:
+            parent = obj.parent.data.bones.get(obj.parent_bone)
+            if parent:
+                return parent
+
+        return obj.parent
+
+    #######################################################
+    @staticmethod
+    def create_frame(obj, append=True, set_parent=True, matrix_local=None):
         self = dff_exporter
         
         frame       = dff.Frame()
@@ -312,13 +320,7 @@ class dff_exporter:
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
 
-        # Scan parent queue
-        for name in self.parent_queue:
-            if name == obj.name:
-                index = self.parent_queue[name]
-                self.dff.frame_list[index].parent = frame_index
-
-        matrix = obj.matrix_local
+        matrix = matrix_local or obj.matrix_local
         if is_bone and obj.parent is not None:
             matrix = self.multiply_matrix(obj.parent.matrix_local.inverted(), matrix)
 
@@ -332,23 +334,26 @@ class dff_exporter:
         if "dff_user_data" in obj:
             frame.user_data = dff.UserData.from_mem(obj["dff_user_data"])
 
-        id_array = self.bones if is_bone else self.frames
-        
-        if set_parent and obj.parent is not None:
+        parent = self.get_object_parent(obj)
+        if set_parent and parent is not None:
 
-            if obj.parent.name not in id_array:
+            if parent not in self.frame_objects:
                 raise DffExportException(f"Failed to set parent for {obj.name} "
-                                         f"to {obj.parent.name}.")
-            
-            parent_frame_idx = id_array[obj.parent.name]
-            frame.parent = parent_frame_idx
+                                         f"to {parent.name}.")
 
-        id_array[obj.name] = frame_index
+            parent_frame_idx = self.frame_objects[parent]
+            frame.parent = parent_frame_idx
 
         if append:
             self.dff.frame_list.append(frame)
 
+        self.frame_objects[obj] = frame_index
         return frame
+
+    #######################################################
+    @staticmethod
+    def get_last_frame_index():
+        return len(dff_exporter.dff.frame_list) - 1
 
     #######################################################
     @staticmethod
@@ -752,19 +757,31 @@ class dff_exporter:
         return mesh
     
     #######################################################
-    def populate_atomic(obj):
+    def populate_atomic(obj, frame_index=None):
         self = dff_exporter
 
-        # Get armature
-        armature = None
-        for modifier in obj.modifiers:
-            if modifier.type == 'ARMATURE':
-                armature = modifier.object
+        # Get frame index from parent
+        if frame_index is None:
+            parent = self.get_object_parent(obj)
+            if parent:
+                frame_index = self.frame_objects.get(parent)
+
+        # Get frame index from armature modifier
+        if frame_index is None:
+            for modifier in obj.modifiers:
+                if modifier.type == 'ARMATURE':
+                    frame_index = self.frame_objects.get(modifier.object)
+                    if frame_index is not None:
+                        break
+
+        # Create new frame if there is no parent
+        if frame_index is None:
+            self.create_frame(obj, set_parent=False)
+            frame_index = self.get_last_frame_index()
 
         # Create geometry
         geometry = dff.Geometry()
         self.populate_geometry_with_mesh_data (obj, geometry)
-        self.create_frame(obj, True, obj.parent != armature)
 
         # Bounding sphere
         sphere_center = 0.125 * sum(
@@ -772,8 +789,8 @@ class dff_exporter:
             mathutils.Vector()
         )
         sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
-        sphere_radius = 1.732 * max(*obj.dimensions) / 2        
-        
+        sphere_radius = 1.732 * max(*obj.dimensions) / 2
+
         geometry.bounding_sphere = dff.Sphere._make(
             list(sphere_center) + [sphere_radius]
         )
@@ -798,39 +815,22 @@ class dff_exporter:
                     geometry.pipeline = int(obj.dff.custom_pipeline, 0)
                 else:
                     geometry.pipeline = int(obj.dff.pipeline, 0)
-                    
+
         except ValueError:
             print("Invalid (Custom) Pipeline")
-            
+
         # Add Geometry to list
         self.dff.geometry_list.append(geometry)
-        
+
         # Create Atomic from geometry and frame
         geometry_index = len(self.dff.geometry_list) - 1
-        frame_index    = len(self.dff.frame_list) - 1
         atomic         = dff.Atomic._make((frame_index,
-                                           geometry_index,
-                                           0x4,
-                                           0
+                                        geometry_index,
+                                        0x4,
+                                        0
         ))
+
         self.dff.atomic_list.append(atomic)
-
-        # Export armature
-        if armature is not None:
-            self.export_armature(armature, obj)
-
-
-    #######################################################
-    @staticmethod
-    def calculate_parent_depth(obj):
-        parent = obj.parent
-        depth = 0
-        
-        while parent is not None:
-            parent = parent.parent
-            depth += 1
-
-        return depth        
 
     #######################################################
     @staticmethod
@@ -857,7 +857,7 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def export_armature(obj, parent):
+    def export_armature(obj):
         self = dff_exporter
         
         for index, bone in enumerate(obj.data.bones):
@@ -869,7 +869,11 @@ class dff_exporter:
                 frame = self.create_frame(bone, False)
 
                 # set the first bone's parent to armature's parent
-                frame.parent = self.frames[parent.name]
+                if obj.parent and obj.parent in self.frame_objects:
+                    frame.parent = self.frame_objects[obj.parent]
+                else:
+                    self.create_frame(obj)
+                    frame.parent = self.get_last_frame_index()
 
                 bone_data = dff.HAnimPLG()
                 bone_data.header = dff.HAnimHeader(
@@ -891,6 +895,7 @@ class dff_exporter:
 
                 frame.bone_data = bone_data
                 self.dff.frame_list.append(frame)
+                self.frame_objects[obj] = self.get_last_frame_index()
                 continue
 
             # Create a regular Bone
@@ -905,18 +910,38 @@ class dff_exporter:
             )
             frame.bone_data = bone_data
             self.dff.frame_list.append(frame)
+            self.frame_objects[bone] = self.get_last_frame_index()
+
+    #######################################################
+    @staticmethod
+    def export_empty(obj):
+        self = dff_exporter
+
+        parent = self.get_object_parent(obj)
+        set_parent = False
+        matrix_local = None
+
+        if parent in self.frame_objects:
+            set_parent = True
+            if obj.parent_type == "BONE":
+                matrix_local = obj.matrix_basis
+
+        # Create new frame
+        self.create_frame(obj, set_parent=set_parent, matrix_local=matrix_local)
 
     #######################################################
     @staticmethod
     def export_objects(objects, name=None):
         self = dff_exporter
-        
+
         self.dff = dff.dff()
 
         # Skip empty collections
         if len(objects) < 1:
             return
-        
+
+        atomics_data = []
+
         for obj in objects:
 
             # We can just ignore collision meshes here as the DFF exporter will still look for
@@ -926,12 +951,25 @@ class dff_exporter:
 
             # create atomic in this case
             if obj.type == "MESH":
-                self.populate_atomic(obj)
+                frame_index = None
+                # create an empty frame
+                if obj.dff.is_frame:
+                    self.export_empty(obj)
+                    frame_index = self.get_last_frame_index()
+                atomics_data.append((obj, frame_index))
 
             # create an empty frame
             elif obj.type == "EMPTY":
-                self.create_frame(obj)
-        
+                self.export_empty(obj)
+
+            elif obj.type == "ARMATURE":
+                self.export_armature(obj)
+
+        atomics_data = sorted(atomics_data, key=lambda a: a[0].dff.atomic_index)
+
+        for mesh, frame_index in atomics_data:
+            self.populate_atomic(mesh, frame_index)
+
         # Collision
         if self.export_coll:
             mem = export_col({
@@ -968,9 +1006,10 @@ class dff_exporter:
         self = dff_exporter
 
         self.file_name = filename
-        
+
+        State.update_scene()
         objects = {}
-        
+
         # Export collections
         if bpy.app.version < (2, 80, 0):
             collections = [bpy.data]
@@ -979,21 +1018,20 @@ class dff_exporter:
             if self.from_outliner:
                 collections = [bpy.context.view_layer.objects.active.users_collection[0]]
             else:
-                collections = [c for c in bpy.data.collections]
+                collections = [c for c in bpy.data.collections] + [bpy.context.scene.collection]
 
         for collection in collections:
             for obj in collection.objects:
                     
                 if not self.selected or obj.select_get():
-                    objects[obj] = self.calculate_parent_depth(obj)
+                    objects[obj] = obj.dff.frame_index
 
             if self.mass_export:
                 objects = sorted(objects, key=objects.get)
                 self.export_objects(objects,
                                     collection.name)
-                objects     = {}
-                self.frames = {}
-                self.bones  = {}
+                objects            = {}
+                self.frame_objects = {}
                 self.collection = collection
 
         if not self.mass_export:

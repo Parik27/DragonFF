@@ -482,14 +482,18 @@ class NativePS2Texture(TextureNative):
     def unswizzle8(data, width, height):
         res = bytearray(width * height)
         for y in range(height):
+            block_y = (y & ~0xf) * width
+            posY = (((y & ~3) >> 1) + (y & 1)) & 0x7
+            swap_selector = (((y + 2) >> 2) & 0x1) * 4
+            base_column_location = posY * width * 2
+
             for x in range(width):
-                block_location = (y & (~0xf)) * width + (x & (~0xf)) * 2
-                swap_selector = (((y + 2) >> 2) & 0x1) * 4
-                posY = (((y & (~3)) >> 1) + (y & 1)) & 0x7
-                column_location = posY * width * 2 + ((x + swap_selector) & 0x7) * 4
+                block_x = (x & ~0xf) * 2
+                column_location = base_column_location + ((x + swap_selector) & 0x7) * 4
                 byte_num = ((y >> 1) & 1) + ((x >> 2) & 2)
-                swizzleid = block_location + column_location + byte_num
+                swizzleid = block_y + block_x + column_location + byte_num
                 res[y * width + x] = data[swizzleid]
+
         return res
 
     #######################################################
@@ -498,18 +502,17 @@ class NativePS2Texture(TextureNative):
         pixels = bytearray(width * height)
         for i in range(width * height // 2):
             index = data[i]
-            id2 = (index >> 4) & 0xf
-            id1 = index & 0xf
-            pixels[i*2] = id1
-            pixels[i*2+1] = id2
+            pixels[i*2] = index & 0xf
+            pixels[i*2+1] = (index >> 4) & 0xf
 
         pixels = NativePS2Texture.unswizzle8(pixels, width, height)
-        res = bytearray(width * height)
+
+        res = bytearray(width * height // 2)
         for i in range(width * height // 2):
-            idx1 = pixels[i*2+0]
+            idx1 = pixels[i*2]
             idx2 = pixels[i*2+1]
-            idx = ((idx2 << 4) | idx1) & 0xff
-            res[i] = idx
+            res[i] = (idx2 << 4) | idx1
+
         return res
 
     #######################################################
@@ -517,8 +520,9 @@ class NativePS2Texture(TextureNative):
     def unswizzle_palette(data):
         palette = bytearray(1024)
         for p in range(256):
-            pos = ((p & 231) + ((p & 8) << 1) + ((p & 16) >> 1))
-            palette[pos*4:pos*4+4] = data[p*4:p*4+4]
+            pos_l = ((p & 231) | ((p & 8) << 1) | ((p & 16) >> 1)) * 4
+            pos_r = p * 4
+            palette[pos_l:pos_l+4] = data[pos_r:pos_r+4]
         return bytes(palette)
 
     #######################################################
@@ -526,8 +530,9 @@ class NativePS2Texture(TextureNative):
         palette = bytearray(size)
         data = self._read_raw(size)
         for i in range(0, size, 4):
-            palette[i:i+3] = data[i:i+3]
-            palette[i+3] = min((data[i+3] & 0xFF) * 2, 255)
+            r, g, b, a = data[i:i+4]
+            palette[i:i+3] = r, g, b
+            palette[i+3] = min(a * 2, 255)
         return bytes(palette)
 
     #######################################################

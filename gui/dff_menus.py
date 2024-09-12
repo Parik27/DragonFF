@@ -1,5 +1,6 @@
 import bpy
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff
+from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
 from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
 
 texture_filters_items = (
@@ -228,7 +229,7 @@ def export_dff_func(self, context):
 def export_dff_outliner(self, context):
     self.layout.separator()
     self.layout.operator_context = 'INVOKE_DEFAULT'
-    op = self.layout.operator(EXPORT_OT_dff.bl_idname, text="Export object as DFF (.dff)")
+    op = self.layout.operator(EXPORT_OT_dff.bl_idname, text="Export collection objects as DFF (.dff)")
     op.from_outliner = True
 
 #######################################################
@@ -288,8 +289,13 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "triangle_strip", text="Use Triangle Strip")
         box.prop(settings, "light", text="Enable Lighting")
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
-            
-        properties = [         
+
+        row = box.row()
+        if not context.object.parent or context.object.children:
+            row.enabled = False
+        row.prop(settings, "is_frame", text="Export As Frame")
+
+        properties = [
             ["day_cols", "Day Vertex Colours"],
             ["night_cols", "Night Vertex Colours"],
         ]
@@ -447,6 +453,11 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         )
     )
 
+    is_frame : bpy.props.BoolProperty(
+        default     = False,
+        description = "Object will be exported as a frame"
+    )
+
     # Mesh properties
     pipeline : bpy.props.EnumProperty(
         items = (
@@ -483,7 +494,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         default=True,
         description="Enable rpGEOMETRYMODULATEMATERIALCOLOR flag"
     )
-    
+
     uv_map1 : bpy.props.BoolProperty(
         default=True,
         description="First UV Map will be exported")
@@ -533,7 +544,158 @@ compatibiility with DFF Viewers"
         default = 0,
         description = "Light used for the Sphere/Cone"
     )
-    
+
+    frame_index : bpy.props.IntProperty(
+        default = 2**31-1,
+        min = 0,
+        max = 2**31-1,
+        options = {'SKIP_SAVE', 'HIDDEN'}
+    )
+
+    atomic_index : bpy.props.IntProperty(
+        default = 2**31-1,
+        min = 0,
+        max = 2**31-1,
+        options = {'SKIP_SAVE', 'HIDDEN'}
+    )
+
     #######################################################    
     def register():
         bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
+
+#######################################################
+class DFF_UL_FrameItems(bpy.types.UIList):
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if item and item.obj:
+            layout.label(text=item.obj.name, icon=item.icon)
+
+    def draw_filter(self, context, layout):
+        layout.prop(context.scene.dff, "filter_collection", toggle=True)
+
+    def filter_items(self, context, data, propname):
+        frames = context.scene.dff.frames
+        frames_num = len(frames)
+
+        flt_flags = [self.bitflag_filter_item | (1 << 0)] * frames_num
+
+        active_object = context.view_layer.objects.active
+        active_collections = {active_object.users_collection} if active_object else None
+
+        if active_collections and context.scene.dff.filter_collection:
+            for i, frame in enumerate(frames):
+                if not active_collections.issubset({frame.obj.users_collection}):
+                    flt_flags[i] &= ~self.bitflag_filter_item
+
+        return flt_flags, list(range(frames_num))
+
+#######################################################
+class DFF_UL_AtomicItems(bpy.types.UIList):
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if item and item.obj:
+            text = item.obj.name
+            if item.frame_obj and not item.obj.dff.is_frame:
+                text += " [%s]" % item.frame_obj.name
+            layout.label(text=text, icon='MESH_DATA')
+
+    def draw_filter(self, context, layout):
+        layout.prop(context.scene.dff, "filter_collection", toggle=True)
+
+    def filter_items(self, context, data, propname):
+        atomics = context.scene.dff.atomics
+        atomics_num = len(atomics)
+
+        flt_flags = [self.bitflag_filter_item | (1 << 0)] * atomics_num
+
+        active_object = context.view_layer.objects.active
+        active_collections = {active_object.users_collection} if active_object else None
+
+        if active_collections and context.scene.dff.filter_collection:
+            for i, atomic in enumerate(atomics):
+                if not active_collections.issubset({atomic.obj.users_collection}):
+                    flt_flags[i] &= ~self.bitflag_filter_item
+
+        return flt_flags, list(range(atomics_num))
+
+#######################################################
+class SCENE_PT_dffFrames(bpy.types.Panel):
+
+    bl_idname      = "SCENE_PT_dffFrames"
+    bl_label       = "DragonFF - Frames"
+    bl_space_type  = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context     = "scene"
+    bl_options     = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        scene_dff = context.scene.dff
+
+        layout = self.layout
+        row = layout.row()
+
+        col = row.column()
+        col.template_list(
+            "DFF_UL_FrameItems",
+            "",
+            scene_dff,
+            "frames",
+            scene_dff,
+            "frames_active",
+            rows=3,
+            maxrows=8,
+            sort_lock=True
+        )
+
+        if len(scene_dff.frames) > 1:
+            col = row.column(align=True)
+            col.operator(SCENE_OT_dff_frame_move.bl_idname, icon='TRIA_UP', text="").direction = 'UP'
+            col.operator(SCENE_OT_dff_frame_move.bl_idname, icon='TRIA_DOWN', text="").direction = 'DOWN'
+
+        row = layout.row()
+        col = row.column()
+        col.prop(scene_dff, "real_time_update", toggle=True)
+        if not scene_dff.real_time_update:
+            col = row.column()
+            col.operator(SCENE_OT_dff_update.bl_idname, icon='FILE_REFRESH', text="")
+
+#######################################################
+class SCENE_PT_dffAtomics(bpy.types.Panel):
+
+    bl_idname      = "SCENE_PT_dffAtomics"
+    bl_label       = "DragonFF - Atomics"
+    bl_space_type  = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context     = "scene"
+    bl_options     = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        scene_dff = context.scene.dff
+
+        layout = self.layout
+        row = layout.row()
+
+        col = row.column()
+        col.template_list(
+            "DFF_UL_AtomicItems",
+            "",
+            scene_dff,
+            "atomics",
+            scene_dff,
+            "atomics_active",
+            rows=3,
+            maxrows=8,
+            sort_lock=True
+        )
+
+        if len(scene_dff.atomics) > 1:
+            col = row.column(align=True)
+            col.operator(SCENE_OT_dff_atomic_move.bl_idname, icon='TRIA_UP', text="").direction = 'UP'
+            col.operator(SCENE_OT_dff_atomic_move.bl_idname, icon='TRIA_DOWN', text="").direction = 'DOWN'
+
+        row = layout.row()
+        col = row.column()
+        col.prop(scene_dff, "real_time_update", toggle=True)
+        if not scene_dff.real_time_update:
+            col = row.column()
+            col.operator(SCENE_OT_dff_update.bl_idname, icon='FILE_REFRESH', text="")

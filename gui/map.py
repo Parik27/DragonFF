@@ -7,12 +7,58 @@ from ..data import map_data
 from ..ops.importer_common import game_version
 
 #######################################################
+class DFFFrameProps(bpy.types.PropertyGroup):
+    obj  : bpy.props.PointerProperty(type=bpy.types.Object)
+    icon : bpy.props.StringProperty()
+
+#######################################################
+class DFFAtomicProps(bpy.types.PropertyGroup):
+    obj       : bpy.props.PointerProperty(type=bpy.types.Object)
+    frame_obj : bpy.props.PointerProperty(type=bpy.types.Object)
+
+#######################################################
 class DFFSceneProps(bpy.types.PropertyGroup):
 
-    #######################################################    
+    #######################################################
     def update_map_sections(self, context):
         return map_data.data[self.game_version_dropdown]['IPL_paths']
-        
+
+    #######################################################
+    def frames_active_changed(self, context):
+        scene_dff = context.scene.dff
+
+        frames_num = len(scene_dff.frames)
+        if not frames_num:
+            return
+
+        if scene_dff.frames_active >= frames_num:
+            scene_dff.frames_active = frames_num - 1
+            return
+
+        frame_object = scene_dff.frames[scene_dff.frames_active].obj
+
+        for a in scene_dff.frames: a.obj.select_set(False)
+        frame_object.select_set(True)
+        context.view_layer.objects.active = frame_object
+
+    #######################################################
+    def atomics_active_changed(self, context):
+        scene_dff = context.scene.dff
+
+        atomics_num = len(scene_dff.atomics)
+        if not atomics_num:
+            return
+
+        if scene_dff.atomics_active >= atomics_num:
+            scene_dff.atomics_active = atomics_num - 1
+            return
+
+        atomic_object = scene_dff.atomics[scene_dff.atomics_active].obj
+
+        for a in scene_dff.atomics: a.obj.select_set(False)
+        atomic_object.select_set(True)
+        context.view_layer.objects.active = atomic_object
+
     game_version_dropdown : bpy.props.EnumProperty(
         name = 'Game',
         items = (
@@ -98,6 +144,42 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         name = "Avoid overly small groups",
         description="Combine really small groups with their neighbor to avoid pointless isolated groups",
         default = True
+    )
+
+    frames : bpy.props.CollectionProperty(
+        type    = DFFFrameProps,
+        options = {'SKIP_SAVE','HIDDEN'}
+    )
+
+    frames_active : bpy.props.IntProperty(
+        name    = "Active frame",
+        default = 0,
+        min     = 0,
+        update  = frames_active_changed
+    )
+
+    atomics : bpy.props.CollectionProperty(
+        type    = DFFAtomicProps,
+        options = {'SKIP_SAVE','HIDDEN'}
+    )
+
+    atomics_active : bpy.props.IntProperty(
+        name    = "Active atomic",
+        default = 0,
+        min     = 0,
+        update  = atomics_active_changed
+    )
+
+    real_time_update : bpy.props.BoolProperty(
+        name        = "Real Time Update",
+        description = "Update the list of objects in real time",
+        default     = True
+    )
+
+    filter_collection : bpy.props.BoolProperty(
+        name        = "Filter Collection",
+        description = "Filter frames and atomics by active collection",
+        default     = True
     )
 
     def draw_fg():

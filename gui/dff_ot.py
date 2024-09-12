@@ -4,6 +4,7 @@ from bpy_extras.io_utils import ImportHelper, ExportHelper
 import time
 
 from ..ops import dff_exporter, dff_importer, col_importer
+from ..ops.state import State
 
 #######################################################
 class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
@@ -107,10 +108,10 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 row = box.row()
                 row.prop(self, "preserve_positions")
 
-            layout.prop(self, "only_selected")
         else:
             layout.prop(self, "preserve_positions")
 
+        layout.prop(self, "only_selected")
         layout.prop(self, "export_coll")
         layout.prop(self, "export_frame_names")
         layout.prop(self, "exclude_geo_faces")
@@ -152,7 +153,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 {
                     "file_name"          : self.filepath,
                     "directory"          : self.directory,
-                    "selected"           : False if self.from_outliner else self.only_selected,
+                    "selected"           : self.only_selected,
                     "mass_export"        : False if self.from_outliner else self.mass_export,
                     "preserve_positions" : self.preserve_positions,
                     "version"            : self.get_selected_rw_version(),
@@ -177,7 +178,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     def invoke(self, context, event):
         # Set good defaults for when invoked from Outliner context menu (probably used with a map edit in mind)
         if self.from_outliner:
-            self.filepath = bpy.context.view_layer.objects.active.name
+            active_object = context.view_layer.objects.active
+            active_collection = active_object.users_collection[0]
+            if active_collection and active_collection != context.scene.collection:
+                self.filepath = active_collection.name
+
+            self.only_selected = False
             self.export_coll = False
             self.preserve_positions = False
 
@@ -365,3 +371,146 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+#######################################################
+class SCENE_OT_dff_frame_move(bpy.types.Operator):
+
+    bl_idname           = "scene.dff_frame_move"
+    bl_description      = "Move the active frame up/down in the list"
+    bl_label            = "Move Frame"
+
+    direction           : bpy.props.EnumProperty(
+        items =
+        (
+            ("UP", "", ""),
+            ("DOWN", "", "")
+        )
+    )
+
+    #######################################################
+    def execute(self, context):
+
+        def append_children_recursive(ob):
+            for ch in ob.children:
+                children.add(ch)
+                append_children_recursive(ch)
+
+        State.update_scene(context.scene)
+
+        step = -1 if self.direction == "UP" else 1
+        scene_dff = context.scene.dff
+        old_index = scene_dff.frames_active
+        frames_num = len(scene_dff.frames)
+
+        obj1 = scene_dff.frames[old_index].obj
+        active_collections = {obj1.users_collection}
+
+        if (3, 1, 0) > bpy.app.version:
+            children = set()
+            append_children_recursive(obj1)
+        else:
+            children = {ch for ch in obj1.children_recursive}
+
+        new_index = old_index + step
+        while new_index >= 0 and new_index < frames_num:
+            obj2 = scene_dff.frames[new_index].obj
+            no_filter = not scene_dff.filter_collection or active_collections.issubset({obj2.users_collection})
+            if step < 0:
+                no_parent = obj1.parent != obj2
+            else:
+                no_parent = obj2 not in children
+
+            if no_filter and no_parent:
+                for idx in range(old_index, new_index, step):
+                    scene_dff.frames[idx].obj.dff.frame_index += step
+                obj2.dff.frame_index = old_index
+                scene_dff.frames.move(new_index, old_index)
+                scene_dff.frames_active = old_index + step
+                return {'FINISHED'}
+
+            new_index += step
+
+        return {'CANCELLED'}
+
+#######################################################
+class SCENE_OT_dff_atomic_move(bpy.types.Operator):
+
+    bl_idname           = "scene.dff_atomic_move"
+    bl_description      = "Move the active atomic up/down in the list"
+    bl_label            = "Move Atomic"
+
+    direction           : bpy.props.EnumProperty(
+        items =
+        (
+            ("UP", "", ""),
+            ("DOWN", "", "")
+        )
+    )
+
+    #######################################################
+    def execute(self, context):
+        State.update_scene(context.scene)
+
+        step = -1 if self.direction == "UP" else 1
+        scene_dff = context.scene.dff
+        old_index = scene_dff.atomics_active
+        atomics_num = len(scene_dff.atomics)
+
+        obj1 = scene_dff.atomics[old_index].obj
+        active_collections = {obj1.users_collection}
+
+        new_index = old_index + step
+        while new_index >= 0 and new_index < atomics_num:
+            obj2 = scene_dff.atomics[new_index].obj
+            no_filter = not scene_dff.filter_collection or active_collections.issubset({obj2.users_collection})
+
+            if no_filter:
+                for idx in range(old_index, new_index, step):
+                    scene_dff.atomics[idx].obj.dff.atomic_index += step
+                obj2.dff.atomic_index = old_index
+                scene_dff.atomics.move(new_index, old_index)
+                scene_dff.atomics_active = old_index + step
+                return {'FINISHED'}
+
+            new_index += step
+
+        return {'CANCELLED'}
+
+#######################################################
+class SCENE_OT_dff_update(bpy.types.Operator):
+
+    bl_idname           = "scene.dff_update"
+    bl_description      = "Update the list of objects"
+    bl_label            = "Update Scene"
+
+
+    #######################################################
+    def execute(self, context):
+        State.update_scene(context.scene)
+        return {'FINISHED'}
+
+#######################################################
+class OBJECT_OT_dff_set_parent_bone(bpy.types.Operator):
+
+    bl_idname           = "object.dff_set_parent_bone"
+    bl_description      = "Set the object's parenting (DragonFF)"
+    bl_label            = "Set Parent Bone (DragonFF)"
+
+    #######################################################
+    def execute(self, context):
+        objects = [obj for obj in context.selected_objects if obj.type in ("MESH", "EMPTY")]
+        if not objects:
+            return {'CANCELLED'}
+
+        armature = context.active_object
+        bone_name = context.active_bone.name
+
+        for obj in objects:
+            dff_importer.set_parent_bone(obj, armature, bone_name)
+
+        return {'FINISHED'}
+
+#######################################################
+def set_parent_bone_func(self, context):
+    self.layout.separator()
+    self.layout.operator(OBJECT_OT_dff_set_parent_bone.bl_idname, text="Set Parent To (DragonFF)")
