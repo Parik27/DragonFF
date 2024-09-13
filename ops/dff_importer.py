@@ -831,7 +831,21 @@ class dff_importer:
         self.current_collection = create_collection(
             os.path.basename(file_name)
         )
-        
+
+        # Create a placeholder frame if there are no frames in the file
+        if len(self.dff.frame_list) == 0:
+            frame = dff.Frame()
+            frame.name            = ""
+            frame.position        = (0, 0, 0)
+            frame.rotation_matrix = dff.Matrix._make(
+                mathutils.Matrix.Identity(3).transposed()
+            )
+            self.dff.frame_list.append(frame)
+
+            # Attach the created frame to the atomics
+            for atomic_index, atomic in enumerate(self.dff.atomic_list):
+                self.dff.atomic_list[atomic_index] = atomic._replace(frame=0)
+
         self.import_atomics()
         self.import_frames()
 
