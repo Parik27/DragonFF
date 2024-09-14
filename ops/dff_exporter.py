@@ -324,9 +324,16 @@ class dff_exporter:
         if is_bone and obj.parent is not None:
             matrix = self.multiply_matrix(obj.parent.matrix_local.inverted(), matrix)
 
+        parent = self.get_object_parent(obj)
+
+        if is_bone or parent or self.preserve_positions:
+            position = matrix.to_translation()
+        else:
+            position = (0, 0, 0)
+
         frame.creation_flags  =  0
         frame.parent          = -1
-        frame.position        = matrix.to_translation() if self.preserve_positions else (0, 0, 0)
+        frame.position        = position
         frame.rotation_matrix = dff.Matrix._make(
             matrix.to_3x3().transposed()
         )
@@ -334,7 +341,6 @@ class dff_exporter:
         if "dff_user_data" in obj:
             frame.user_data = dff.UserData.from_mem(obj["dff_user_data"])
 
-        parent = self.get_object_parent(obj)
         if set_parent and parent is not None:
 
             if parent not in self.frame_objects:
