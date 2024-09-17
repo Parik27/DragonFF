@@ -39,6 +39,7 @@ EnvMapFX    = namedtuple("EnvMapFX"    , "coefficient use_fb_alpha env_map")
 DualFX      = namedtuple("DualFX"      , "src_blend dst_blend texture")
 ReflMat     = namedtuple("ReflMat"     , "s_x s_y o_x o_y intensity")
 SpecularMat = namedtuple("SpecularMap" , "level texture")
+GeomBone    = namedtuple("GeomBone"    , "start_vertex vertices_count bone_id")
 
 TexDict = namedtuple("TexDict", "texture_count device_id")
 PITexDict = namedtuple("PITexDict", "texture_count device_id")
@@ -113,6 +114,8 @@ types = {
     "PI Texture Dictionary"   : 35,
     "UV Animation Dictionary" : 43,
     "Morph PLG"               : 261,
+    "Animation PLG"           : 264,
+    "Bone PLG"                : 270,
     "Skin PLG"                : 278,
     "HAnim PLG"               : 286,
     "User Data PLG"           : 287,
@@ -164,6 +167,7 @@ class Sections:
         TexCoords   : "<2f",
         ReflMat     : "<5f4x",
         SpecularMat : "<f24s",
+        GeomBone    : "<3I",
 
         TexDict : "<2H",
         PITexDict: "<2H"
@@ -1873,6 +1877,18 @@ class dff:
         self._read(chunk_size)
 
     #######################################################
+    def read_bone_plg(self, parent_chunk, geometry):
+        chunk_end = self.pos + parent_chunk.size
+
+        geom_bones = []
+        while self.pos < chunk_end:
+            bone = Sections.read(GeomBone, self.data, self._read(12))
+            if bone.vertices_count > 0:
+                geom_bones.append(bone)
+
+        geometry.extensions['bones'] = geom_bones
+
+    #######################################################
     def read_matfx_bumpmap(self):
         bump_map   = None
         intensity  = 0.0
@@ -2190,6 +2206,9 @@ class dff:
 
             elif chunk.type == types["Native Data PLG"]:
                 self.read_native_data_plg(chunk,geometry)
+
+            elif chunk.type == types["Bone PLG"]:
+                self.read_bone_plg(chunk,geometry)
 
             else:
                 self._read(chunk.size)
