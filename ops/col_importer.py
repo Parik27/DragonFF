@@ -154,8 +154,8 @@ class col_importer:
                 face = bm.faces.new(
                     [
                         bm.verts[f.a],
-                        bm.verts[f.b],
-                        bm.verts[f.c]
+                        bm.verts[f.c],
+                        bm.verts[f.b]
                     ]
                 )
                 if hasattr(f, "surface"):

@@ -95,14 +95,14 @@ class col_exporter:
 
             if col.Sections.version == 1:
                 faces.append(col.TFace._make(
-                    [vert.index + vert_offset for vert in face.verts] + [
+                    [vert.index + vert_offset for vert in (face.verts[0], face.verts[2], face.verts[1])] + [
                         col.TSurface(*surface)
                     ]
                 ))
 
             else:
                 faces.append(col.TFace._make(
-                    [vert.index + vert_offset for vert in face.verts] + [
+                    [vert.index + vert_offset for vert in (face.verts[0], face.verts[2], face.verts[1])] + [
                         surface[0], surface[3]
                     ]
                 ))
