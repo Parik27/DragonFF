@@ -1,5 +1,7 @@
 # DragonFF 🐉
 
+[![Discord](https://img.shields.io/discord/1286221154612281405.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/QxpkwNqeTr)
+
 DragonFF is a Blender Addon for import and export of GTA files. 
 
 At the moment, only Renderware files are supported. Support for formats other than .dff is planned. 
