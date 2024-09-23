@@ -18,7 +18,7 @@ from struct import unpack_from, calcsize, pack
 
 from .dff import Chunk, RGBA, Sections, TexCoords, Triangle, Vector
 from .dff import ExtraVertColorExtension
-from .txd import TextureNative, RasterFormat
+from .txd import TextureNative, RasterFormat, PaletteType
 
 # geometry flags
 rpGEOMETRYTRISTRIP              = 0x00000001
@@ -423,7 +423,7 @@ class NativePS2Texture(TextureNative):
         self.data = data
 
         (
-            self._platform_id, self._filter_mode, self.uv_addressing
+            self.platform_id, self.filter_mode, self.uv_addressing
         ) = unpack_from("<IHH", self.data, self._read(8))
 
         str_chunk = self._read_chunk()
@@ -438,17 +438,17 @@ class NativePS2Texture(TextureNative):
         raster_chunk = self._read_chunk()
 
         (
-            self.width, self.height, self.depth, self.raster_format,
+            self.width, self.height, self.depth, self.raster_format_flags,
             tex0_gs_reg, tex1_gs_reg, miptbp1_gs_reg, miptbp2_gs_reg,
             pixels_size, palette_size, gpu_data_aligned_size, sky_mipmap_val
         ) = unpack_from("<4I4Q4I", self.data, self._read(raster_chunk.size))
 
         texture_chunk = self._read_chunk()
 
-        palette_format = self.raster_format & 0xf000
-        pixels_format = (self.raster_format >> 8) & 0x0f
+        palette_format = self.get_raster_palette_type()
+        raster_format = self.get_raster_format_type()
 
-        if pixels_format == RasterFormat.RASTER_8888:
+        if raster_format == RasterFormat.RASTER_8888:
             if palette_size > 0:
                 pixels_size -= 80
                 palette_size -= 80
@@ -457,9 +457,9 @@ class NativePS2Texture(TextureNative):
                 pixels = self._read_raw(pixels_size)
 
                 self._read(80) # skip palette header
-                if palette_format == 0x2000:
+                if palette_format == PaletteType.PALETTE_8:
                     self.palette = self._read_palette(1024)
-                elif palette_format == 0x4000:
+                elif palette_format == PaletteType.PALETTE_4:
                     self.palette = self._read_palette(64)
                     self._read(palette_size - 64) # skip padding
 

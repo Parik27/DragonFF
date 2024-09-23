@@ -23,6 +23,7 @@ from .dff import Sections, NativePlatformType
 from .dff import types, Chunk, TexDict, PITexDict, Texture
 from .dff import strlen
 
+#######################################################
 class RasterFormat(IntEnum):
     RASTER_DEFAULT = 0x00
     RASTER_1555    = 0x01
@@ -31,7 +32,50 @@ class RasterFormat(IntEnum):
     RASTER_LUM     = 0x04
     RASTER_8888    = 0x05
     RASTER_888     = 0x06
+    RASTER_16      = 0x07
+    RASTER_24      = 0x08
+    RASTER_32      = 0x09
     RASTER_555     = 0x0a
+
+#######################################################
+class D3DFormat(IntEnum):
+    D3D_8888 = 21
+    D3D_888  = 22
+    D3D_565  = 23
+    D3D_555  = 24
+    D3D_1555 = 25
+    D3D_4444 = 26
+
+    D3DFMT_L8   = 50
+    D3DFMT_A8L8 = 51
+
+    D3D_DXT1 = 827611204
+    D3D_DXT2 = 844388420
+    D3D_DXT3 = 861165636
+    D3D_DXT4 = 877942852
+    D3D_DXT5 = 894720068
+
+#######################################################
+class D3DCompressType(IntEnum):
+    DXT1 = 1
+    DXT2 = 2
+    DXT3 = 3
+    DXT4 = 4
+    DXT5 = 5
+
+#######################################################
+class PaletteType(IntEnum):
+    PALETTE_NONE = 0
+    PALETTE_8    = 1
+    PALETTE_4    = 2
+
+#######################################################
+class DeviceType(IntEnum):
+    DEVICE_NONE = 0
+    DEVICE_D3D8 = 1
+    DEVICE_D3D9 = 2
+    DEVICE_PS2  = 6
+    DEVICE_XBOX = 8
 
 #######################################################
 class ImageDecoder:
@@ -79,7 +123,7 @@ class ImageDecoder:
         return (2 * b + a) // 3
 
     @staticmethod
-    def dxt1(data, width, height, alpha_flag):
+    def bc1(data, width, height, alpha_flag):
         pos = 0
         ret = bytearray(4 * width * height)
 
@@ -118,7 +162,7 @@ class ImageDecoder:
         return bytes(ret)
 
     @staticmethod
-    def dxt3(data, width, height):
+    def bc2(data, width, height, premultiplied):
         pos = 0
         ret = bytearray(4 * width * height)
 
@@ -154,6 +198,89 @@ class ImageDecoder:
 
                         a = ((alphas[j] >> (i * 4)) & 0xf) * 0x11
                         idx = 4 * ((y + j) * width + (x + i))
+                        if premultiplied and a > 0:
+                            r = min(round(r * 255 / a), 255)
+                            g = min(round(g * 255 / a), 255)
+                            b = min(round(b * 255 / a), 255)
+                        ret[idx:idx+4] = bytes([r, g, b, a])
+
+        return bytes(ret)
+
+    @staticmethod
+    def bc3(data, width, height, premultiplied):
+        pos = 0
+        ret = bytearray(4 * width * height)
+
+        for y in range(0, height, 4):
+            for x in range(0, width, 4):
+                alpha0, alpha1, alpha2, alpha3, alpha4, color0, color1, bits = unpack_from("<2B3H2HI", data, pos)
+                pos += 16
+
+                r0, g0, b0 = ImageDecoder._decode565(color0)
+                r1, g1, b1 = ImageDecoder._decode565(color1)
+
+                if alpha0 > alpha1:
+                    alphas = (
+                        alpha0,
+                        alpha1,
+                        round(alpha0 * (6 / 7) + alpha1 * (1 / 7)),
+                        round(alpha0 * (5 / 7) + alpha1 * (2 / 7)),
+                        round(alpha0 * (4 / 7) + alpha1 * (3 / 7)),
+                        round(alpha0 * (3 / 7) + alpha1 * (4 / 7)),
+                        round(alpha0 * (2 / 7) + alpha1 * (5 / 7)),
+                        round(alpha0 * (1 / 7) + alpha1 * (6 / 7))
+                    )
+                else:
+                    alphas = (
+                        alpha0,
+                        alpha1,
+                        round(alpha0 * (4 / 5) + alpha1 * (1 / 5)),
+                        round(alpha0 * (3 / 5) + alpha1 * (2 / 5)),
+                        round(alpha0 * (2 / 5) + alpha1 * (3 / 5)),
+                        round(alpha0 * (1 / 5) + alpha1 * (4 / 5)),
+                        0,
+                        255
+                    )
+
+                alpha_indices = (alpha4, alpha3, alpha2)
+
+                # Decode this block into 4x4 pixels
+                for j in range(4):
+                    for i in range(4):
+                        # Get next control op and generate a pixel
+                        control = bits & 3
+                        bits = bits >> 2
+                        if control == 0:
+                            r, g, b = r0, g0, b0
+                        elif control == 1:
+                            r, g, b = r1, g1, b1
+                        elif control == 2:
+                            if color0 > color1:
+                                r, g, b = ImageDecoder._c2a(r0, r1), ImageDecoder._c2a(g0, g1), ImageDecoder._c2a(b0, b1)
+                            else:
+                                r, g, b = ImageDecoder._c2b(r0, r1), ImageDecoder._c2b(g0, g1), ImageDecoder._c2b(b0, b1)
+                        elif control == 3:
+                            if color0 > color1:
+                                r, g, b = ImageDecoder._c3(r0, r1),ImageDecoder. _c3(g0, g1), ImageDecoder._c3(b0, b1)
+                            else:
+                                r, g, b = 0, 0, 0
+
+                        # Get alpha index
+                        shift = 3 * (15 - ((3 - i) + (j * 4)))
+                        shift_s = shift % 16
+                        row_s = shift // 16
+                        row_e = (shift + 2) // 16
+                        alpha_index = (alpha_indices[2 - row_s] >> shift_s) & 7
+                        if row_s != row_e:
+                            shift_e = 16 - shift_s
+                            alpha_index += (alpha_indices[2 - row_e] & ((2 ** (3 - shift_e)) - 1)) << shift_e
+                        a = alphas[alpha_index]
+
+                        idx = 4 * ((y + j) * width + (x + i))
+                        if premultiplied and a > 0:
+                            r = min(round(r * 255 / a), 255)
+                            g = min(round(g * 255 / a), 255)
+                            b = min(round(b * 255 / a), 255)
                         ret[idx:idx+4] = bytes([r, g, b, a])
 
         return bytes(ret)
@@ -270,22 +397,23 @@ class TextureNative:
     #######################################################
     def __init__(self):
         # Header
-        self._platform_id = 0
-        self._filter_mode = 0
+        self.platform_id = 0
+        self.filter_mode = 0
 
         self.uv_addressing = 0
 
         self.name = ""
         self.mask = ""
 
-        self.raster_format = 0
-        self.width         = 0
-        self.height        = 0
-        self.depth         = 0
-        self.num_levels    = 1
-        self.raster_type   = 0
+        self.raster_format_flags = 0
+        self.d3d_format          = 0
+        self.width               = 0
+        self.height              = 0
+        self.depth               = 0
+        self.num_levels          = 1
+        self.raster_type         = 0
 
-        self.image_properties = None
+        self.platform_properties = None
 
         # Palette
         self.palette = b''
@@ -299,49 +427,103 @@ class TextureNative:
         height = self.get_height(level)
         pixels = self.pixels[level]
 
+        # Texture with palette
         if self.palette:
-            palette_format = self.raster_format & 0xf000
+            palette_format = self.get_raster_palette_type()
 
-            if palette_format > 0:
-                if palette_format == 0x2000:
+            if palette_format != PaletteType.PALETTE_NONE:
+                if palette_format == PaletteType.PALETTE_8:
                     return ImageDecoder.pal8(pixels, self.palette, width, height)
-                elif palette_format == 0x4000:
+                else:
                     if self.depth == 4:
                         return ImageDecoder.pal4(pixels, self.palette, width, height)
                     else:
                         return ImageDecoder.pal8(pixels, self.palette, width, height)
 
-        else:
-            # TODO: improve format definition
-            pixels_format = (self.raster_format >> 8) & 0x0f
+        # D3D8 specific texture
+        elif self.platform_id == NativePlatformType.D3D8:
+            if self.platform_properties.dxt_type == D3DCompressType.DXT1:
+                return ImageDecoder.bc1(pixels, width, height, 0x00)
+            elif self.platform_properties.dxt_type == D3DCompressType.DXT2:
+                return ImageDecoder.bc2(pixels, width, height, True)
+            elif self.platform_properties.dxt_type == D3DCompressType.DXT3:
+                return ImageDecoder.bc2(pixels, width, height, False)
+            elif self.platform_properties.dxt_type == D3DCompressType.DXT4:
+                return ImageDecoder.bc3(pixels, width, height, True)
+            elif self.platform_properties.dxt_type == D3DCompressType.DXT5:
+                return ImageDecoder.bc3(pixels, width, height, False)
 
-            if self.image_properties.compressed:
-                if pixels_format == RasterFormat.RASTER_DEFAULT:
-                    return ImageDecoder.lum8a8(pixels, width, height)
-                if pixels_format == RasterFormat.RASTER_1555:
-                    return ImageDecoder.dxt1(pixels, width, height, 0x00)
-                elif pixels_format == RasterFormat.RASTER_565:
-                    return ImageDecoder.dxt1(pixels, width, height, 0xff)
-                elif pixels_format == RasterFormat.RASTER_4444:
-                    return ImageDecoder.dxt3(pixels, width, height)
-            else:
-                if pixels_format == RasterFormat.RASTER_1555:
-                    # return ImageDecoder.bgra1555(pixels, width, height)
-                    return ImageDecoder.dxt1(pixels, width, height, 0x00)
-                elif pixels_format == RasterFormat.RASTER_565:
-                    # return ImageDecoder.bgra565(pixels, width, height)
-                    return ImageDecoder.dxt1(pixels, width, height, 0xff)
-                elif pixels_format == RasterFormat.RASTER_4444:
-                    # return ImageDecoder.bgra4444(pixels, width, height)
-                    return ImageDecoder.dxt3(pixels, width, height)
-                elif pixels_format == RasterFormat.RASTER_LUM:
-                    return ImageDecoder.lum8(pixels, width, height)
-                elif pixels_format == RasterFormat.RASTER_8888:
-                    return ImageDecoder.bgra8888(pixels, width, height)
-                elif pixels_format == RasterFormat.RASTER_888:
-                    return ImageDecoder.bgra888(pixels, width, height)
-                elif pixels_format == RasterFormat.RASTER_555:
-                    return ImageDecoder.bgra555(pixels, width, height)
+        # D3D9 specific texture
+        elif self.platform_id == NativePlatformType.D3D9:
+            if self.d3d_format == D3DFormat.D3D_8888:
+                return ImageDecoder.bgra8888(pixels, width, height)
+            elif self.d3d_format == D3DFormat.D3D_888:
+                return ImageDecoder.bgra888(pixels, width, height)
+            elif self.d3d_format == D3DFormat.D3D_565:
+                return ImageDecoder.bgra565(pixels, width, height)
+            elif self.d3d_format == D3DFormat.D3D_555:
+                return ImageDecoder.bgra555(pixels, width, height)
+            elif self.d3d_format == D3DFormat.D3D_1555:
+                return ImageDecoder.bgra1555(pixels, width, height)
+            elif self.d3d_format == D3DFormat.D3D_4444:
+                return ImageDecoder.bgra4444(pixels, width, height)
+
+            elif self.d3d_format == D3DFormat.D3DFMT_L8:
+                return ImageDecoder.lum8(pixels, width, height)
+            elif self.d3d_format == D3DFormat.D3DFMT_A8L8:
+                return ImageDecoder.lum8a8(pixels, width, height)
+
+            elif self.d3d_format == D3DFormat.D3D_DXT1:
+                return ImageDecoder.bc1(pixels, width, height, 0x00)
+            elif self.d3d_format == D3DFormat.D3D_DXT2:
+                return ImageDecoder.bc2(pixels, width, height, True)
+            elif self.d3d_format == D3DFormat.D3D_DXT3:
+                return ImageDecoder.bc2(pixels, width, height, False)
+            elif self.d3d_format == D3DFormat.D3D_DXT4:
+                return ImageDecoder.bc3(pixels, width, height, True)
+            elif self.d3d_format == D3DFormat.D3D_DXT5:
+                return ImageDecoder.bc3(pixels, width, height, False)
+
+        # Common raster cases
+        raster_format = self.get_raster_format_type()
+        if raster_format == RasterFormat.RASTER_1555:
+            return ImageDecoder.bgra1555(pixels, width, height)
+        elif raster_format == RasterFormat.RASTER_565:
+            return ImageDecoder.bgra565(pixels, width, height)
+        elif raster_format == RasterFormat.RASTER_4444:
+            return ImageDecoder.bgra4444(pixels, width, height)
+        elif raster_format == RasterFormat.RASTER_LUM:
+            return ImageDecoder.lum8(pixels, width, height)
+        elif raster_format == RasterFormat.RASTER_8888:
+            return ImageDecoder.bgra8888(pixels, width, height)
+        elif raster_format == RasterFormat.RASTER_888:
+            return ImageDecoder.bgra888(pixels, width, height)
+        elif raster_format == RasterFormat.RASTER_555:
+            return ImageDecoder.bgra555(pixels, width, height)
+
+    #######################################################
+    def get_raster_format(self):
+        return self.raster_format_flags & 0b1111
+
+    #######################################################
+    def get_raster_private_flags(self):
+        return (self.raster_format_flags >> 4) & 0b1111
+
+    #######################################################
+    def get_raster_format_type(self):
+        return (self.raster_format_flags >> 8) & 0b1111
+
+    #######################################################
+    def get_raster_auto_mipmaps(self):
+        return (self.raster_format_flags >> 12) & 0b1
+
+    #######################################################
+    def get_raster_palette_type(self):
+        return (self.raster_format_flags >> 13) & 0b11
+
+    #######################################################
+    def get_raster_has_mipmaps(self):
+        return (self.raster_format_flags >> 15) & 0b1
 
     #######################################################
     def get_width(self, level=0):
@@ -358,13 +540,13 @@ class TextureNative:
 
     #######################################################
     def read_palette(self, data, offset):
-        palette_format = self.raster_format & 0xf000
+        palette_format = self.get_raster_palette_type()
 
-        if palette_format > 0:
-            if palette_format == 0x2000:
+        if palette_format != PaletteType.PALETTE_NONE:
+            if palette_format == PaletteType.PALETTE_8:
                 return data[offset:offset+1024]
 
-            if palette_format == 0x4000:
+            else:
                 if self.depth == 4:
                     return data[offset:offset+64]
 
@@ -373,49 +555,37 @@ class TextureNative:
         return b''
 
     #######################################################
-    def read_image_properties(self, data, offset):
-
-        ImageProperties = namedtuple(
-            "ImageProperties",
-            [
-                "alpha", "cube_texture", "auto_mipmaps",
-                "compressed"]
-        )
-
+    def read_platform_properties(self, data, offset):
         prop = unpack_from("<B", data, offset)[0]
-        return ImageProperties(prop & 0b0001 != 0,
-                               prop & 0b0010 != 0,
-                               prop & 0b0100 != 0,
-                               prop & 0b1000 != 0)
+
+        if self.platform_id == NativePlatformType.D3D8:
+            PlatformProperties = namedtuple(
+                "PlatformProperties",
+                ["dxt_type"]
+            )
+            return PlatformProperties(prop)
+
+        elif self.platform_id == NativePlatformType.D3D9:
+            PlatformProperties = namedtuple(
+                "PlatformProperties",
+                ["alpha", "cube_texture", "auto_mipmaps", "compressed"]
+            )
+            return PlatformProperties(prop & 0b0001 != 0,
+                                      prop & 0b0010 != 0,
+                                      prop & 0b0100 != 0,
+                                      prop & 0b1000 != 0)
 
     #######################################################
     def from_mem(data):
 
         self = TextureNative()
 
-        TextureFormat = namedtuple(
-            "Header",
-            [
-                'platform_id' , 'filter_mode' , 'uv_addressing' ,
-                'name'        , 'mask_name']
-        )
-
-        RasterHeader  = namedtuple(
-            "RasterHeader",
-            [
-                'raster_format' , 'sa_format_3vc_hasAlpha' , 'width'      ,
-                'height'        , 'depth'                  , 'num_levels' ,
-                'raster_type'   , 'image_properties']
-        )
-
         pos = 0
-        tex_format = TextureFormat._make(unpack_from("<IHH32s32s", data, pos))
-        pos += 72
-
         (
-            self._platform_id, self._filter_mode, self.uv_addressing, self.name,
+            self.platform_id, self.filter_mode, self.uv_addressing, self.name,
             self.mask
-        ) = tex_format
+        ) = unpack_from("<IHH32s32s", data, pos)
+        pos += 72
 
         self.name = self.name.decode("utf-8").replace('\0', '')
         try:
@@ -423,16 +593,14 @@ class TextureNative:
         except UnicodeDecodeError:
             self.mask = ''
 
-        raster_header = RasterHeader(
-            *unpack_from("<IIHHBBB", data, pos),
-            self.read_image_properties(data, pos + 15)
-        )
-        pos += 16
-
         (
-            self.raster_format, sa_format_3vc_hasAlpha, self.width, self.height,
-            self.depth, self.num_levels, self.raster_type, self.image_properties
-        ) = raster_header
+            self.raster_format_flags, self.d3d_format, self.width, self.height,
+            self.depth, self.num_levels, self.raster_type
+        ) = unpack_from("<IIHHBBB", data, pos)
+        pos += 15
+
+        self.platform_properties = self.read_platform_properties(data, pos)
+        pos += 1
 
         self.palette = self.read_palette(data, pos)
         pos += len(self.palette)
@@ -531,8 +699,8 @@ class txd:
                 platform_id = unpack_from("<I", self.data, self.pos)[0]
                 texture = None
 
-                if self.device_id == 0:
-                    if platform_id in (NativePlatformType.XBOX, NativePlatformType.D3D8, NativePlatformType.D3D9):
+                if self.device_id == DeviceType.DEVICE_NONE:
+                    if platform_id in (NativePlatformType.D3D8, NativePlatformType.D3D9):
                         texture = TextureNative.from_mem(
                                 self.data[self.pos:self.pos+chunk.size]
                         )
@@ -541,12 +709,12 @@ class txd:
                         texture = NativePS2Texture.from_mem(self.data[self.pos:])
                         self._read(texture.pos - chunk.size)
 
-                elif self.device_id in (1, 2):
+                elif self.device_id in (DeviceType.DEVICE_D3D8, DeviceType.DEVICE_D3D9):
                     texture = TextureNative.from_mem(
                             self.data[self.pos:self.pos+chunk.size]
                     )
 
-                elif self.device_id == 6:
+                elif self.device_id == DeviceType.DEVICE_PS2:
                     from .native_ps2 import NativePS2Texture
                     texture = NativePS2Texture.from_mem(self.data[self.pos:])
                     self._read(texture.pos - chunk.size)
@@ -630,7 +798,7 @@ class txd:
             if chunk.type == types["Struct"]:
 
                 text_dict = Sections.read(TexDict, self.data, self._read(chunk.size))
-                self.device_id = text_dict.device_id # 1 for D3D8, 2 for D3D9, 6 for PlayStation 2, 8 for XBOX, 9 for PSP
+                self.device_id = text_dict.device_id
 
                 for _ in range(text_dict.texture_count):
                     chunk = self.read_chunk()
@@ -693,7 +861,7 @@ class txd:
         self.pos             = 0
         self.data            = ""
         self.rw_version      = ""
-        self.device_id       = 0
+        self.device_id       = DeviceType.DEVICE_NONE
 
     #######################################################
     def load_file(self, filename):
