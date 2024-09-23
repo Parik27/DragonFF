@@ -285,12 +285,14 @@ def export_col(options):
     col_exporter.version = options['version']
     col_exporter.collection = options['collection']
     col_exporter.only_selected = options['only_selected']
-
+    
     if options['mass_export']:
-        output = b'';
-        
-        root_collection = bpy.context.scene.collection if col_exporter.collection is None else col_exporter.collection
-        collections = root_collection.children.values() + [root_collection]
+        output = b''
+
+        root_collection = col_exporter.collection or bpy.context.scene.collection
+        collections = root_collection.children.values()
+        if not collections or root_collection != bpy.context.scene.collection:
+            collections += [root_collection]
         col_exporter.memory = True
 
         for collection in collections:
