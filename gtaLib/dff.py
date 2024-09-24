@@ -1449,7 +1449,6 @@ class Geometry:
         'materials',
         'extensions',
         'export_flags',
-        'pipeline',
         'native_platform_type',
         '_num_triangles',
         '_num_vertices',
@@ -1471,7 +1470,6 @@ class Geometry:
         self.normals            = []
         self.materials          = []
         self.extensions         = {}
-        self.pipeline           = None
 
         # user for native plg
         self.native_platform_type = 0
@@ -2260,10 +2258,9 @@ class dff:
     def read_atomic(self, parent_chunk):
 
         chunk_end = self.pos + parent_chunk.size
-        
+
         atomic = None
-        pipeline = None
-        
+
         while self.pos < chunk_end:
             chunk = self.read_chunk()
 
@@ -2273,6 +2270,10 @@ class dff:
                     self.data[self.pos:self.pos+chunk.size]
                 )
                 self.pos += chunk.size
+
+            elif chunk.type == types["Geometry"]:
+                self.read_geometry(chunk)
+                atomic.geometry = len(self.geometry_list) - 1
 
             elif chunk.type == types["Extension"]:
                 _chunk_end = chunk.size + self.pos
@@ -2284,24 +2285,17 @@ class dff:
                         right_to_render = Sections.read(RightToRender, self.data, self._read(chunk.size))
                         atomic.extensions["right_to_render"] = right_to_render
 
+                    elif chunk.type == types["Pipeline Set"]:
+                        pipeline = unpack_from("<I", self.data, self._read(chunk.size))[0]
+                        atomic.extensions["pipeline"] = pipeline
+
                 self.pos = _chunk_end
-
-            elif chunk.type == types["Geometry"]:
-                self.read_geometry(chunk)
-                atomic.geometry = len(self.geometry_list) - 1
-
-            elif chunk.type == types["Pipeline Set"]:
-                pipeline = unpack_from("<I", self.data, self._read(chunk.size))[0]
 
             else:
                 self.pos += chunk.size
 
         if atomic:
             self.atomic_list.append(atomic)
-
-            # Set geometry's pipeline
-            if pipeline:
-                self.geometry_list[atomic.geometry].pipeline = pipeline
 
     #######################################################
     def read_clump(self, root_chunk):
@@ -2449,23 +2443,24 @@ class dff:
             right_to_render = atomic.extensions.get("right_to_render")
             if not right_to_render:
                 right_to_render = RightToRender._make((0x0116, 1))
-
             ext_data += Sections.write_chunk(
                 pack("<II", right_to_render.value1, right_to_render.value2),
                 types["Right to Render"]
             )
+
         if geometry._hasMatFX:
             ext_data += Sections.write_chunk(
                 pack("<I", 1),
                 types["Material Effects PLG"]
             )
-        if geometry.pipeline is not None:
+
+        pipeline = atomic.extensions.get("pipeline")
+        if pipeline is not None:
             ext_data += Sections.write_chunk(
-                pack("<I", geometry.pipeline),
+                pack("<I", pipeline),
                 types["Pipeline Set"]
             )
-            pass
-        
+
         data += Sections.write_chunk(ext_data, types["Extension"])
         return Sections.write_chunk(data, types["Atomic"])
 

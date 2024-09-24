@@ -274,15 +274,6 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         settings = context.object.dff
 
         box = layout.box()
-        box.prop(settings, "pipeline", text="Pipeline")
-        if settings.pipeline == 'CUSTOM':
-            col = box.column()
-            
-            col.alert = not self.validate_pipeline(settings.custom_pipeline)
-            icon = "ERROR" if col.alert else "NONE"
-
-            col.prop(settings, "custom_pipeline", icon=icon, text="Custom Pipeline")
-        
         box.prop(settings, "export_normals", text="Export Normals")
         box.prop(settings, "export_split_normals", text="Export Custom Split Normals")
         box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
@@ -317,6 +308,14 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Atomic")
+        box.prop(settings, "pipeline", text="Pipeline")
+        if settings.pipeline == 'CUSTOM':
+            col = box.column()
+
+            col.alert = not self.validate_pipeline(settings.custom_pipeline)
+            icon = "ERROR" if col.alert else "NONE"
+
+            col.prop(settings, "custom_pipeline", icon=icon, text="Custom Pipeline")
 
         box.prop(settings, "right_to_render", text="Right To Render")
 
@@ -464,22 +463,6 @@ class DFFObjectProps(bpy.types.PropertyGroup):
     )
 
     # Mesh properties
-    pipeline : bpy.props.EnumProperty(
-        items = (
-            ('NONE', 'None', 'Export without setting a pipeline'),
-            ('0x53F20098', 'Buildings', 'Refl. Building Pipleine (0x53F20098)'),
-            (
-                '0x53F2009A',
-                'Night Vertex Colors',
-                'Night Vertex Colors (0x53F2009C)'
-            ),
-            ('CUSTOM', 'Custom Pipeline', 'Set a different pipeline')
-        ),
-        name="Pipeline",
-        description="Select the Engine rendering pipeline"
-    )
-    custom_pipeline : bpy.props.StringProperty(name="Custom Pipeline")
-    
     export_normals : bpy.props.BoolProperty(
         default=True,
         description="Whether Normals will be exported. (Disable for Map objects)"
@@ -530,11 +513,6 @@ compatibiility with DFF Viewers"
         description="Use Triangle Strip instead of Triangle List for Bin Mesh PLG"
     )
 
-    right_to_render : bpy.props.IntProperty(
-        default = 1,
-        description = "Right To Render value (only for skinned object)"
-    )
-
     col_material : bpy.props.IntProperty(
         default = 12,
         description = "Material used for the Sphere/Cone"
@@ -553,6 +531,29 @@ compatibiility with DFF Viewers"
     col_light : bpy.props.IntProperty(
         default = 0,
         description = "Light used for the Sphere/Cone"
+    )
+
+    # Atomic properties
+    pipeline : bpy.props.EnumProperty(
+        items = (
+            ('NONE', 'None', 'Export without setting a pipeline'),
+            ('0x53F20098', 'Buildings', 'Refl. Building Pipleine (0x53F20098)'),
+            (
+                '0x53F2009A',
+                'Night Vertex Colors',
+                'Night Vertex Colors (0x53F2009C)'
+            ),
+            ('CUSTOM', 'Custom Pipeline', 'Set a different pipeline')
+        ),
+        name="Pipeline",
+        description="Select the Engine rendering pipeline"
+    )
+    custom_pipeline : bpy.props.StringProperty(name="Custom Pipeline")
+
+    right_to_render : bpy.props.IntProperty(
+        default = 1,
+        min = 0,
+        description = "Right To Render value (only for skinned object)"
     )
 
     frame_index : bpy.props.IntProperty(

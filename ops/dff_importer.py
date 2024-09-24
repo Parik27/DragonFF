@@ -128,8 +128,6 @@ class dff_importer:
             # Temporary Custom Properties that'll be used to set Object properties
             # later.
             mesh['dragon_normals'] = False
-            mesh['dragon_pipeline'] = 'NONE'
-            mesh['dragon_cust_pipeline'] = None
             mesh['dragon_light'] = (geom.flags & dff.rpGEOMETRYLIGHT) != 0
             mesh['dragon_modulate_color'] = \
                 (geom.flags & dff.rpGEOMETRYMODULATEMATERIALCOLOR) != 0
@@ -235,18 +233,6 @@ class dff_importer:
                     mesh.use_auto_smooth = True
 
             mesh['dragon_normals'] = geom.has_normals
-
-            # Set pipeline
-            if geom.pipeline is not None:
-                
-                pipeline = "0x%X" % (geom.pipeline)
-
-                if pipeline in ["0x53F20098", "0x53F2009A"]:
-                    mesh['dragon_pipeline'] = pipeline
-                else:
-                    mesh['dragon_pipeline'] = "CUSTOM"
-                    mesh['dragon_cust_pipeline'] = pipeline
-                                
             mesh.update()
 
             # Import materials and add the mesh to the meshes list
@@ -258,24 +244,30 @@ class dff_importer:
             obj.rotation_mode       = 'QUATERNION'
 
             # Set object properties from mesh properties
-            obj.dff.pipeline       = mesh['dragon_pipeline']
             obj.dff.export_normals = mesh['dragon_normals']
             obj.dff.light          = mesh['dragon_light']
             obj.dff.modulate_color = mesh['dragon_modulate_color']
             obj.dff.triangle_strip = mesh['dragon_triangle_strip']
 
-            if obj.dff.pipeline == 'CUSTOM':
-                obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
+            # Set pipeline
+            if 'pipeline' in atomic.extensions:
+                pipeline = "0x%X" % (atomic.extensions['pipeline'])
 
+                if pipeline in ["0x53F20098", "0x53F2009A"]:
+                    obj.dff.pipeline        = pipeline
+                    obj.dff.custom_pipeline = ""
+                else:
+                    obj.dff.pipeline        = "CUSTOM"
+                    obj.dff.custom_pipeline = pipeline
+
+            # Set Right To Render
             if 'right_to_render' in atomic.extensions:
                 obj.dff.right_to_render = atomic.extensions['right_to_render'].value2
 
             obj.dff.atomic_index = atomic_index
 
             # Delete temporary properties used earlier
-            del mesh['dragon_pipeline'      ]
             del mesh['dragon_normals'       ]
-            del mesh['dragon_cust_pipeline' ]
             del mesh['dragon_light'         ]
             del mesh['dragon_modulate_color']
             del mesh['dragon_triangle_strip']

@@ -815,16 +815,6 @@ class dff_exporter:
             geometry.extensions['user_data'] = dff.UserData.from_mem(
                 obj.data['dff_user_data'])
 
-        try:
-            if obj.dff.pipeline != 'NONE':
-                if obj.dff.pipeline == 'CUSTOM':
-                    geometry.pipeline = int(obj.dff.custom_pipeline, 0)
-                else:
-                    geometry.pipeline = int(obj.dff.pipeline, 0)
-
-        except ValueError:
-            print("Invalid (Custom) Pipeline")
-
         # Add Geometry to list
         self.dff.geometry_list.append(geometry)
 
@@ -833,6 +823,16 @@ class dff_exporter:
         atomic.frame    = frame_index
         atomic.geometry = len(self.dff.geometry_list) - 1
         atomic.flags    = 0x4
+
+        try:
+            if obj.dff.pipeline != 'NONE':
+                if obj.dff.pipeline == 'CUSTOM':
+                    atomic.extensions['pipeline'] = int(obj.dff.custom_pipeline, 0)
+                else:
+                    atomic.extensions['pipeline'] = int(obj.dff.pipeline, 0)
+
+        except ValueError:
+            print("Invalid (Custom) Pipeline")
 
         if "skin" in geometry.extensions:
             right_to_render = dff.RightToRender._make((0x0116,
