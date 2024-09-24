@@ -829,12 +829,16 @@ class dff_exporter:
         self.dff.geometry_list.append(geometry)
 
         # Create Atomic from geometry and frame
-        geometry_index = len(self.dff.geometry_list) - 1
-        atomic         = dff.Atomic._make((frame_index,
-                                        geometry_index,
-                                        0x4,
-                                        0
-        ))
+        atomic          = dff.Atomic()
+        atomic.frame    = frame_index
+        atomic.geometry = len(self.dff.geometry_list) - 1
+        atomic.flags    = 0x4
+
+        if "skin" in geometry.extensions:
+            right_to_render = dff.RightToRender._make((0x0116,
+                obj.dff.right_to_render
+            ))
+            atomic.extensions['right_to_render'] = right_to_render
 
         self.dff.atomic_list.append(atomic)
 

@@ -315,6 +315,11 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         if settings.uv_map1:
             box.prop(settings, "uv_map2", text="UV Map 2")
 
+        box = layout.box()
+        box.label(text="Atomic")
+
+        box.prop(settings, "right_to_render", text="Right To Render")
+
     #######################################################
     def draw_col_menu(self, context):
         layout = self.layout
@@ -519,10 +524,15 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         description="Enabling will increase file size, but will increase\
 compatibiility with DFF Viewers"
     )
-    
+
     triangle_strip : bpy.props.BoolProperty(
         default=False,
         description="Use Triangle Strip instead of Triangle List for Bin Mesh PLG"
+    )
+
+    right_to_render : bpy.props.IntProperty(
+        default = 1,
+        description = "Right To Render value (only for skinned object)"
     )
 
     col_material : bpy.props.IntProperty(

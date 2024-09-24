@@ -267,6 +267,9 @@ class dff_importer:
             if obj.dff.pipeline == 'CUSTOM':
                 obj.dff.custom_pipeline = mesh['dragon_cust_pipeline']
 
+            if 'right_to_render' in atomic.extensions:
+                obj.dff.right_to_render = atomic.extensions['right_to_render'].value2
+
             obj.dff.atomic_index = atomic_index
 
             # Delete temporary properties used earlier
@@ -843,8 +846,8 @@ class dff_importer:
             self.dff.frame_list.append(frame)
 
             # Attach the created frame to the atomics
-            for atomic_index, atomic in enumerate(self.dff.atomic_list):
-                self.dff.atomic_list[atomic_index] = atomic._replace(frame=0)
+            for atomic in self.dff.atomic_list:
+                atomic.frame = 0
 
         self.import_atomics()
         self.import_frames()

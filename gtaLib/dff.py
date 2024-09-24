@@ -21,25 +21,25 @@ from enum import Enum, IntEnum
 from .pyffi.utils import tristrip
 
 # Data types
-Chunk       = namedtuple("Chunk"       , "type size version")
-Clump       = namedtuple("Clump"       , "atomics lights cameras")
-Vector      = namedtuple("Vector"      , "x y z")
-Matrix      = namedtuple("Matrix"      , "right up at")
-HAnimHeader = namedtuple("HAnimHeader" , "version id bone_count")
-Bone        = namedtuple("Bone"        , "id index type")
-RGBA        = namedtuple("RGBA"        , "r g b a")
-GeomSurfPro = namedtuple("GeomSurfPro" , "ambient specular diffuse")
-TexCoords   = namedtuple("TexCoords"   , "u v")
-Sphere      = namedtuple("Sphere"      , "x y z radius")
-Triangle    = namedtuple("Triangle"    , "b a material c")
-Atomic      = namedtuple("Atomic"      , "frame geometry flags unk")
-UVFrame     = namedtuple("UVFrame"     , "time uv prev")
-BumpMapFX   = namedtuple("BumpMapFX"   , "intensity bump_map height_map")
-EnvMapFX    = namedtuple("EnvMapFX"    , "coefficient use_fb_alpha env_map")
-DualFX      = namedtuple("DualFX"      , "src_blend dst_blend texture")
-ReflMat     = namedtuple("ReflMat"     , "s_x s_y o_x o_y intensity")
-SpecularMat = namedtuple("SpecularMap" , "level texture")
-GeomBone    = namedtuple("GeomBone"    , "start_vertex vertices_count bone_id")
+Chunk         = namedtuple("Chunk"         , "type size version")
+Clump         = namedtuple("Clump"         , "atomics lights cameras")
+Vector        = namedtuple("Vector"        , "x y z")
+Matrix        = namedtuple("Matrix"        , "right up at")
+HAnimHeader   = namedtuple("HAnimHeader"   , "version id bone_count")
+Bone          = namedtuple("Bone"          , "id index type")
+RGBA          = namedtuple("RGBA"          , "r g b a")
+GeomSurfPro   = namedtuple("GeomSurfPro"   , "ambient specular diffuse")
+TexCoords     = namedtuple("TexCoords"     , "u v")
+Sphere        = namedtuple("Sphere"        , "x y z radius")
+Triangle      = namedtuple("Triangle"      , "b a material c")
+UVFrame       = namedtuple("UVFrame"       , "time uv prev")
+BumpMapFX     = namedtuple("BumpMapFX"     , "intensity bump_map height_map")
+EnvMapFX      = namedtuple("EnvMapFX"      , "coefficient use_fb_alpha env_map")
+DualFX        = namedtuple("DualFX"        , "src_blend dst_blend texture")
+ReflMat       = namedtuple("ReflMat"       , "s_x s_y o_x o_y intensity")
+SpecularMat   = namedtuple("SpecularMap"   , "level texture")
+GeomBone      = namedtuple("GeomBone"      , "start_vertex vertices_count bone_id")
+RightToRender = namedtuple("RightToRender" , "value1 value2")
 
 TexDict = namedtuple("TexDict", "texture_count device_id")
 PITexDict = namedtuple("PITexDict", "texture_count device_id")
@@ -154,20 +154,20 @@ class Sections:
 
     # Unpack/pack format for above data types
     formats =  {
-        Chunk       : "<3I",
-        Clump       : "<3I",
-        Vector      : "<3f",
-        HAnimHeader : "<3i",
-        Bone        : "<3i",
-        RGBA        : "<4B",
-        GeomSurfPro : "<3f",
-        Sphere      : "<4f",
-        Triangle    : "<4H",
-        Atomic      : "<4I",
-        TexCoords   : "<2f",
-        ReflMat     : "<5f4x",
-        SpecularMat : "<f24s",
-        GeomBone    : "<3I",
+        Chunk         : "<3I",
+        Clump         : "<3I",
+        Vector        : "<3f",
+        HAnimHeader   : "<3i",
+        Bone          : "<3i",
+        RGBA          : "<4B",
+        GeomSurfPro   : "<3f",
+        Sphere        : "<4f",
+        Triangle      : "<4H",
+        TexCoords     : "<2f",
+        ReflMat       : "<5f4x",
+        SpecularMat   : "<f24s",
+        GeomBone      : "<3I",
+        RightToRender : "<II",
 
         TexDict : "<2H",
         PITexDict: "<2H"
@@ -499,6 +499,47 @@ class Material:
         return hash(self.to_mem())
 
 #######################################################
+class Atomic:
+
+    __slots__ = [
+        'frame',
+        'geometry',
+        'flags',
+        'unk',
+        'extensions'
+    ]
+
+    ##################################################################
+    def __init__(self):
+        self.frame      = 0
+        self.geometry   = 0
+        self.flags      = 0
+        self.unk        = 0
+        self.extensions = {}
+
+    ##################################################################
+    def from_mem(data):
+
+        self = Atomic()
+
+        _Atomic = namedtuple("_Atomic", "frame geometry flags unk")
+        _atomic = _Atomic._make(unpack_from("<4I", data))
+
+        self.frame    = _atomic.frame
+        self.geometry = _atomic.geometry
+        self.flags    = _atomic.flags
+        self.unk      = _atomic.unk
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+
+        data = b''
+        data += pack("<4I", self.frame, self.geometry, self.flags, self.unk)
+        return data
+
+#######################################################
 class UserData:
 
     __slots__ = ['sections']
@@ -583,7 +624,7 @@ class UserData:
                     data += pack("<I%ds" % len(string), len(string), string.encode("ascii"))
 
         return Sections.write_chunk(data, types["User Data PLG"])
-    
+
 #######################################################
 class Frame:
 
@@ -2228,15 +2269,26 @@ class dff:
 
             # STRUCT
             if chunk.type == types["Struct"]:
-                atomic = Sections.read(Atomic, self.data, self._read(chunk.size))
+                atomic = Atomic.from_mem(
+                    self.data[self.pos:self.pos+chunk.size]
+                )
+                self.pos += chunk.size
 
             elif chunk.type == types["Extension"]:
-                pass
+                _chunk_end = chunk.size + self.pos
+
+                while self.pos < _chunk_end:
+                    chunk = self.read_chunk()
+
+                    if chunk.type == types["Right to Render"]:
+                        right_to_render = Sections.read(RightToRender, self.data, self._read(chunk.size))
+                        atomic.extensions["right_to_render"] = right_to_render
+
+                self.pos = _chunk_end
 
             elif chunk.type == types["Geometry"]:
                 self.read_geometry(chunk)
-                geometry_index = len(self.geometry_list) - 1
-                atomic = atomic._replace(geometry=geometry_index)
+                atomic.geometry = len(self.geometry_list) - 1
 
             elif chunk.type == types["Pipeline Set"]:
                 pipeline = unpack_from("<I", self.data, self._read(chunk.size))[0]
@@ -2388,13 +2440,18 @@ class dff:
     #######################################################
     def write_atomic(self, atomic):
 
-        data = Sections.write(Atomic, atomic, types["Struct"])
+        data = atomic.to_mem()
+        data = Sections.write_chunk(data, types["Struct"])
         geometry = self.geometry_list[atomic.geometry]
-        
+
         ext_data = b''
         if "skin" in geometry.extensions:
+            right_to_render = atomic.extensions.get("right_to_render")
+            if not right_to_render:
+                right_to_render = RightToRender._make((0x0116, 1))
+
             ext_data += Sections.write_chunk(
-                pack("<II", 0x0116, 1),
+                pack("<II", right_to_render.value1, right_to_render.value2),
                 types["Right to Render"]
             )
         if geometry._hasMatFX:
