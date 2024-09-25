@@ -522,11 +522,18 @@ class Atomic:
 
         self = Atomic()
 
-        _Atomic = namedtuple("_Atomic", "frame geometry flags unk")
-        _atomic = _Atomic._make(unpack_from("<4I", data))
+        # Atomic with embedded geometry
+        if len(data) == 12:
+            _Atomic = namedtuple("_Atomic", "frame flags unk")
+            _atomic = _Atomic._make(unpack_from("<3I", data))
+
+        else:
+            _Atomic = namedtuple("_Atomic", "frame geometry flags unk")
+            _atomic = _Atomic._make(unpack_from("<4I", data))
+
+            self.geometry = _atomic.geometry
 
         self.frame    = _atomic.frame
-        self.geometry = _atomic.geometry
         self.flags    = _atomic.flags
         self.unk      = _atomic.unk
 
