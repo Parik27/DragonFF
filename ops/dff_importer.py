@@ -134,7 +134,8 @@ class dff_importer:
             mesh['dragon_triangle_strip'] = (geom.flags & dff.rpGEOMETRYTRISTRIP) != 0
 
             uv_layers = []
-            
+            normals = []
+
             # Vertices
             for v in geom.vertices:
                 bm.verts.new(v)
@@ -168,6 +169,7 @@ class dff_importer:
                 faces = geom.triangles
 
             use_face_loops = geom.native_platform_type == dff.NativePlatformType.GC
+            use_custom_normals = geom.has_normals and self.import_normals
             vert_index = -1
 
             for f in faces:
@@ -210,22 +212,20 @@ class dff_importer:
                                 c / 255.0 for c in
                                 extension.colors[vert_index]
                             ]
+
+                        # Normals
+                        if use_custom_normals:
+                            normals.append(geom.normals[vert_index])
                             
                     face.smooth = True
                 except BaseException as e:
+                    vert_index += 3
                     print(e)
                     
             bm.to_mesh(mesh)
 
             # Set loop normals
-            if geom.has_normals and self.import_normals:
-                normals = []
-                if use_face_loops:
-                    normals = geom.normals
-                else:
-                    for loop in mesh.loops:
-                        normals.append(geom.normals[loop.vertex_index])
-
+            if normals:
                 mesh.normals_split_custom_set(normals)
 
                 # NOTE: Mesh.use_auto_smooth is removed
