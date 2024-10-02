@@ -20,6 +20,8 @@ import mathutils
 import os
 import os.path
 
+from collections import OrderedDict
+
 from ..gtaLib import dff
 from ..ops.state import State
 from .col_exporter import export_col
@@ -187,55 +189,162 @@ class material_helper:
     #######################################################
     def get_uv_animation(self):
 
-        anim = dff.UVAnim()
-
         # See if export_animation checkbox is checked
         if not self.material.dff.export_animation:
             return None
 
+        # Check if mapping nodes exist
+        if not self.principled or not self.principled.base_color_texture.has_mapping_node():
+            return None
+
+        # Check if animation data exists
+        anim_data = self.material.node_tree.animation_data
+        if not anim_data:
+            return None
+
+        fps = bpy.context.scene.render.fps
+
+        anim = dff.UVAnim()
         anim.name = self.material.dff.animation_name
-        
-        if self.principled:
-            if self.principled.base_color_texture.has_mapping_node():
-                anim_data = self.material.node_tree.animation_data
-                
-                fps = bpy.context.scene.render.fps
-                
-                if anim_data:
-                    for curve in anim_data.action.fcurves:
 
-                        # Rw doesn't support Z texture coordinate.
-                        if curve.array_index > 1:
-                            continue
+        # Multiple keyframes may contain the same time,
+        # so time_inc is added for the key
+        keyframes_dict = {} # (time, time_inc): [(val, is_constant_interpolation)] * 4
 
-                        # Offset in the UV array
-                        uv_offset = {
-                            'nodes["Mapping"].inputs[1].default_value': 4,
-                            'nodes["Mapping"].inputs[3].default_value': 1,
-                        }
+        data_path_offset = {
+            'nodes["Mapping"].inputs[1].default_value': 2,
+            'nodes["Mapping"].inputs[3].default_value': 0,
+        }
 
-                        if curve.data_path not in uv_offset:
-                            continue
-                        
-                        off = uv_offset[curve.data_path]
-                        
-                        for i, frame in enumerate(curve.keyframe_points):
-                            
-                            if len(anim.frames) <= i:
-                                anim.frames.append(dff.UVFrame(0,[0]*6, i-1))
+        mapping = self.principled.base_color_texture.node_mapping_get()
+        default_values = (
+            mapping.inputs['Scale'].default_value[0],
+            mapping.inputs['Scale'].default_value[1],
+            mapping.inputs['Location'].default_value[0],
+            mapping.inputs['Location'].default_value[1],
+        )
 
-                            _frame = list(anim.frames[i])
-                                
-                            uv = _frame[1]
-                            uv[off + curve.array_index] = frame.co[1]
+        # Set keyframes_dict
+        for curve in anim_data.action.fcurves:
 
-                            _frame[0] = frame.co[0] / fps
+            # Rw doesn't support Z texture coordinate.
+            if curve.array_index > 1:
+                continue
 
-                            anim.frames[i] = dff.UVFrame._make(_frame)
-                            anim.duration = max(anim.frames[i].time,anim.duration)
-                            
-                    return anim
-    
+            if curve.data_path not in data_path_offset:
+                continue
+
+            off = data_path_offset[curve.data_path]
+
+            for frame in curve.keyframe_points:
+
+                time, val = frame.co
+                time = time / fps
+                idx = off + curve.array_index
+                is_constant = frame.interpolation == 'CONSTANT'
+
+                # Y coords are flipped in Blender
+                if idx == 3:
+                    val = 1 - val
+
+                # Find a free time_key
+                time_key = (time, 0)
+                while time_key in keyframes_dict:
+                    if keyframes_dict[time_key][idx] is None:
+                        break
+                    time_key = (time, time_key[1] + 1)
+
+                if time_key not in keyframes_dict:
+                    keyframes_dict[time_key] = [None] * 4
+
+                keyframes_dict[time_key][idx] = (val, is_constant)
+
+        keyframes_dict = OrderedDict(sorted(keyframes_dict.items()))
+
+        # Interpolate missing keyframes
+        for idx in range(4):
+            prev_kf, prev_time_key = None, None
+
+            for time_key, kf in keyframes_dict.items():
+                if kf[idx] is not None:
+                    prev_kf, prev_time_key = kf[idx], time_key
+                    continue
+
+                # Find next keyframe
+                next_kf, next_time_key = None, None
+                for time_key_, kf_ in keyframes_dict.items():
+                    if time_key_ > time_key and kf_[idx] is not None:
+                        next_kf, next_time_key = kf_[idx], time_key_
+                        break
+
+                # Add the missing keyframe
+                if prev_kf is None and next_kf is None:
+                    kf_ = (default_values[idx], False)
+
+                elif prev_kf is None:
+                    kf_ = (next_kf[0], False)
+
+                elif next_kf is None:
+                    kf_ = (prev_kf[0], False)
+
+                else:
+                    prev_val, next_val = prev_kf[0], next_kf[0]
+                    duration = next_time_key[0] - prev_time_key[0]
+
+                    # Reset the constant interpolation of the previous keyframe to assign to the new one
+                    if prev_kf[1]:
+                        keyframes_dict[prev_time_key][idx] = (prev_val, False)
+                        fraction = 0.0
+
+                    elif duration == 0.0:
+                        fraction = 0.0
+
+                    else:
+                        fraction = (time_key[0] - prev_time_key[0]) / duration
+
+                    val = prev_val + (next_val - prev_val) * fraction
+                    kf_ = (val, prev_kf[1])
+
+                keyframes_dict[time_key][idx] = kf_
+                prev_kf, prev_time_key = kf_, time_key
+
+        frame_idx = 0
+        was_constant = [False] * 4
+
+        # Create UVFrames
+        for time_key, kf in keyframes_dict.items():
+
+            # Create dummy UVFrame for constant interpolation
+            if True in was_constant:
+                uv_vals = [0] * 6
+                for idx in range(4):
+                    uv_idx = (idx // 2) * 3 + (idx % 2) + 1
+                    uv_vals[uv_idx] = anim.frames[-1].uv[uv_idx] if was_constant[idx] else kf[idx][0]
+
+                frame = dff.UVFrame(time_key[0], uv_vals, frame_idx-1)
+                anim.frames.append(dff.UVFrame._make(frame))
+                frame_idx += 1
+
+                was_constant = [False] * 4
+
+            # Create a regular UVFrame
+            uv_vals = [0] * 6
+            for idx in range(4):
+                val, is_constant = kf[idx]
+                uv_idx = (idx // 2) * 3 + (idx % 2) + 1
+                uv_vals[uv_idx] = val
+                if is_constant:
+                    was_constant[idx] = True
+
+            frame = dff.UVFrame(time_key[0], uv_vals, frame_idx-1)
+            anim.frames.append(dff.UVFrame._make(frame))
+            frame_idx += 1
+
+        if anim.frames:
+            anim.duration = list(keyframes_dict.keys())[-1][0]
+
+        return anim
+
     #######################################################
     def __init__(self, material):
         self.material = material
