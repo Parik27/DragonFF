@@ -65,15 +65,17 @@ class D3DCompressType(IntEnum):
 
 #######################################################
 class PaletteType(IntEnum):
-    PALETTE_NONE = 0
-    PALETTE_8    = 1
-    PALETTE_4    = 2
+    PALETTE_NONE  = 0
+    PALETTE_8     = 1
+    PALETTE_4     = 2
+    PALETTE_4_LSB = 3
 
 #######################################################
 class DeviceType(IntEnum):
     DEVICE_NONE = 0
     DEVICE_D3D8 = 1
     DEVICE_D3D9 = 2
+    DEVICE_GC   = 3 # probably
     DEVICE_PS2  = 6
     DEVICE_XBOX = 8
 
@@ -83,31 +85,39 @@ class ImageDecoder:
     @staticmethod
     def _decode1555(bits):
         a = ((bits >> 15) & 0x1) * 0xff
-        b = ((bits >> 10) & 0x1f) << 3
-        c = ((bits >> 5) & 0x1f) << 3
-        d = (bits & 0x1f) << 3
+        b = ((bits >> 10) & 0x1f) * 0xff // 0x1f
+        c = ((bits >> 5) & 0x1f) * 0xff // 0x1f
+        d = (bits & 0x1f) * 0xff // 0x1f
+        return a, b, c, d
+
+    @staticmethod
+    def _decode4443(bits):
+        a = ((bits >> 12) & 0x7) * 0xff // 0x7
+        b = ((bits >> 8) & 0xf) * 0xff // 0xf
+        c = ((bits >> 4) & 0xf) * 0xff // 0xf
+        d = (bits & 0xf) * 0xff // 0xf
         return a, b, c, d
 
     @staticmethod
     def _decode4444(bits):
-        a = ((bits >> 12) & 0xf) << 4
-        b = ((bits >> 8) & 0xf) << 4
-        c = ((bits >> 4) & 0xf) << 4
-        d = (bits & 0xf) << 4
+        a = ((bits >> 12) & 0xf) * 0xff // 0xf
+        b = ((bits >> 8) & 0xf) * 0xff // 0xf
+        c = ((bits >> 4) & 0xf) * 0xff // 0xf
+        d = (bits & 0xf) * 0xff // 0xf
         return a, b, c, d
 
     @staticmethod
     def _decode565(bits):
-        a = ((bits >> 11) & 0x1f) << 3
-        b = ((bits >> 5) & 0x3f) << 2
-        c = (bits & 0x1f) << 3
+        a = ((bits >> 11) & 0x1f) * 0xff // 0x1f
+        b = ((bits >> 5) & 0x3f) * 0xff // 0x3f
+        c = (bits & 0x1f) * 0xff // 0x1f
         return a, b, c
 
     @staticmethod
     def _decode555(bits):
-        a = ((bits >> 10) & 0x1f) << 3
-        b = ((bits >> 5) & 0x1f) << 3
-        c = (bits & 0x1f) << 3
+        a = ((bits >> 10) & 0x1f) * 0xff // 0x1f
+        b = ((bits >> 5) & 0x1f) * 0xff // 0x1f
+        c = (bits & 0x1f) * 0xff // 0x1f
         return a, b, c
 
     @staticmethod
@@ -371,12 +381,24 @@ class ImageDecoder:
         pos = 0
         ret = bytearray(4 * width * height)
 
-        shift = 0
         for i in data:
-            idx = (i >> shift) & 0xf
-            ret[pos+0:pos+4] = palette[idx*4:idx*4+4]
-            shift ^= 4
-            pos += 4
+            idx1, idx2 = (i >> 4) & 0xf, i & 0xf
+            ret[pos+0:pos+4] = palette[idx1*4:idx1*4+4]
+            ret[pos+4:pos+8] = palette[idx2*4:idx2*4+4]
+            pos += 8
+
+        return bytes(ret)
+
+    @staticmethod
+    def pal4_noalpha(data, palette, width, height):
+        pos = 0
+        ret = bytearray(4 * width * height)
+
+        for i in data:
+            idx1, idx2 = (i >> 4) & 0xf, i & 0xf
+            ret[pos+0:pos+4] = palette[idx1*4:idx1*4+3] + b'\xff'
+            ret[pos+4:pos+8] = palette[idx2*4:idx2*4+3] + b'\xff'
+            pos += 8
 
         return bytes(ret)
 
@@ -387,6 +409,17 @@ class ImageDecoder:
 
         for idx in data:
             ret[pos:pos+4] = palette[idx*4:idx*4+4]
+            pos += 4
+
+        return bytes(ret)
+
+    @staticmethod
+    def pal8_noalpha(data, palette, width, height):
+        pos = 0
+        ret = bytearray(4 * width * height)
+
+        for idx in data:
+            ret[pos:pos+4] = palette[idx*4:idx*4+3] + b'\xff'
             pos += 4
 
         return bytes(ret)
@@ -432,13 +465,14 @@ class TextureNative:
             palette_format = self.get_raster_palette_type()
 
             if palette_format != PaletteType.PALETTE_NONE:
-                if palette_format == PaletteType.PALETTE_8:
-                    return ImageDecoder.pal8(pixels, self.palette, width, height)
-                else:
-                    if self.depth == 4:
+                if palette_format != PaletteType.PALETTE_8 and self.depth == 4:
+                    if self.has_alpha():
                         return ImageDecoder.pal4(pixels, self.palette, width, height)
-                    else:
-                        return ImageDecoder.pal8(pixels, self.palette, width, height)
+                    return ImageDecoder.pal4_noalpha(pixels, self.palette, width, height)
+
+            if self.has_alpha():
+                return ImageDecoder.pal8(pixels, self.palette, width, height)
+            return ImageDecoder.pal8_noalpha(pixels, self.palette, width, height)
 
         # D3D8 specific texture
         elif self.platform_id == NativePlatformType.D3D8:
@@ -532,6 +566,18 @@ class TextureNative:
     #######################################################
     def get_height(self, level=0):
         return max(self.height >> level, 1)
+
+    #######################################################
+    def has_alpha(self):
+        if self.platform_id == NativePlatformType.D3D9:
+            return self.platform_properties.alpha != 0
+
+        raster_format = self.get_raster_format_type()
+        if raster_format in (RasterFormat.RASTER_565, RasterFormat.RASTER_LUM,
+                             RasterFormat.RASTER_888, RasterFormat.RASTER_555):
+            return False
+
+        return True
 
     #######################################################
     def read_pixels(self, data, offset):
@@ -709,6 +755,11 @@ class txd:
                         texture = NativePS2Texture.from_mem(self.data[self.pos:])
                         self._read(texture.pos - chunk.size)
 
+                    elif (platform_id >> 24) == NativePlatformType.GC:
+                        from .native_gc import NativeGCTexture
+                        texture = NativeGCTexture.from_mem(self.data[self.pos:], self.rw_version)
+                        self._read(texture.pos - chunk.size)
+
                 elif self.device_id in (DeviceType.DEVICE_D3D8, DeviceType.DEVICE_D3D9):
                     texture = TextureNative.from_mem(
                             self.data[self.pos:self.pos+chunk.size]
@@ -717,6 +768,11 @@ class txd:
                 elif self.device_id == DeviceType.DEVICE_PS2:
                     from .native_ps2 import NativePS2Texture
                     texture = NativePS2Texture.from_mem(self.data[self.pos:])
+                    self._read(texture.pos - chunk.size)
+
+                elif self.device_id == DeviceType.DEVICE_GC:
+                    from .native_gc import NativeGCTexture
+                    texture = NativeGCTexture.from_mem(self.data[self.pos:], self.rw_version)
                     self._read(texture.pos - chunk.size)
 
                 if texture:
@@ -846,12 +902,12 @@ class txd:
         self.data = data
 
         chunk = self.read_chunk()
+        self.rw_version = Sections.get_rw_version(chunk.version)
+
         if chunk.type == types["Texture Dictionary"]:
             self.read_texture_dictionary(chunk)
         elif chunk.type == types["PI Texture Dictionary"]:
             self.read_pi_texture_dictionary(chunk)
-
-        self.rw_version = Sections.get_rw_version(chunk.version)
 
     #######################################################
     def clear(self):
