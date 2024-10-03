@@ -170,9 +170,18 @@ class dff_importer:
 
             use_face_loops = geom.native_platform_type == dff.NativePlatformType.GC
             use_custom_normals = geom.has_normals and self.import_normals
+            last_face_index = len(faces) - 1
             vert_index = -1
 
-            for f in faces:
+            for fi, f in enumerate(faces):
+
+                # Skip double face (keep the last one)
+                if fi < last_face_index:
+                    next_face = faces[fi + 1]
+                    if set((f.a, f.b, f.c)) == set((next_face.a, next_face.b, next_face.c)):
+                        vert_index += 3
+                        continue
+
                 try:
                     face = bm.faces.new(
                         [
