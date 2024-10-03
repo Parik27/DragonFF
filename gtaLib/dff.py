@@ -924,7 +924,7 @@ class SkinPLG:
                 unpack_format = "<4x16f"
 
             # Read bone matrices
-            for i in range(self.num_bones):
+            for _ in range(self.num_bones):
 
                 _data = list(unpack_from(unpack_format, data, pos))
                 _data[ 3] = 0.0
@@ -1598,7 +1598,6 @@ class Geometry:
         return Sections.write_chunk(data, types["Material List"])
 
     #######################################################
-    # TODO: Triangle Strips support
     def write_bin_split(self):
 
         data = b''
@@ -2295,6 +2294,9 @@ class dff:
                     elif chunk.type == types["Pipeline Set"]:
                         pipeline = unpack_from("<I", self.data, self._read(chunk.size))[0]
                         atomic.extensions["pipeline"] = pipeline
+
+                    else:
+                        self._read(chunk.size)
 
                 self.pos = _chunk_end
 

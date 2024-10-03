@@ -648,7 +648,7 @@ class dff_importer:
     def set_vertex_groups(obj, skin_data):
 
         # Allocate vertex groups
-        for i in range(skin_data.num_bones):
+        for _ in range(skin_data.num_bones):
             obj.vertex_groups.new()
 
         # vertex_bone_indices stores what 4 bones influence this vertex
