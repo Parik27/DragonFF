@@ -493,13 +493,16 @@ class SCENE_OT_dff_update(bpy.types.Operator):
 class OBJECT_OT_dff_set_parent_bone(bpy.types.Operator):
 
     bl_idname           = "object.dff_set_parent_bone"
-    bl_description      = "Set the object's parenting (DragonFF)"
-    bl_label            = "Set Parent Bone (DragonFF)"
+    bl_description      = "Set the object's parenting"
+    bl_label            = "Set Parent Bone"
 
     #######################################################
     def execute(self, context):
         objects = [obj for obj in context.selected_objects if obj.type in ("MESH", "EMPTY")]
         if not objects:
+            return {'CANCELLED'}
+
+        if not context.active_bone:
             return {'CANCELLED'}
 
         armature = context.active_object
@@ -511,6 +514,22 @@ class OBJECT_OT_dff_set_parent_bone(bpy.types.Operator):
         return {'FINISHED'}
 
 #######################################################
-def set_parent_bone_func(self, context):
-    self.layout.separator()
-    self.layout.operator(OBJECT_OT_dff_set_parent_bone.bl_idname, text="Set Parent To (DragonFF)")
+class OBJECT_OT_dff_clear_parent_bone(bpy.types.Operator):
+
+    bl_idname           = "object.dff_clear_parent_bone"
+    bl_description      = "Clear the object's parenting"
+    bl_label            = "Clear Parent Bone"
+
+    #######################################################
+    def execute(self, context):
+        objects = [obj for obj in context.selected_objects if obj.type in ("MESH", "EMPTY")]
+        if not objects:
+            return {'CANCELLED'}
+
+        armature = context.active_object
+
+        for obj in objects:
+            obj.matrix_world = armature.matrix_world
+            obj.parent_bone = ""
+
+        return {'FINISHED'}
