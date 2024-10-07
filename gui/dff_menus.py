@@ -282,7 +282,7 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
 
         row = box.row()
-        if not context.object.parent or context.object.children:
+        if settings.is_frame_locked:
             row.enabled = False
         row.prop(settings, "is_frame", text="Export As Frame")
 
@@ -569,6 +569,9 @@ compatibiility with DFF Viewers"
         max = 2**31-1,
         options = {'SKIP_SAVE', 'HIDDEN'}
     )
+
+    # Miscellaneous properties
+    is_frame_locked : bpy.props.BoolProperty()
 
     #######################################################    
     def register():

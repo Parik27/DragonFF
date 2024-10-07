@@ -19,6 +19,20 @@ class State(metaclass=_StateMeta):
             frame_objects_set.add(ob)
             ordered_frame_objcets.append(ob)
 
+        def update_frame_status(ob):
+            is_frame, is_frame_locked = ob.dff.is_frame, False
+            if ob.parent and not ob.children:
+                if ob.parent.type == 'ARMATURE' and not ob.parent_bone:
+                    is_frame, is_frame_locked = False, True
+            else:
+                is_frame, is_frame_locked = True, True
+
+            if ob.dff.is_frame != is_frame:
+                ob.dff.is_frame = is_frame
+            if ob.dff.is_frame_locked != is_frame_locked:
+                ob.dff.is_frame_locked = is_frame_locked
+            return is_frame
+
         scene = scene or bpy.context.scene
         frame_objects, atomic_objects = [], []
 
@@ -28,9 +42,7 @@ class State(metaclass=_StateMeta):
 
             if ob.type == 'MESH':
                 atomic_objects.append(ob)
-                if not ob.dff.is_frame and (not ob.parent or ob.children):
-                    ob.dff.is_frame = True
-                if ob.dff.is_frame:
+                if update_frame_status(ob):
                     frame_objects.append(ob)
 
             elif ob.type in ('EMPTY', 'ARMATURE'):
