@@ -766,7 +766,7 @@ class dff_exporter:
         dm_entries = self.get_delta_morph_entries(obj, mesh)
 
         # Check for vertices once before exporting to report instanstly
-        if len(mesh.vertices) > 0xFFFF:
+        if not self.exclude_geo_faces and len(mesh.vertices) > 0xFFFF:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
 
         for polygon in mesh.polygons:
@@ -821,7 +821,7 @@ class dff_exporter:
 
         # Check vertices count again since duplicate vertices may have increased
         # vertices count above the limit
-        if len(vertices_list) > 0xFFFF:
+        if not self.exclude_geo_faces and len(vertices_list) > 0xFFFF:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
 
         self.populate_geometry_from_vertices_data(
