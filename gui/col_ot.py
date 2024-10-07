@@ -59,8 +59,6 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
                 "file_name"      : self.filepath,
                 "version"        : int(self.export_version),
                 "collection"     : context.collection if self.use_active_collection else None,
-                "memory"         : False,
-                "mass_export"    : True,
                 "only_selected"  : self.only_selected
             }
         )

@@ -1092,13 +1092,10 @@ class dff_exporter:
         # Collision
         if self.export_coll:
             mem = export_col({
-                'file_name'     : name if name is not None else
-                               os.path.basename(self.file_name),
-                'memory'        : True,
+                'file_name'     : None,
                 'version'       : 3,
                 'collection'    : self.collection,
-                'only_selected' : self.selected,
-                'mass_export'   : False
+                'only_selected' : self.selected
             })
 
             if len(mem) != 0:
@@ -1154,7 +1151,9 @@ class dff_exporter:
                 self.collection = collection
 
         if not self.mass_export:
-                
+            if self.from_outliner:
+                self.collection = collections[0]
+
             objects = sorted(objects, key=objects.get)
             self.export_objects(objects)
                 

@@ -25,10 +25,8 @@ from ..gtaLib import col
 class col_exporter:
 
     coll = None
-    filename = ""
+    filename = "" # Whether it will return a bytes file (not write to a file), if no file name is specified
     version = None
-    collection = None
-    memory = False # Whether it will return a bytes file (not write to a file)
     only_selected = False
 
     #######################################################
@@ -240,12 +238,10 @@ class col_exporter:
                 self._process_boxes(obj)
 
         self._update_bounds(obj)
-        
-    
+
     #######################################################
-    def export_col(name):
+    def export_col(collection, name):
         self = col_exporter
-        self.file_name = name
 
         col.Sections.init_sections(self.version)
 
@@ -254,66 +250,65 @@ class col_exporter:
         self.coll.model_name = os.path.basename(name)
 
         bounds_found = False
-        objects = bpy.data.objects
-        if self.collection is not None and len(self.collection.objects) > 0:
-            objects = self.collection.objects
-            # Get original import bounds from collection (some collisions come in as just bounds with no other items)
-            if self.collection.get('bounds min') and self.collection.get('bounds max'):
-                bounds_found = True
-                self.coll.bounds = [self.collection['bounds min'], self.collection['bounds max']]
+
+        # Get original import bounds from collection (some collisions come in as just bounds with no other items)
+        if collection.get('bounds min') and collection.get('bounds max'):
+            bounds_found = True
+            self.coll.bounds = [collection['bounds min'], collection['bounds max']]
 
         total_objects = 0
-        for obj in objects:
+        for obj in collection.objects:
             if obj.dff.type == 'COL' or obj.dff.type == 'SHA':
                 if not self.only_selected or obj.select_get():
                     self._process_obj(obj)
                     total_objects += 1
-                
+
         self._convert_bounds()
-        
-        if self.memory:
-            if total_objects > 0 or bounds_found:
-                return col.coll(self.coll).write_memory()
+
+        if total_objects == 0 and (col_exporter.only_selected or not bounds_found):
             return b''
 
-        col.coll(self.coll).write_file(name)
+        return col.coll(self.coll).write_memory()
+
+#######################################################
+def get_col_collection_name(collection, parent_collection=None):
+    name = collection.name
+
+    # Strip stuff like vehicles.col. from the name so that
+    # for example vehicles.col.infernus changes to just infernus
+    if parent_collection and parent_collection != collection:
+        prefix = parent_collection.name + "."
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+
+    return name
 
 #######################################################
 def export_col(options):
-    
-    col_exporter.memory = options['memory']
+
     col_exporter.version = options['version']
     col_exporter.collection = options['collection']
     col_exporter.only_selected = options['only_selected']
-    
-    if options['mass_export']:
-        output = b''
 
-        root_collection = col_exporter.collection or bpy.context.scene.collection
-        collections = root_collection.children.values()
-        if not collections or root_collection != bpy.context.scene.collection:
-            collections += [root_collection]
-        col_exporter.memory = True
+    file_name = options['file_name']
+    output = b''
+
+    if not col_exporter.collection:
+        scene_collection = bpy.context.scene.collection
+        root_collections = scene_collection.children.values() + [scene_collection]
+    else:
+        root_collections = [col_exporter.collection]
+
+    for root_collection in root_collections:
+        collections = root_collection.children.values() + [root_collection]
 
         for collection in collections:
-            col_exporter.collection = collection
-            name = collection.name
+            name = get_col_collection_name(collection, root_collection)
+            output += col_exporter.export_col(collection, name)
 
-            # Strip stuff like vehicles.col. from the name so that
-            # for example vehicles.col.infernus changes to just infernus
-            try:
-                name = name[name.index(".col.") + 5:]
-                
-            except ValueError:
-                pass
-            
-            output += col_exporter.export_col(name)
-
-        if options['memory']:
-            return output
-
-        with open(options['file_name'], mode='wb') as file:
+    if file_name:
+        with open(file_name, mode='wb') as file:
             file.write(output)
-            return
-        
-    return col_exporter.export_col(options['file_name'])
+        return
+
+    return output
