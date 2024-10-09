@@ -387,6 +387,7 @@ class dff_exporter:
     selected = False
     mass_export = False
     preserve_positions = True
+    preserve_rotations = True
     file_name = ""
     dff = None
     version = None
@@ -435,17 +436,24 @@ class dff_exporter:
 
         parent = self.get_object_parent(obj)
 
-        if is_bone or parent or self.preserve_positions:
+        if is_bone or parent:
             position = matrix.to_translation()
+            rotation_matrix = matrix.to_3x3().transposed()
         else:
-            position = (0, 0, 0)
+            if self.preserve_positions:
+                position = matrix.to_translation()
+            else:
+                position = (0, 0, 0)
+
+            if self.preserve_rotations:
+                rotation_matrix = matrix.to_3x3().transposed()
+            else:
+                rotation_matrix = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 
         frame.creation_flags  =  0
         frame.parent          = -1
         frame.position        = position
-        frame.rotation_matrix = dff.Matrix._make(
-            matrix.to_3x3().transposed()
-        )
+        frame.rotation_matrix = dff.Matrix._make(rotation_matrix)
 
         if "dff_user_data" in obj:
             frame.user_data = dff.UserData.from_mem(obj["dff_user_data"])
@@ -1166,6 +1174,7 @@ def export_dff(options):
     dff_exporter.exclude_geo_faces  = options['exclude_geo_faces']
     dff_exporter.mass_export        = options['mass_export']
     dff_exporter.preserve_positions = options['preserve_positions']
+    dff_exporter.preserve_rotations = options['preserve_rotations']
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
     dff_exporter.export_coll        = options['export_coll']

@@ -57,7 +57,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         description     = "Don't set object positions to (0,0,0)",
         default         = True
     )
-    
+
+    preserve_rotations     : bpy.props.BoolProperty(
+        name            = "Preserve Rotations",
+        description     = "Don't set object rotations to (0,0,0)",
+        default         = True
+    )
+
     export_version      : bpy.props.EnumProperty(
         items =
         (
@@ -105,11 +111,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 row = box.row()
                 row.label(text="Mass Export:")
 
-                row = box.row()
-                row.prop(self, "preserve_positions")
+                box.prop(self, "preserve_positions")
+                box.prop(self, "preserve_rotations")
 
         else:
             layout.prop(self, "preserve_positions")
+            layout.prop(self, "preserve_rotations")
 
         layout.prop(self, "only_selected")
         layout.prop(self, "export_coll")
@@ -156,6 +163,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "selected"           : self.only_selected,
                     "mass_export"        : False if self.from_outliner else self.mass_export,
                     "preserve_positions" : self.preserve_positions,
+                    "preserve_rotations" : self.preserve_rotations,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
                     "export_frame_names" : self.export_frame_names,
@@ -186,6 +194,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             self.only_selected = False
             self.export_coll = False
             self.preserve_positions = False
+            self.preserve_rotations = False
 
         if 'dragonff_imported_version' in context.scene:
             self.export_version = context.scene['dragonff_imported_version']
