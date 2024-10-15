@@ -87,8 +87,8 @@ class col_exporter:
                 surface[1] = mat.dff.col_flags
                 surface[2] = mat.dff.col_brightness
                 surface[3] = mat.dff.col_light
-                
-            except IndexError:
+
+            except (IndexError, AttributeError):
                 pass
 
             if col.Sections.version == 1:
