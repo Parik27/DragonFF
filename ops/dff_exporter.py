@@ -993,14 +993,16 @@ class dff_exporter:
 
             # Create a special bone (contains information for all subsequent bones)
             if index == 0:
-                frame = self.create_frame(bone, False)
 
                 # set the first bone's parent to armature's parent
                 if obj.parent and obj.parent in self.frame_objects:
-                    frame.parent = self.frame_objects[obj.parent]
+                    frame_parent = self.frame_objects[obj.parent]
                 else:
                     self.create_frame(obj)
-                    frame.parent = self.get_last_frame_index()
+                    frame_parent = self.get_last_frame_index()
+
+                frame = self.create_frame(bone, False)
+                frame.parent = frame_parent
 
                 bone_data = dff.HAnimPLG()
                 bone_data.header = dff.HAnimHeader(
