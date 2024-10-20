@@ -39,6 +39,7 @@ _classes = [
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
+    gui.OBJECT_OT_dff_generate_bone_props,
     gui.OBJECT_OT_dff_set_parent_bone,
     gui.OBJECT_OT_dff_clear_parent_bone,
     gui.OBJECT_OT_facegoups_col,
@@ -51,6 +52,7 @@ _classes = [
     gui.DFFAtomicProps,
     gui.DFFSceneProps,
     gui.DFF_MT_ExportChoice,
+    gui.DFF_MT_EditArmature,
     gui.DFF_MT_Pose,
     gui.DFF_UL_FrameItems,
     gui.DFF_UL_AtomicItems,
@@ -74,6 +76,7 @@ def register():
         bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
         bpy.types.OUTLINER_MT_collection.append(gui.export_col_outliner)
         bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
+        bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
         bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
         bpy.types.SpaceView3D.draw_handler_add(gui.DFFSceneProps.draw_fg, (), 'WINDOW', 'POST_VIEW')
 
@@ -91,6 +94,7 @@ def unregister():
         bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
         bpy.types.OUTLINER_MT_collection.remove(gui.export_col_outliner)
         bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
+        bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
         bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
 
     gui.State.unhook_events()

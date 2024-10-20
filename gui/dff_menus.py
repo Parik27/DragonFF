@@ -1,5 +1,6 @@
 import bpy
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
+    OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
 from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
@@ -240,6 +241,18 @@ def export_col_outliner(self, context):
     op = self.layout.operator(EXPORT_OT_col.bl_idname, text="Export collection as collision container (.col)")
     op.use_active_collection = True
     op.filepath = context.collection.name
+
+#######################################################@
+class DFF_MT_EditArmature(bpy.types.Menu):
+    bl_label = "DragonFF"
+
+    def draw(self, context):
+        self.layout.operator(OBJECT_OT_dff_generate_bone_props.bl_idname, text="Generate Bone Properties")
+
+#######################################################
+def edit_armature_dff_func(self, context):
+    self.layout.separator()
+    self.layout.menu("DFF_MT_EditArmature", text="DragonFF")
 
 #######################################################@
 class DFF_MT_Pose(bpy.types.Menu):

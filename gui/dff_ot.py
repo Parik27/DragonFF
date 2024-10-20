@@ -499,6 +499,45 @@ class SCENE_OT_dff_update(bpy.types.Operator):
         return {'FINISHED'}
 
 #######################################################
+class OBJECT_OT_dff_generate_bone_props(bpy.types.Operator):
+
+    bl_idname           = "object.dff_generate_bone_props"
+    bl_description      = "Generate HAnim data for selected bones"
+    bl_label            = "Generate Bone Properties"
+
+    #######################################################
+    def execute(self, context):
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            selected_objects = [context.object]
+
+        for obj in selected_objects:
+            used_bone_ids = set()
+            for e_bone in obj.data.edit_bones:
+                if 'bone_id' in e_bone:
+                    used_bone_ids.add(e_bone['bone_id'])
+
+            for i, e_bone in enumerate(obj.data.edit_bones):
+                if not e_bone.select:
+                    continue
+
+                if 'bone_id' not in e_bone:
+                    bone_id = i
+                    while bone_id in used_bone_ids:
+                        bone_id += 1
+                    e_bone['bone_id'] = bone_id
+                    used_bone_ids.add(bone_id)
+
+                bone_type = 2
+                if not e_bone.children:
+                    bone_type = 1
+                elif not e_bone.parent or e_bone.parent.children[-1] == e_bone:
+                    bone_type = 0
+                e_bone['type'] = bone_type
+
+        return {'FINISHED'}
+
+#######################################################
 class OBJECT_OT_dff_set_parent_bone(bpy.types.Operator):
 
     bl_idname           = "object.dff_set_parent_bone"
