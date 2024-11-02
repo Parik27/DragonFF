@@ -21,7 +21,7 @@ class State(metaclass=_StateMeta):
 
         def update_frame_status(ob):
             is_frame, is_frame_locked = ob.dff.is_frame, False
-            if ob.parent and not ob.children:
+            if ob.parent and not any(ch.dff.type == 'OBJ' for ch in ob.children):
                 if ob.parent.type == 'ARMATURE' and not ob.parent_bone:
                     is_frame, is_frame_locked = False, True
             else:

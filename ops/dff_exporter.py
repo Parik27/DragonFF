@@ -1075,7 +1075,7 @@ class dff_exporter:
 
             # We can just ignore collision meshes here as the DFF exporter will still look for
             # them in their own nested collection later if export_coll is true.
-            if obj.dff.type == 'COL' or obj.dff.type == 'SHA':
+            if obj.dff.type != 'OBJ':
                 continue
 
             # create atomic in this case
