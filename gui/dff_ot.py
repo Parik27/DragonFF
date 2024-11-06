@@ -253,7 +253,13 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     )
 
     skip_mipmaps :  bpy.props.BoolProperty(
-        name        = "Skip mipmaps",
+        name        = "Skip Mipmaps",
+        default     = True
+    )
+
+    txd_pack : bpy.props.BoolProperty(
+        name        = "Pack Images",
+        description = "Pack images as embedded data into the .blend file",
         default     = True
     )
 
@@ -311,6 +317,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         box.prop(self, "load_txd")
         if self.load_txd:
             box.prop(self, "skip_mipmaps")
+            box.prop(self, "txd_pack")
             box.prop(self, "txd_filename", text="File name")
 
         layout.prop(self, "connect_bones")
@@ -350,6 +357,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'load_txd'       : self.load_txd,
                         'txd_filename'   : self.txd_filename,
                         'skip_mipmaps'   : self.skip_mipmaps,
+                        'txd_pack'       : self.txd_pack,
                         'image_ext'      : image_ext,
                         'connect_bones'  : self.connect_bones,
                         'use_mat_split'  : self.read_mat_split,

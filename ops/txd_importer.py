@@ -23,6 +23,7 @@ from ..gtaLib import txd
 class txd_importer:
 
     skip_mipmaps = True
+    pack = True
 
     __slots__ = [
         'txd',
@@ -40,7 +41,7 @@ class txd_importer:
         self.file_name = ""
 
     #######################################################
-    def _create_image(name, rgba, width, height):
+    def _create_image(name, rgba, width, height, pack=False):
         pixels = []
         for h in range(height - 1, -1, -1):
             offset = h * width * 4
@@ -48,6 +49,9 @@ class txd_importer:
 
         image = bpy.data.images.new(name, width, height)
         image.pixels = pixels
+
+        if pack:
+            image.pack()
 
         return image
 
@@ -69,7 +73,8 @@ class txd_importer:
                     image = txd_importer._create_image(image_name,
                                                         tex.to_rgba(level),
                                                         tex.get_width(level),
-                                                        tex.get_height(level))
+                                                        tex.get_height(level),
+                                                        self.pack)
                 images.append(image)
 
             self.images[tex.name] = images
@@ -85,7 +90,8 @@ class txd_importer:
                 image = txd_importer._create_image(image_name,
                                                     img.to_rgba(),
                                                     img.width,
-                                                    img.height)
+                                                    img.height,
+                                                    self.pack)
                 images.append(image)
 
             self.images[tex.name] = images
@@ -105,6 +111,7 @@ class txd_importer:
 def import_txd(options):
 
     txd_importer.skip_mipmaps = options['skip_mipmaps']
+    txd_importer.pack = options['pack']
 
     txd_importer.import_txd(options['file_name'])
 

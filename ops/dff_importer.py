@@ -68,6 +68,7 @@ class dff_importer:
     load_txd           = False
     txd_filename       = ""
     skip_mipmaps       = True
+    txd_pack           = True
     image_ext          = "png"
     use_bone_connect   = False
     current_collection = None
@@ -828,6 +829,7 @@ class dff_importer:
                     {
                         'file_name'    : txd_path,
                         'skip_mipmaps' : self.skip_mipmaps,
+                        'pack'         : self.txd_pack,
                     }
                 ).images
 
@@ -902,6 +904,7 @@ def import_dff(options):
     dff_importer.load_txd         = options['load_txd']
     dff_importer.txd_filename     = options['txd_filename']
     dff_importer.skip_mipmaps     = options['skip_mipmaps']
+    dff_importer.txd_pack         = options['txd_pack']
     dff_importer.image_ext        = options['image_ext']
     dff_importer.use_bone_connect = options['connect_bones']
     dff_importer.use_mat_split    = options['use_mat_split']

@@ -114,6 +114,7 @@ class Map_Import_Operator(bpy.types.Operator):
                     'load_txd'       : self.settings.load_txd,
                     'txd_filename'   : "%s.txd" % txd,
                     'skip_mipmaps'   : True,
+                    'txd_pack'       : False,
                     'image_ext'      : 'PNG',
                     'connect_bones'  : False,
                     'use_mat_split'  : self.settings.read_mat_split,
