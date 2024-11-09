@@ -91,6 +91,7 @@ class NativePlatformType(IntEnum):
     SOFTRAS     = 0x7
     D3D8        = 0x8
     D3D9        = 0x9
+    PSP         = 0xa
     PS2FOURCC   = 0x00325350
 
 # Block types
@@ -956,6 +957,9 @@ class SkinPLG:
             elif platform == NativePlatformType.GC:
                 from .native_gc import NativeGSSkin
                 NativeGSSkin.unpack(self, data[16:], geometry)
+            elif platform == NativePlatformType.PSP:
+                from .native_psp import NativePSPSkin
+                NativePSPSkin.unpack(self, data[16:], geometry)
 
         return self
 
@@ -1914,6 +1918,9 @@ class dff:
         elif platform == NativePlatformType.GC:
             from .native_gc import NativeGCGeometry
             NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
+        elif platform == NativePlatformType.PSP:
+            from .native_psp import NativePSPGeometry
+            NativePSPGeometry.unpack(geometry, self.raw(chunk_size))
         else:
             print("Unsupported native platform %d" % (platform))
 
