@@ -64,10 +64,12 @@ class NativePSPSkin:
         pos += 12
 
         skin.bones_used = []
-        if splits_num:
-            for _ in range(skin.num_bones):
-                skin.bones_used.append(unpack_from("<B", data, pos)[0])
-                pos += 1
+        if not splits_num:
+            return
+
+        for _ in range(skin.num_bones):
+            skin.bones_used.append(unpack_from("<B", data, pos)[0])
+            pos += 1
 
         table1_offset = pos
         table2_offset = pos + splits_num * 2
@@ -101,12 +103,14 @@ class NativePSPSkin:
 #######################################################
 class NativePSPGeometry:
     __slots__ = [
-        "_pos"
+        "_pos",
+        "_indices_map"
     ]
 
     #######################################################
     def __init__(self):
         self._pos = 0
+        self._indices_map = []
 
     #######################################################
     @staticmethod
@@ -136,103 +140,43 @@ class NativePSPGeometry:
         self._pos += splits_num * 32 # skip
         self._pos += 16 # skip
 
-        for _ in range(splits_num):
-            self._pos += 16 # skip
-            fmt, unk, indices_num, offset = unpack_from("<4I", data, self._read(16))
-            self._pos += 16 # skip
-            info_offset, stride, matrix_offset, unk = unpack_from("<4I", data, self._read(16))
-            next_offset = self._pos
+        next_strip_offset = self._pos
+        prev_indices_offset = 0
 
+        # Read split data
+        for _ in range(splits_num):
+
+            # Read header
+            self._pos = next_strip_offset
+
+            self._pos += 16 # skip
+            fmt, indices_map_len, indices_num, indices_offset, indices_map_offset = \
+                unpack_from("<3I2i", data, self._read(20))
+            self._pos += 12 # skip
+            info_offset, stride, matrix_offset, unk2 = unpack_from("<i3I", data, self._read(16))
+            index_format = (fmt >> 11) & 3
+
+            next_strip_offset = self._pos
+
+            # Read scale matrix
             self._pos = matrix_offset
             scale_matrix = unpack_from("<16f", data, self._read(64))
 
-            uv_format     = fmt & 3
-            color_format  = (fmt >> 2) & 7
-            normal_format = (fmt >> 5) & 3
-            vertex_format = (fmt >> 7) & 3
-            weight_format = (fmt >> 9) & 3
-            index_format  = (fmt >> 11) & 3
-            weights_num   = ((fmt >> 14) & 7) + 1
-            vertices_num  = ((fmt >> 18) & 7) + 1
-            coord_type    = (fmt >> 23) & 1
+            # Read indices map
+            if index_format == 2:
+                self._pos = indices_map_offset
+                indices = unpack_from("<%dH" % indices_map_len, data, self._read(indices_map_len * 2))
+            elif index_format == 0:
+                o = len(geometry.vertices)
+                indices = list(o + i for i in range(indices_num))
+            self._indices_map.append(indices)
 
-            self._pos = offset
-            for _ in range(indices_num):
-                if weight_format == 1:
-                    wn = (weights_num + 3) // 4 * 4
-                    weights = unpack_from("<%dB" % wn, data, self._read(wn))
-                    geometry._vertex_bone_weights.append(tuple(
-                        1.0 if w == 128 else w / 127.0 for w in weights
-                    ))
+            # Read split geometry
+            if prev_indices_offset != indices_offset:
+                self._pos = indices_offset
+                self._read_split_geometry(geometry, data, indices_num, fmt, scale_matrix)
 
-                if uv_format == 1:
-                    tu, tv = unpack_from("<2b", data, self._read(2))
-                    geometry.uv_layers[0].append(TexCoords(tu / 127.0, tv / 127.0))
-                    for uv in geometry.uv_layers[1:]:
-                        uv.append(TexCoords(0, 0))
-
-                elif uv_format == 2:
-                    tu, tv = unpack_from("<2h", data, self._read(4))
-                    geometry.uv_layers[0].append(TexCoords(tu / 32767.0, tv / 32767.0))
-                    for uv in geometry.uv_layers[1:]:
-                        uv.append(TexCoords(0, 0))
-
-                elif uv_format == 3:
-                    tu, tv = unpack_from("<2f", data, self._read(8))
-                    geometry.uv_layers[0].append(TexCoords(tu, tv))
-                    for uv in geometry.uv_layers[1:]:
-                        uv.append(TexCoords(0, 0))
-
-                if color_format > 3:
-                    if color_format == 6:
-                        color = unpack_from("<H", data, self._read(2))[0]
-                        geometry.prelit_colors.append(RGBA(
-                            (color << 4) & 0xF0,
-                            (color & 0xF0),
-                            (color >> 4 ) & 0xF0,
-                            (color >> 8 ) & 0xF0
-                            ))
-
-                if normal_format == 1:
-                    nx, ny, nz = unpack_from("<3b", data, self._read(3))
-                    nx /= 127.0
-                    ny /= 127.0
-                    nz /= 127.0
-                    geometry.normals.append(Vector(nx, ny, nz))
-
-                elif normal_format == 2:
-                    nx, ny, nz = unpack_from("<3h", data, self._read(6))
-                    nx /= 32767.0
-                    ny /= 32767.0
-                    nz /= 32767.0
-                    geometry.normals.append(Vector(nx, ny, nz))
-
-                elif normal_format == 3:
-                    nx, ny, nz = unpack_from("<3f", data, self._read(12))
-                    geometry.normals.append(Vector(nx, ny, nz))
-
-                if vertex_format == 1:
-                    x, y, z = unpack_from("<3b", data, self._read(3))
-                    vx = ( x / 127.0) * scale_matrix[0]
-                    vy = ( y / 127.0) * scale_matrix[5]
-                    vz = ( z / 127.0) * scale_matrix[10]
-                    geometry.vertices.append(Vector(vx, vy, vz))
-
-                elif vertex_format == 2:
-                    x, y, z = unpack_from("<3h", data, self._read(6))
-                    vx = ( x / 32767.0) * scale_matrix[0]
-                    vy = ( y / 32767.0) * scale_matrix[5]
-                    vz = ( z / 32767.0) * scale_matrix[10]
-                    geometry.vertices.append(Vector(vx, vy, vz))
-
-                elif vertex_format == 3:
-                    x, y, z = unpack_from("<3f", data, self._read(12))
-                    vx = x * scale_matrix[0]
-                    vy = y * scale_matrix[5]
-                    vz = z * scale_matrix[10]
-                    geometry.vertices.append(Vector(vx, vy, vz))
-
-            self._pos = next_offset
+            prev_indices_offset = indices_offset
 
         self._generate_triangles(geometry)
 
@@ -258,14 +202,109 @@ class NativePSPGeometry:
         return current_pos
 
     #######################################################
-    def _generate_triangles(self, geometry):
-        split_vert_idx = 0
+    def _read_split_geometry(self, geometry, data, indices_num, fmt, scale_matrix):
+        uv_format     = fmt & 3
+        color_format  = (fmt >> 2) & 7
+        normal_format = (fmt >> 5) & 3
+        vertex_format = (fmt >> 7) & 3
+        weight_format = (fmt >> 9) & 3
+        weights_num   = ((fmt >> 14) & 7) + 1
+        vertices_num  = ((fmt >> 18) & 7) + 1
+        coord_type    = (fmt >> 23) & 1
 
-        for split_header in geometry.extensions['split_headers']:
+        for _ in range(indices_num):
+            if weight_format == 1:
+                wn = (weights_num + 3) // 4 * 4
+                weights = unpack_from("<%dB" % wn, data, self._read(wn))
+                geometry._vertex_bone_weights.append(tuple(
+                    1.0 if w == 128 else w / 127.0 for w in weights
+                ))
+
+            if uv_format == 1:
+                tu, tv = unpack_from("<2b", data, self._read(2))
+                geometry.uv_layers[0].append(TexCoords(tu / 127.0, tv / 127.0))
+                for uv in geometry.uv_layers[1:]:
+                    uv.append(TexCoords(0, 0))
+
+            elif uv_format == 2:
+                tu, tv = unpack_from("<2h", data, self._read(4))
+                geometry.uv_layers[0].append(TexCoords(tu / 32767.0, tv / 32767.0))
+                for uv in geometry.uv_layers[1:]:
+                    uv.append(TexCoords(0, 0))
+
+            elif uv_format == 3:
+                tu, tv = unpack_from("<2f", data, self._read(8))
+                geometry.uv_layers[0].append(TexCoords(tu, tv))
+                for uv in geometry.uv_layers[1:]:
+                    uv.append(TexCoords(0, 0))
+
+            if color_format > 3:
+                if color_format == 6:
+                    color = unpack_from("<H", data, self._read(2))[0]
+                    geometry.prelit_colors.append(RGBA(
+                        (color << 4) & 0xF0,
+                        (color & 0xF0),
+                        (color >> 4) & 0xF0,
+                        (color >> 8) & 0xF0
+                        ))
+
+                elif color_format == 7:
+                    color = unpack_from("<I", data, self._read(4))[0]
+                    geometry.prelit_colors.append(RGBA(
+                        (color & 0xFF),
+                        (color >> 8) & 0xFF,
+                        (color >> 16) & 0xFF,
+                        (color >> 24) & 0xFF
+                        ))
+
+            if normal_format == 1:
+                nx, ny, nz = unpack_from("<3bx", data, self._read(4))
+                nx /= 127.0
+                ny /= 127.0
+                nz /= 127.0
+                geometry.normals.append(Vector(nx, ny, nz))
+
+            elif normal_format == 2:
+                nx, ny, nz = unpack_from("<3h", data, self._read(6))
+                nx /= 32767.0
+                ny /= 32767.0
+                nz /= 32767.0
+                geometry.normals.append(Vector(nx, ny, nz))
+
+            elif normal_format == 3:
+                nx, ny, nz = unpack_from("<3f", data, self._read(12))
+                geometry.normals.append(Vector(nx, ny, nz))
+
+            if vertex_format == 1:
+                x, y, z = unpack_from("<3bx", data, self._read(4))
+                vx = ( x / 127.0) * scale_matrix[0]
+                vy = ( y / 127.0) * scale_matrix[5]
+                vz = ( z / 127.0) * scale_matrix[10]
+                geometry.vertices.append(Vector(vx, vy, vz))
+
+            elif vertex_format == 2:
+                x, y, z = unpack_from("<3h", data, self._read(6))
+                vx = ( x / 32767.0) * scale_matrix[0]
+                vy = ( y / 32767.0) * scale_matrix[5]
+                vz = ( z / 32767.0) * scale_matrix[10]
+                geometry.vertices.append(Vector(vx, vy, vz))
+
+            elif vertex_format == 3:
+                x, y, z = unpack_from("<3f", data, self._read(12))
+                vx = x * scale_matrix[0]
+                vy = y * scale_matrix[5]
+                vz = z * scale_matrix[10]
+                geometry.vertices.append(Vector(vx, vy, vz))
+
+    #######################################################
+    def _generate_triangles(self, geometry):
+        for split, split_header in enumerate(geometry.extensions['split_headers']):
+            indices_map = self._indices_map[split]
+
             for i in range(split_header.indices_count - 2):
-                idx1 = split_vert_idx + i + 0
-                idx2 = split_vert_idx + i + 1
-                idx3 = split_vert_idx + i + 2
+                idx1 = indices_map[i + 0]
+                idx2 = indices_map[i + 1]
+                idx3 = indices_map[i + 2]
 
                 v1 = geometry.vertices[idx1]
                 v2 = geometry.vertices[idx2]
@@ -289,5 +328,3 @@ class NativePSPGeometry:
                     )
 
                 geometry.triangles.append(triangle)
-
-            split_vert_idx += split_header.indices_count
