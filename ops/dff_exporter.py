@@ -576,12 +576,12 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def get_delta_morph_entries(obj, mesh):
+    def get_delta_morph_entries(obj, shape_keys):
         dm_entries = []
         self = dff_exporter
 
-        if mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 1:
-            for kb in mesh.shape_keys.key_blocks[1:]:
+        if shape_keys and len(shape_keys.key_blocks) > 1:
+            for kb in shape_keys.key_blocks[1:]:
                 min_corner = mathutils.Vector(min(v.co[i] for v in kb.data) for i in range(3))
                 max_corner = mathutils.Vector(max(v.co[i] for v in kb.data) for i in range(3))
                 dimensions = mathutils.Vector(max_corner[i] - min_corner[i] for i in range(3))
@@ -619,7 +619,7 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def populate_geometry_from_vertices_data(vertices_list, skin_plg, dm_entries,
-                                             mesh, obj, geometry, num_vcols):
+                                             obj, geometry, num_vcols):
 
         has_prelit_colors = num_vcols > 0 and obj.dff.day_cols
         has_night_colors  = num_vcols > 1 and obj.dff.night_cols
@@ -681,7 +681,7 @@ class dff_exporter:
                 sk_cos = vertex['sk_cos']
                 for index, co in enumerate(sk_cos[1:]):
                     pos = mathutils.Vector(co) - mathutils.Vector(sk_cos[0])
-                    if sum(pos) == 0.0:
+                    if pos.length == 0.0:
                         continue
 
                     entrie = dm_entries[index]
@@ -754,7 +754,7 @@ class dff_exporter:
     def populate_geometry_with_mesh_data(obj, geometry):
         self = dff_exporter
 
-        mesh = self.convert_to_mesh(obj)
+        mesh, shape_keys = self.convert_to_mesh(obj)
 
         self.triangulate_mesh(mesh)
         # NOTE: Mesh.calc_normals is no longer needed and has been removed
@@ -771,7 +771,7 @@ class dff_exporter:
         faces_list = []
 
         skin_plg, bone_groups = self.get_skin_plg_and_bone_groups(obj, mesh)
-        dm_entries = self.get_delta_morph_entries(obj, mesh)
+        dm_entries = self.get_delta_morph_entries(obj, shape_keys)
 
         # Check for vertices once before exporting to report instanstly
         if not self.exclude_geo_faces and len(mesh.vertices) > 0xFFFF:
@@ -802,8 +802,8 @@ class dff_exporter:
                     if group.group in bone_groups and group.weight > 0:
                         bones.append((bone_groups[group.group], group.weight))
 
-                if mesh.shape_keys:
-                    for kb in mesh.shape_keys.key_blocks:
+                if shape_keys:
+                    for kb in shape_keys.key_blocks:
                         sk_cos.append(kb.data[loop.vertex_index].co)
 
                 key = (loop.vertex_index,
@@ -833,7 +833,7 @@ class dff_exporter:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
 
         self.populate_geometry_from_vertices_data(
-            vertices_list, skin_plg, dm_entries, mesh, obj, geometry, len(vcols))
+            vertices_list, skin_plg, dm_entries, obj, geometry, len(vcols))
 
         self.populate_geometry_from_faces_data(faces_list, geometry)
         
@@ -877,7 +877,7 @@ class dff_exporter:
         for kb, v in key_shape_values.items():
             kb.value = v
 
-        return mesh
+        return mesh, object_eval.data.shape_keys
     
     #######################################################
     def populate_atomic(obj, frame_index=None):
