@@ -688,8 +688,9 @@ class dff_importer:
                 bmesh.ops.remove_doubles(bm, verts = bm.verts, dist = 0.00001)
 
                 # Add an edge split modifier
-                modifier = mesh.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
-                modifier.use_edge_angle = False
+                if not mesh.data.shape_keys:
+                    modifier = mesh.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
+                    modifier.use_edge_angle = False
                 
                 bm.to_mesh(mesh.data)
                 

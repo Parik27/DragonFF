@@ -877,8 +877,15 @@ class dff_exporter:
         for kb, v in key_shape_values.items():
             kb.value = v
 
+        # Modifiers cannot be applied with shape keys
+        if object_eval.data.shape_keys:
+            vertices_num = len(mesh.vertices)
+            for kb in object_eval.data.shape_keys.key_blocks:
+                if vertices_num != len(kb.data):
+                    raise DffExportException(f"Modifier cannot be applied to a mesh with shape keys ({obj.name})")
+
         return mesh, object_eval.data.shape_keys
-    
+
     #######################################################
     def populate_atomic(obj, frame_index=None):
         self = dff_exporter
