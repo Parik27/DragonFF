@@ -22,7 +22,7 @@ from .pyffi.utils import tristrip
 
 # Data types
 Chunk         = namedtuple("Chunk"         , "type size version")
-Clump         = namedtuple("Clump"         , "atomics lights cameras")
+ClumpStruct   = namedtuple("ClumpStruct"   , "atomics lights cameras")
 Vector        = namedtuple("Vector"        , "x y z")
 Matrix        = namedtuple("Matrix"        , "right up at")
 HAnimHeader   = namedtuple("HAnimHeader"   , "version id bone_count")
@@ -104,7 +104,7 @@ types = {
     "Material List"           : 8,
     "Frame List"              : 14,
     "Geometry"                : 15,
-    "Clump"                   : 16,
+    "ClumpStruct"             : 16,
     "Atomic"                  : 20,
     "Texture Native"          : 21,
     "Texture Dictionary"      : 22,
@@ -156,7 +156,7 @@ class Sections:
     # Unpack/pack format for above data types
     formats =  {
         Chunk         : "<3I",
-        Clump         : "<3I",
+        ClumpStruct   : "<3I",
         Vector        : "<3f",
         HAnimHeader   : "<3i",
         Bone          : "<3i",
@@ -1400,12 +1400,14 @@ class DeltaMorph:
 class DeltaMorphPLG:
 
     __slots__ = [
-        'entries'
+        'entries',
+        'base_name'
     ]
 
    #######################################################
     def __init__(self):
         self.entries = []
+        self.base_name = ""
 
     #######################################################
     def append_entry(self, entry):
@@ -1726,15 +1728,23 @@ class Geometry:
         return Sections.write_chunk(data, types["Geometry"])
 
 #######################################################
+class Clump:
 
-
-class dff:
+    frame_list    = []
+    geometry_list = []
+    collisions    = []
+    atomic_list   = []
+    light_list    = []
+    ext_2dfx      = Extension2dfx()
+    pos           = 0
+    data          = ""
+    rw_version    = ""
 
     #######################################################
     def _read(self, size):
         current_pos = self.pos
         self.pos += size
-        
+
         return current_pos
 
     #######################################################
@@ -1742,7 +1752,7 @@ class dff:
 
         if offset is None:
             offset = self.pos
-        
+
         return self.data[offset:offset+size]
 
     #######################################################
@@ -2356,62 +2366,6 @@ class dff:
                     self.pos += chunk.size
 
     #######################################################
-    def read_uv_anim_dict(self):
-        chunk = self.read_chunk()
-        
-        if chunk.type == types["Struct"]:
-            num_anims = unpack_from("<I", self.data, self._read(4))[0]
-
-        for i in range(num_anims):
-            
-            chunk = self.read_chunk()
-
-            if chunk.type == types["Animation Anim"]:
-                self.uvanim_dict.append(
-                    UVAnim.from_mem(self.data[self.pos:])
-                )
-
-            self._read(chunk.size)
-            
-    #######################################################
-    def load_memory(self, data):
-
-        self.data = data
-        while self.pos < len(data) - 12:
-            chunk = self.read_chunk()
-
-            if chunk.type == types["Clump"]:
-                self.read_clump(chunk)
-                self.rw_version = Sections.get_rw_version(chunk.version)
-
-            elif chunk.type == types["UV Animation Dictionary"]:
-                self.read_uv_anim_dict()
-
-            elif chunk.type == types["Atomic"]:
-                self.read_atomic(chunk)
-                self.rw_version = Sections.get_rw_version(chunk.version)
-
-    #######################################################
-    def clear(self):
-        self.frame_list    = []
-        self.geometry_list = []
-        self.collisions    = []
-        self.atomic_list   = []
-        self.uvanim_dict   = []
-        self.light_list    = []
-        self.ext_2dfx      = Extension2dfx()
-        self.pos           = 0
-        self.data          = ""
-        self.rw_version    = ""
-            
-    #######################################################
-    def load_file(self, filename):
-
-        with open(filename, mode='rb') as file:
-            content = file.read()
-            self.load_memory(content)
-           
-    #######################################################
     def write_frame_list(self):
 
         data = b''
@@ -2481,30 +2435,16 @@ class dff:
         return Sections.write_chunk(data, types["Atomic"])
 
     #######################################################
-    def write_uv_dict(self):
+    def write_memory(self):
 
-        if len(self.uvanim_dict) < 1:
-            return b''
-        
-        data = pack("<I", len(self.uvanim_dict))
-        data = Sections.write_chunk(data, types["Struct"])
-        
-        for dictionary in self.uvanim_dict:
-            data += dictionary.to_mem()
-
-        return Sections.write_chunk(data, types["UV Animation Dictionary"])
-
-    #######################################################
-    def write_clump(self):
-
-        data = Sections.write(Clump, (len(self.atomic_list), 0,0), types["Struct"])
+        data = Sections.write(ClumpStruct, (len(self.atomic_list), 0,0), types["Struct"])
 
         # Old RW versions didn't have cameras and lights in their clump structure
         if Sections.get_rw_version() < 0x33000:
             data = Sections.write_chunk(pack("<I",
                                              len(self.atomic_list)),
                                         types["Struct"])
-            
+
         data += self.write_frame_list()
         data += self.write_geometry_list()
 
@@ -2514,11 +2454,130 @@ class dff:
         for coll_data in self.collisions:
             _data = Sections.write_chunk(coll_data, types["Collision Model"])
             data += Sections.write_chunk(_data, types["Extension"])
-            
+
         data += Sections.write_chunk(b'', types["Extension"])
-            
-        return Sections.write_chunk(data, types["Clump"])
-    
+
+        return Sections.write_chunk(data, types["ClumpStruct"])
+
+    #######################################################
+    # Populate the clump from memory
+    # Returns the bytes read
+    def load_memory(self, root_chunk, data, pos = 0):
+        self.data = data
+        self.pos = pos
+
+        self.read_clump(root_chunk)
+        return self.pos - pos
+
+    #######################################################
+    # Populate the clump from atomic chunk
+    # Returns the bytes read
+    def load_from_atomic(self, root_chunk, data, pos = 0):
+        self.data = data
+        self.pos = pos
+
+        self.read_atomic(root_chunk)
+        return self.pos - pos
+
+    #######################################################
+    def clear(self):
+        self.frame_list    = []
+        self.geometry_list = []
+        self.collisions    = []
+        self.atomic_list   = []
+        self.light_list    = []
+        self.ext_2dfx      = Extension2dfx()
+        self.pos           = 0
+        self.data          = ""
+        self.rw_version    = ""
+
+    #######################################################
+    def __init__(self):
+        self.clear()
+
+#######################################################
+class dff:
+
+    clumps        = []
+    uvanim_dict   = []
+    pos           = 0
+    data          = ""
+    rw_version    = ""
+
+    #######################################################
+    def _read(self, size):
+        current_pos = self.pos
+        self.pos += size
+
+        return current_pos
+
+    #######################################################
+    def raw(self, size, offset=None):
+
+        if offset is None:
+            offset = self.pos
+
+        return self.data[offset:offset+size]
+
+    #######################################################
+    def read_chunk(self):
+        chunk = Sections.read(Chunk, self.data, self._read(12))
+        return chunk
+
+    #######################################################
+    def read_uv_anim_dict(self):
+        chunk = self.read_chunk()
+
+        if chunk.type == types["Struct"]:
+            num_anims = unpack_from("<I", self.data, self._read(4))[0]
+
+        for _ in range(num_anims):
+
+            chunk = self.read_chunk()
+
+            if chunk.type == types["Animation Anim"]:
+                self.uvanim_dict.append(
+                    UVAnim.from_mem(self.data[self.pos:])
+                )
+
+            self._read(chunk.size)
+
+    #######################################################
+    def write_uv_dict(self):
+
+        if len(self.uvanim_dict) < 1:
+            return b''
+
+        data = pack("<I", len(self.uvanim_dict))
+        data = Sections.write_chunk(data, types["Struct"])
+
+        for dictionary in self.uvanim_dict:
+            data += dictionary.to_mem()
+
+        return Sections.write_chunk(data, types["UV Animation Dictionary"])
+
+    #######################################################
+    def load_memory(self, data):
+
+        self.data = data
+        while self.pos < len(data) - 12:
+            chunk = self.read_chunk()
+
+            if chunk.type == types["ClumpStruct"]:
+                clump = Clump()
+                self.pos += clump.load_memory(chunk, self.data, self.pos)
+                self.clumps.append(clump)
+                self.rw_version = Sections.get_rw_version(chunk.version)
+
+            elif chunk.type == types["UV Animation Dictionary"]:
+                self.read_uv_anim_dict()
+
+            elif chunk.type == types["Atomic"]:
+                clump = Clump()
+                self.pos += clump.load_from_atomic(chunk, self.data, self.pos)
+                self.clumps.append(clump)
+                self.rw_version = Sections.get_rw_version(chunk.version)
+
     #######################################################
     def write_memory(self, version):
 
@@ -2526,17 +2585,33 @@ class dff:
         Sections.set_library_id(version, 0xFFFF)
 
         data += self.write_uv_dict()
-        data += self.write_clump()
+        for clump in self.clumps:
+            data += clump.write_memory()
 
         return data
-            
+
+    #######################################################
+    def load_file(self, filename):
+
+        with open(filename, mode='rb') as file:
+            content = file.read()
+            self.load_memory(content)
+
     #######################################################
     def write_file(self, filename, version):
 
         with open(filename, mode='wb') as file:
             content = self.write_memory(version)
             file.write(content)
-            
+
+    #######################################################
+    def clear(self):
+        self.clumps        = []
+        self.uvanim_dict   = []
+        self.pos           = 0
+        self.data          = ""
+        self.rw_version    = ""
+
     #######################################################
     def __init__(self):
         self.clear()

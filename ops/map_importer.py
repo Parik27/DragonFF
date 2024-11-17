@@ -120,7 +120,8 @@ class Map_Import_Operator(bpy.types.Operator):
                     'use_mat_split'  : self.settings.read_mat_split,
                     'remove_doubles' : True,
                     'group_materials': True,
-                    'import_normals' : True
+                    'import_normals' : True,
+                    'clumps_to_dm'   : False
                 }
             )
 

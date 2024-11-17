@@ -46,7 +46,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         description     = "Exclude faces from the Geometry section and force export Bin Mesh PLG",
         default         = False
     )
-    
+
+    dm_to_clumps    :  bpy.props.BoolProperty(
+        name        = "Delta Morph Multiple Clumps",
+        description = "Split Delta Morph into multiple clumps",
+        default     = False
+    )
+
     only_selected       : bpy.props.BoolProperty(
         name            = "Only Selected",
         default         = False
@@ -122,6 +128,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         layout.prop(self, "export_coll")
         layout.prop(self, "export_frame_names")
         layout.prop(self, "exclude_geo_faces")
+        layout.prop(self, "dm_to_clumps")
         layout.prop(self, "export_version")
 
         if self.export_version == 'custom':
@@ -164,6 +171,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "mass_export"        : False if self.from_outliner else self.mass_export,
                     "preserve_positions" : self.preserve_positions,
                     "preserve_rotations" : self.preserve_rotations,
+                    "dm_to_clumps"       : self.dm_to_clumps,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
                     "export_frame_names" : self.export_frame_names,
@@ -293,7 +301,13 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         name        = "Import Custom Normals",
         default     = False
     )
-    
+
+    clumps_to_dm    :  bpy.props.BoolProperty(
+        name        = "Delta Morph Multiple Clumps",
+        description = "Merge multiple clumps into one using Delta Morph",
+        default     = False
+    )
+
     image_ext : bpy.props.EnumProperty(
         items =
         (
@@ -331,7 +345,8 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         layout.prop(self, "remove_doubles")
         layout.prop(self, "import_normals")
         layout.prop(self, "group_materials")
-        
+        layout.prop(self, "clumps_to_dm")
+
     #######################################################
     def execute(self, context):
         
@@ -363,7 +378,8 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'use_mat_split'  : self.read_mat_split,
                         'remove_doubles' : self.remove_doubles,
                         'group_materials': self.group_materials,
-                        'import_normals' : self.import_normals
+                        'import_normals' : self.import_normals,
+                        'clumps_to_dm'   : self.clumps_to_dm
                     }
                 )
 

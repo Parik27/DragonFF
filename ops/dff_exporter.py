@@ -16,9 +16,8 @@
 
 import bpy
 import bmesh
+import copy
 import mathutils
-import os
-import os.path
 
 from collections import OrderedDict
 
@@ -391,11 +390,15 @@ class dff_exporter:
     file_name = ""
     dff = None
     version = None
-    frame_objects = {}
     collection = None
     export_coll = False
     exclude_geo_faces = False
+    dm_to_clumps = False
     from_outliner = False
+
+    # Current clump specific data
+    current_clump = None
+    frame_objects = {}
 
     #######################################################
     @staticmethod
@@ -421,7 +424,7 @@ class dff_exporter:
         self = dff_exporter
         
         frame       = dff.Frame()
-        frame_index = len(self.dff.frame_list)
+        frame_index = len(self.current_clump.frame_list)
         
         # Get rid of everything before the last period
         if self.export_frame_names:
@@ -468,7 +471,7 @@ class dff_exporter:
             frame.parent = parent_frame_idx
 
         if append:
-            self.dff.frame_list.append(frame)
+            self.current_clump.frame_list.append(frame)
 
         self.frame_objects[obj] = frame_index
         return frame
@@ -476,7 +479,7 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def get_last_frame_index():
-        return len(dff_exporter.dff.frame_list) - 1
+        return len(dff_exporter.current_clump.frame_list) - 1
 
     #######################################################
     @staticmethod
@@ -638,6 +641,7 @@ class dff_exporter:
         delta_morph_plg = None
         if dm_entries:
             delta_morph_plg = dff.DeltaMorphPLG()
+            delta_morph_plg.base_name = obj.data.shape_keys.key_blocks[0].name
             for entrie in dm_entries:
                 delta_morph_plg.append_entry(entrie)
            
@@ -887,6 +891,39 @@ class dff_exporter:
         return mesh, object_eval.data.shape_keys
 
     #######################################################
+    @staticmethod
+    def convert_delta_morphs_to_clumps():
+        self = dff_exporter
+
+        # Won't work as intended on already-multi-clump models
+        if len(self.dff.clumps) > 1:
+            return
+
+        clump = self.dff.clumps[0]
+        for atomic in clump.atomic_list:
+            geom = clump.geometry_list[atomic.geometry]
+            if "delta_morph" in geom.extensions:
+                delta_morph : dff.DeltaMorphPLG = geom.extensions.pop("delta_morph")
+
+                if delta_morph.base_name:
+                    clump.frame_list[atomic.frame].name = delta_morph.base_name
+
+                for i, dm in enumerate(delta_morph.entries, start=1):
+                    if i <= len(self.dff.clumps):
+                        self.dff.clumps.append(copy.deepcopy(clump))
+
+                    morph_clump = self.dff.clumps[i]
+                    morph_geom = morph_clump.geometry_list[atomic.geometry]
+
+                    morph_clump.frame_list[atomic.frame].name = dm.name
+
+                    for j, vi in enumerate(dm.indices):
+                        positions = dm.positions
+                        if positions:
+                            morph_geom.vertices[vi] = \
+                            dff.Vector(*map(sum,zip(geom.vertices[vi], positions[j])))
+
+    #######################################################
     def populate_atomic(obj, frame_index=None):
         self = dff_exporter
 
@@ -940,12 +977,12 @@ class dff_exporter:
                 obj.data['dff_user_data'])
 
         # Add Geometry to list
-        self.dff.geometry_list.append(geometry)
+        self.current_clump.geometry_list.append(geometry)
 
         # Create Atomic from geometry and frame
         atomic          = dff.Atomic()
         atomic.frame    = frame_index
-        atomic.geometry = len(self.dff.geometry_list) - 1
+        atomic.geometry = len(self.current_clump.geometry_list) - 1
         atomic.flags    = 0x4
 
         try:
@@ -964,7 +1001,7 @@ class dff_exporter:
             ))
             atomic.extensions['right_to_render'] = right_to_render
 
-        self.dff.atomic_list.append(atomic)
+        self.current_clump.atomic_list.append(atomic)
 
     #######################################################
     @staticmethod
@@ -1030,7 +1067,7 @@ class dff_exporter:
                     )
 
                 frame.bone_data = bone_data
-                self.dff.frame_list.append(frame)
+                self.current_clump.frame_list.append(frame)
                 self.frame_objects[obj] = self.get_last_frame_index()
                 continue
 
@@ -1045,7 +1082,7 @@ class dff_exporter:
                 0
             )
             frame.bone_data = bone_data
-            self.dff.frame_list.append(frame)
+            self.current_clump.frame_list.append(frame)
             self.frame_objects[bone] = self.get_last_frame_index()
 
     #######################################################
@@ -1067,44 +1104,51 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def export_objects(objects, name=None):
+    def export_objects(clump_objects, name=None):
         self = dff_exporter
 
         self.dff = dff.dff()
 
-        # Skip empty collections
-        if len(objects) < 1:
-            return
+        for objects in clump_objects:
 
-        atomics_data = []
-
-        for obj in objects:
-
-            # We can just ignore collision meshes here as the DFF exporter will still look for
-            # them in their own nested collection later if export_coll is true.
-            if obj.dff.type != 'OBJ':
+            # Skip empty collections
+            if len(objects) < 1:
                 continue
 
-            # create atomic in this case
-            if obj.type == "MESH":
-                frame_index = None
+            self.frame_objects = {}
+            self.current_clump = dff.Clump()
+
+            atomics_data = []
+
+            for obj in objects:
+
+                # We can just ignore collision meshes here as the DFF exporter will still look for
+                # them in their own nested collection later if export_coll is true.
+                if obj.dff.type != 'OBJ':
+                    continue
+
+                # create atomic in this case
+                if obj.type == "MESH":
+                    frame_index = None
+                    # create an empty frame
+                    if obj.dff.is_frame:
+                        self.export_empty(obj)
+                        frame_index = self.get_last_frame_index()
+                    atomics_data.append((obj, frame_index))
+
                 # create an empty frame
-                if obj.dff.is_frame:
+                elif obj.type == "EMPTY":
                     self.export_empty(obj)
-                    frame_index = self.get_last_frame_index()
-                atomics_data.append((obj, frame_index))
 
-            # create an empty frame
-            elif obj.type == "EMPTY":
-                self.export_empty(obj)
+                elif obj.type == "ARMATURE":
+                    self.export_armature(obj)
 
-            elif obj.type == "ARMATURE":
-                self.export_armature(obj)
+            atomics_data = sorted(atomics_data, key=lambda a: a[0].dff.atomic_index)
 
-        atomics_data = sorted(atomics_data, key=lambda a: a[0].dff.atomic_index)
+            for mesh, frame_index in atomics_data:
+                self.populate_atomic(mesh, frame_index)
 
-        for mesh, frame_index in atomics_data:
-            self.populate_atomic(mesh, frame_index)
+            self.dff.clumps.append(self.current_clump)
 
         # Collision
         if self.export_coll:
@@ -1116,10 +1160,19 @@ class dff_exporter:
             })
 
             if len(mem) != 0:
-                self.dff.collisions = [mem]
+                if not self.dff.clumps:
+                    self.dff.clumps.append(dff.Clump())
+                self.dff.clumps[0].collisions = [mem]
+
+        # Skip empty clumps
+        if not self.dff.clumps:
+            return
+
+        if self.dm_to_clumps:
+            self.convert_delta_morphs_to_clumps()
 
         if name is None:
-            self.dff.write_file(self.file_name, self.version )
+            self.dff.write_file(self.file_name, self.version)
         else:
             filename = "%s/%s" % (self.path, name)
             if not filename.endswith('.dff'):
@@ -1141,39 +1194,50 @@ class dff_exporter:
         self.file_name = filename
 
         State.update_scene()
-        objects = {}
+        clump_objects = [{}]
 
         # Export collections
-        if bpy.app.version < (2, 80, 0):
-            collections = [bpy.data]
-
+        if self.from_outliner:
+            collections = [bpy.context.view_layer.objects.active.users_collection[0]]
         else:
-            if self.from_outliner:
-                collections = [bpy.context.view_layer.objects.active.users_collection[0]]
-            else:
-                collections = [c for c in bpy.data.collections] + [bpy.context.scene.collection]
+            collections = [c for c in bpy.data.collections if c.dff.type != 'NON'] + [bpy.context.scene.collection]
 
         for collection in collections:
+            if len(collections) > 1 and collection.dff.type == 'CLUMP':
+                continue
+
             for obj in collection.objects:
-                    
                 if not self.selected or obj.select_get():
-                    objects[obj] = obj.dff.frame_index
+                    clump_objects[0][obj] = obj.dff.frame_index
+
+            clump_sub_collections = [ch for ch in collection.children if ch.dff.type == 'CLUMP']
+            clump_sub_collections.sort(key=lambda c: c.dff.clump_index)
+
+            for clump_idx, sub_collection in enumerate(clump_sub_collections):
+                if clump_idx == len(clump_objects):
+                    clump_objects.append({})
+
+                for obj in sub_collection.objects:
+                    if not self.selected or obj.select_get():
+                        clump_objects[clump_idx][obj] = obj.dff.frame_index
 
             if self.mass_export:
-                objects = sorted(objects, key=objects.get)
-                self.export_objects(objects,
-                                    collection.name)
-                objects            = {}
-                self.frame_objects = {}
+                for clump_idx, objects in enumerate(clump_objects):
+                    clump_objects[clump_idx] = sorted(objects, key=objects.get)
+
+                self.export_objects(clump_objects, collection.name)
+                clump_objects   = [{}]
                 self.collection = collection
 
         if not self.mass_export:
             if self.from_outliner:
                 self.collection = collections[0]
 
-            objects = sorted(objects, key=objects.get)
-            self.export_objects(objects)
-                
+            for clump_idx, objects in enumerate(clump_objects):
+                clump_objects[clump_idx] = sorted(objects, key=objects.get)
+
+            self.export_objects(clump_objects)
+
 #######################################################
 def export_dff(options):
 
@@ -1181,6 +1245,7 @@ def export_dff(options):
     dff_exporter.selected           = options['selected']
     dff_exporter.export_frame_names = options['export_frame_names']
     dff_exporter.exclude_geo_faces  = options['exclude_geo_faces']
+    dff_exporter.dm_to_clumps       = options['dm_to_clumps']
     dff_exporter.mass_export        = options['mass_export']
     dff_exporter.preserve_positions = options['preserve_positions']
     dff_exporter.preserve_rotations = options['preserve_rotations']

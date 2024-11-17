@@ -393,7 +393,42 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
             return
         
         self.draw_obj_menu(context)
-    
+
+#######################################################
+class OBJECT_PT_dffCollections(bpy.types.Panel):
+
+    bl_idname      = "OBJECT_PT_dffCollections"
+    bl_label       = "DragonFF - Export Collection"
+    bl_space_type  = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context     = "collection"
+
+    #######################################################
+    def draw_labelled_prop(self, row, settings, props, label, text=""):
+
+        row.label(text=label)
+        for prop in props:
+            row.prop(settings, prop, text=text)
+
+    #######################################################
+    def draw_collection_menu(self, context):
+
+        layout = self.layout
+        settings = context.collection.dff
+
+        layout.prop(settings, "type", text="Type")
+
+        if settings.type == 'CLUMP':
+            layout.prop(settings, "clump_index", text="Clump Index")
+
+    #######################################################
+    def draw(self, context):
+
+        if not context.collection.dff:
+            return
+
+        self.draw_collection_menu(context)
+
 # Custom properties
 #######################################################
 class DFFMaterialProps(bpy.types.PropertyGroup):
@@ -603,6 +638,27 @@ compatibiility with DFF Viewers"
     #######################################################    
     def register():
         bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
+
+#######################################################
+class DFFCollectionProps(bpy.types.PropertyGroup):
+
+    type : bpy.props.EnumProperty(
+        items = (
+            ('CMN',   'Common', 'Common collection'),
+            ('CLUMP', 'Clump', 'Objects in this collection will be exported into separate clumps'),
+            ('NON',   "Don't export", 'Objects in this collection will NOT be exported')
+        )
+    )
+
+    clump_index : bpy.props.IntProperty(
+        default = 0,
+        min = 0,
+        description = "Clump index for multiple clumps dff"
+    )
+
+    #######################################################
+    def register():
+        bpy.types.Collection.dff = bpy.props.PointerProperty(type=DFFCollectionProps)
 
 #######################################################
 class DFF_UL_FrameItems(bpy.types.UIList):
