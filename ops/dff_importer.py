@@ -695,7 +695,15 @@ class dff_importer:
                     modifier.use_edge_angle = False
                 
                 bm.to_mesh(mesh.data)
-                
+
+    #######################################################
+    def link_obj_to_frame_bone(obj, frame_index):
+        self = dff_importer
+
+        frame_bone = self.frame_bones[frame_index]
+        armature, bone_name = frame_bone['armature'], frame_bone['name']
+        set_parent_bone(obj, armature, bone_name)
+
     #######################################################
     def import_frames():
         self = dff_importer
@@ -751,16 +759,18 @@ class dff_importer:
                 
                 # Construct an armature
                 if frame.bone_data.header.bone_count > 0:
-                    armature, obj = self.construct_armature(frame, index)
+                    _, obj = self.construct_armature(frame, index)
+
+                    for mesh in meshes:
+                        if not mesh.vertex_groups:
+                            self.link_obj_to_frame_bone(mesh, index)
+                            mesh.dff.is_frame = False
 
                 # Skip bones
                 elif frame.bone_data.header.id in self.bones:
 
-                    # Link mesh to frame
                     for mesh in meshes:
-                        parent_bone = self.frame_bones[index]
-                        armature, bone_name = parent_bone['armature'], parent_bone['name']
-                        set_parent_bone(mesh, armature, bone_name)
+                        self.link_obj_to_frame_bone(mesh, index)
                         mesh.dff.is_frame = False
 
                     continue
@@ -793,9 +803,7 @@ class dff_importer:
             # Set parent
             if frame.parent != -1:
                 if frame.parent in self.frame_bones:
-                    parent_bone = self.frame_bones[frame.parent]
-                    armature, bone_name = parent_bone['armature'], parent_bone['name']
-                    set_parent_bone(obj, armature, bone_name)
+                    self.link_obj_to_frame_bone(obj, frame.parent)
 
                 else:
                     obj.parent = self.objects[frame.parent]
