@@ -1458,6 +1458,7 @@ class Geometry:
         'has_normals',
         'normals',
         'materials',
+        'split_headers',
         'extensions',
         'export_flags',
         'native_platform_type',
@@ -1480,6 +1481,7 @@ class Geometry:
         self.has_normals        = None
         self.normals            = []
         self.materials          = []
+        self.split_headers      = []
         self.extensions         = {}
 
         # user for native plg
@@ -1631,7 +1633,7 @@ class Geometry:
         total_indices = sum(len(triangles) for triangles in meshes.values())
         data += pack("<III", int(is_tri_strip), len(meshes), total_indices)
 
-        for mesh in meshes:
+        for mesh in sorted(meshes):
             data += pack("<II", len(meshes[mesh]), mesh)
             data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
 
@@ -1821,8 +1823,7 @@ class dff:
         calculated_size = 12 + header.mesh_count * 8 + (header.total_indices * 2)
         opengl = calculated_size >= parent_chunk.size
 
-        if geometry.flags & rpGEOMETRYNATIVE != 0:
-            geometry.extensions['split_headers'] = []
+        geometry.split_headers = []
 
         is_tri_strip = header.flags == 1
         for i in range(header.mesh_count):
@@ -1832,8 +1833,9 @@ class dff:
                                                           self.data,
                                                           self._read(8)))
 
+            geometry.split_headers.append(split_header)
+
             if geometry.flags & rpGEOMETRYNATIVE != 0:
-                geometry.extensions['split_headers'].append(split_header)
                 continue
 
             unpack_format = "<H" if opengl else "<H2x"
