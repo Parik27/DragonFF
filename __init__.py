@@ -45,6 +45,8 @@ _classes = [
     gui.OBJECT_OT_facegoups_col,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
+    gui.EXT2DFXObjectProps,
+    gui.Light2DFXObjectProps,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
     gui.MapImportPanel,

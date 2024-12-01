@@ -1025,7 +1025,7 @@ class Light2dfx:
         self.effect_id = 0
 
         self.loc = loc
-        self.color = [0,0,0]
+        self.color = [0,0,0,0]
         self.coronaFarClip = 0
         self.pointlightRange = 0
         self.coronaSize = 0
@@ -1058,7 +1058,7 @@ class Light2dfx:
 
         # 80 bytes structure
         if size > 76:
-            self.lookDirection = unpack_from("<BBB", data, offset + 76)
+            self.lookDirection = unpack_from("<bbb", data, offset + 76)
 
         # Convert byte arrays to strings here
         self.coronaTexName = self.coronaTexName[:strlen(self.coronaTexName)]
@@ -1076,32 +1076,40 @@ class Light2dfx:
         # 76 bytes
         data += pack(
             "<ffffBBBBB24s24sBB",
-            self.coronaFarClip   , self.pointlightRange,
-            self.coronaSize      , self.shadowSize,
-            self.coronaShowMode  , self.coronaEnableReflection,
-            self.coronaFlareType , self.shadowColorMultiplier,
-            self._flags1         , self.coronaTexName,
-            self.shadowTexName   , self.shadowZDistance,
+            self.coronaFarClip          , self.pointlightRange,
+            self.coronaSize             , self.shadowSize,
+            self.coronaShowMode         , self.coronaEnableReflection,
+            self.coronaFlareType        , self.shadowColorMultiplier,
+            self._flags1                , self.coronaTexName.encode(),
+            self.shadowTexName.encode() , self.shadowZDistance,
             self._flags2
         )
 
         # 80 bytes
         if self.lookDirection is not None:
-            data += pack("<BBB2x", *self.lookDirection)
+            data += pack("<bbb2x", *self.lookDirection)
 
         # 76 bytes (padding)
         else:
             data += pack("<x")
 
         return data
-    
+
+    #######################################################
+    def check_flag(self, flag):
+        return (self._flags1 & flag.value) != 0
+
+    #######################################################
+    def check_flag2(self, flag):
+        return (self._flags2 & flag.value) != 0
+
     #######################################################
     def set_flag(self, flag):
-        self._flag |= flag
+        self._flags1 |= flag
 
     #######################################################
     def set_flag2(self, flag):
-        self._flag2 |= flag
+        self._flags2 |= flag
 
 #######################################################
 class Particle2dfx:
@@ -1117,13 +1125,12 @@ class Particle2dfx:
     def from_mem(loc, data, offset, size):
 
         self = Particle2dfx(loc)
-        self.effect = data[offset:strlen(data, offset)].decode('ascii')
-                
+        self.effect = unpack_from("<24s", data, offset)[0].decode('ascii')
         return self
 
     #######################################################
     def to_mem(self):
-        return pack("<24s", self.effect)
+        return pack("<24s", self.effect.encode())
 
 #######################################################
 class PedAttractor2dfx:
@@ -1206,6 +1213,10 @@ class Extension2dfx:
         self.entries.append(entry)
 
     #######################################################
+    def is_empty(self):
+        return len(self.entries) == 0
+
+    #######################################################
     @staticmethod
     def from_mem(data, offset):
 
@@ -1213,7 +1224,7 @@ class Extension2dfx:
         entries_count = unpack_from("<I", data, offset)[0]
 
         pos = 4 + offset
-        for i in range(entries_count):
+        for _ in range(entries_count):
 
             # Stores classes for each effect
             entries_funcs = {
@@ -1222,7 +1233,7 @@ class Extension2dfx:
                 3: PedAttractor2dfx,
                 4: SunGlare2dfx
             }
-            
+
             loc = Sections.read(Vector, data, pos)
             entry_type, size = unpack_from("<II", data, pos + 12)
 
@@ -1242,21 +1253,23 @@ class Extension2dfx:
     def to_mem(self):
 
         # Write only if there are entries
-        if len(self.entries) == 0:
+        if self.is_empty():
             return b''
-        
+
         # Entries length
         data = pack("<I", len(self.entries))
 
         # Entries
         for entry in self.entries:
+            data += Sections.write(Vector, entry.loc)
+
             entry_data = entry.to_mem()
 
-            data += pack("<II", entry.effect_id)
+            data += pack("<II", entry.effect_id, len(entry_data))
             data += entry_data
 
         return Sections.write_chunk(data, types['2d Effect'])
-            
+
     #######################################################
     def __add__(self, other):
         self.entries += other.entries # concatinate entries
@@ -2430,7 +2443,6 @@ class dff:
 
     #######################################################
     def write_geometry_list(self):
-
         data = b''
         data += pack("<I", len(self.geometry_list))
 
@@ -2440,10 +2452,10 @@ class dff:
 
             # Append 2dfx to extra extensions in the last geometry
             extra_extensions = []
-            if index == len(self.geometry_list):
+            if index == len(self.geometry_list) - 1 and not self.ext_2dfx.is_empty():
                 extra_extensions.append(self.ext_2dfx)
             
-            data += geometry.to_mem()
+            data += geometry.to_mem(extra_extensions)
         
         return Sections.write_chunk(data, types["Geometry List"])
 
