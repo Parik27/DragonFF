@@ -156,7 +156,7 @@ class NativeGCGeometry:
         # Read Header
         unk1, mesh_index, unk2, sections_num = unpack_from(">HHII", data, self._read(12))
 
-        splits_num = len(geometry.extensions['split_headers'])
+        splits_num = len(geometry.split_headers)
         section_header_len = (data_pos - self._pos - splits_num * 8) // sections_num
 
         for _ in range(sections_num):
@@ -243,7 +243,7 @@ class NativeGCGeometry:
             geometry.uv_layers.append([])
 
         for split_index, hdr in enumerate(self.triangle_section_headers):
-            split_header = geometry.extensions['split_headers'][split_index]
+            split_header = geometry.split_headers[split_index]
 
             self._pos = data_pos + hdr.section_offset
             end_pos = self._pos + hdr.section_size

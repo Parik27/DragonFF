@@ -20,6 +20,8 @@ import bmesh
 import math
 import mathutils
 
+from collections import OrderedDict
+
 from ..gtaLib import dff
 from .importer_common import (
     link_object, create_collection,
@@ -94,6 +96,11 @@ class dff_importer:
             mesh = bpy.data.meshes.new(frame.name)
             bm   = bmesh.new()
 
+            # Create a material order sorted by geometry splits
+            mat_order = [split.material for split in geom.split_headers] + list(range(len(geom.materials)))
+            mat_order = list(OrderedDict.fromkeys(mat_order))
+            mat_indices = sorted(range(len(mat_order)), key=lambda i: mat_order[i])
+
             # Temporary Custom Properties that'll be used to set Object properties
             # later.
             mesh['dragon_normals'] = False
@@ -159,7 +166,7 @@ class dff_importer:
                             bm.verts[f.c]
                         ])
 
-                    face.material_index = f.material
+                    face.material_index = mat_indices[f.material]
                     
                     # Setting UV coordinates
                     for loop in face.loops:
@@ -214,7 +221,7 @@ class dff_importer:
             mesh.update()
 
             # Import materials and add the mesh to the meshes list
-            self.import_materials(geom, frame, mesh)
+            self.import_materials(geom, frame, mesh, mat_order)
 
             obj = bpy.data.objects.new('mesh', mesh)
             link_object(obj, dff_importer.current_collection)
@@ -327,13 +334,14 @@ class dff_importer:
         
     ##################################################################
     # TODO: MatFX: Dual Textures
-    def import_materials(geometry, frame, mesh):
+    def import_materials(geometry, frame, mesh, mat_order):
 
-        self = dff_importer        
+        self = dff_importer
         from bpy_extras.image_utils import load_image
 
         # Refactored
-        for index, material in enumerate(geometry.materials):
+        for index, mat_idx in enumerate(mat_order):
+            material = geometry.materials[mat_idx]
 
             # Check for equal materials
             if self.group_materials and hash(material) in self.materials:
