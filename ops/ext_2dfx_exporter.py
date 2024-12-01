@@ -106,6 +106,15 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
+    def export_trigger_point(self, obj):
+        settings = obj.dff.ext_2dfx
+
+        entry = dff.TriggerPoint2dfx(obj.location)
+        entry.point_id = settings.val_int_1
+
+        return entry
+
+    #######################################################
     def export_objects(self, objects):
 
         """ Export objects and fill 2dfx entries """
@@ -114,6 +123,7 @@ class ext_2dfx_exporter:
             0: self.export_light,
             1: self.export_particle,
             4: self.export_sun_glare,
+            8: self.export_trigger_point,
         }
 
         for obj in objects:

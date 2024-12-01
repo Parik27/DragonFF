@@ -88,6 +88,15 @@ class ext_2dfx_importer:
         return obj
 
     #######################################################
+    def import_trigger_point(self, entry):
+        obj = bpy.data.objects.new("2dfx_trigger_point", None)
+
+        settings = obj.dff.ext_2dfx
+        settings.val_int_1 = entry.point_id
+
+        return obj
+
+    #######################################################
     def get_objects(self):
 
         """ Import and return the list of imported objects """
@@ -96,6 +105,7 @@ class ext_2dfx_importer:
             0: self.import_light,
             1: self.import_particle,
             4: self.import_sun_glare,
+            8: self.import_trigger_point,
         }
 
         objects = []

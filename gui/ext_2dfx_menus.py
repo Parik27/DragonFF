@@ -8,8 +8,11 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
             ('0', 'Light', 'Light'),
             ('1', 'Particle', 'Particle'),
             ('4', 'Sun Glare', 'Sun Glare'),
+            ('8', 'Trigger Point', 'Trigger Point'),
         )
     )
+
+    val_int_1 : bpy.props.IntProperty()
 
     val_str24_1 : bpy.props.StringProperty(maxlen = 23)
 
@@ -193,6 +196,14 @@ class EXT2DFXMenus:
         pass
 
     #######################################################
+    def draw_trigger_point_menu(layout, context):
+        obj = context.object
+        settings = obj.dff.ext_2dfx
+
+        box = layout.box()
+        box.prop(settings, "val_int_1", text="Point ID")
+
+    #######################################################
     def draw_menu(effect, layout, context):
         self = EXT2DFXMenus
 
@@ -200,6 +211,7 @@ class EXT2DFXMenus:
             0: self.draw_light_menu,
             1: self.draw_particle_menu,
             4: self.draw_sun_glare_menu,
+            8: self.draw_trigger_point_menu,
         }
 
         functions[effect](layout, context)

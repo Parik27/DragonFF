@@ -1200,7 +1200,28 @@ class SunGlare2dfx:
     #######################################################
     def to_mem(self):
         return b''
-        
+
+#######################################################
+class TriggerPoint2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 8
+        self.point_id = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = TriggerPoint2dfx(loc)
+        self.point_id = unpack_from("<I", data, offset)[0]
+        return self
+
+    #######################################################
+    def to_mem(self):
+        return pack("<I", self.point_id)
+
 #######################################################
 class Extension2dfx:
 
@@ -1231,7 +1252,8 @@ class Extension2dfx:
                 0: Light2dfx,
                 1: Particle2dfx,
                 3: PedAttractor2dfx,
-                4: SunGlare2dfx
+                4: SunGlare2dfx,
+                8: TriggerPoint2dfx,
             }
 
             loc = Sections.read(Vector, data, pos)
