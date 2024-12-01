@@ -123,7 +123,7 @@ class NativePS2Geometry:
 
         read_types = []
 
-        for split_index, split_header in enumerate(geometry.extensions['split_headers']):
+        for split_index, split_header in enumerate(geometry.split_headers):
             split_size, no_pointers = unpack_from("<II", data, self._read(8))
 
             self._indices.append([])
@@ -376,7 +376,7 @@ class NativePS2Geometry:
     def _generate_triangles(self, geometry):
         geometry.triangles = []
 
-        for split_index, split_header in enumerate(geometry.extensions['split_headers']):
+        for split_index, split_header in enumerate(geometry.split_headers):
             indices = self._indices[split_index]
             if geometry.flags & rpGEOMETRYTRISTRIP != 0:
                 for i in range(len(indices) - 2):

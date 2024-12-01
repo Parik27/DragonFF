@@ -93,7 +93,7 @@ class NativePSPSkin:
         weights = geometry._vertex_bone_weights
         indices = []
 
-        for split_index, split_header in enumerate(geometry.extensions['split_headers']):
+        for split_index, split_header in enumerate(geometry.split_headers):
             for _ in range(split_header.indices_count):
                 indices.append(bone_idx_list[split_index])
 
@@ -298,7 +298,7 @@ class NativePSPGeometry:
 
     #######################################################
     def _generate_triangles(self, geometry):
-        for split, split_header in enumerate(geometry.extensions['split_headers']):
+        for split, split_header in enumerate(geometry.split_headers):
             indices_map = self._indices_map[split]
 
             for i in range(split_header.indices_count - 2):
