@@ -20,8 +20,8 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
 class Light2DFXObjectProps(bpy.types.PropertyGroup):
 
     alpha : bpy.props.FloatProperty(
-        min=0,
-        max=1
+        min = 0,
+        max = 1
     )
 
     corona_far_clip : bpy.props.FloatProperty(
@@ -33,6 +33,11 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
     )
 
     export_view_vector : bpy.props.BoolProperty()
+
+    view_vector : bpy.props.IntVectorProperty(
+        min = -128,
+        max = 127
+    )
 
     corona_size : bpy.props.FloatProperty()
 
@@ -58,14 +63,14 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
     )
 
     corona_flare_type : bpy.props.IntProperty(
-        min=0,
-        max=2,
+        min = 0,
+        max = 2,
         description = "Type of highlights for the corona"
     )
 
     shadow_color_multiplier : bpy.props.IntProperty(
-        min=0,
-        max=255,
+        min = 0,
+        max = 255,
         description = "Shadow intensity"
     )
 
@@ -84,8 +89,8 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
     )
 
     shadow_z_distance : bpy.props.IntProperty(
-        min=0,
-        max=255,
+        min = 0,
+        max = 255,
         description = "Maximum distance for drawing shadow"
     )
 
@@ -94,8 +99,8 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
     )
 
     flag1_fog_type : bpy.props.IntProperty(
-        min=0,
-        max=3,
+        min = 0,
+        max = 3,
         description = "Fog type for point light source"
     )
 
@@ -151,6 +156,8 @@ class EXT2DFXMenus:
         box.prop(settings, "alpha", text="Alpha")
         box.prop(settings, "point_light_range", text="Point Light Range")
         box.prop(settings, "export_view_vector", text="Export View Vector")
+        if settings.export_view_vector:
+            box.prop(settings, "view_vector", text="View Vector")
 
         box = layout.box()
         box.label(text="Corona")

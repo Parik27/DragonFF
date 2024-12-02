@@ -1058,7 +1058,7 @@ class Light2dfx:
 
         # 80 bytes structure
         if size > 76:
-            self.lookDirection = unpack_from("<bbb", data, offset + 76)
+            self.lookDirection = unpack_from("<bbb", data, offset + 75)
 
         # Convert byte arrays to strings here
         self.coronaTexName = self.coronaTexName[:strlen(self.coronaTexName)]

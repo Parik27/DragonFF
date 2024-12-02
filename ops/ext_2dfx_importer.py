@@ -67,7 +67,7 @@ class ext_2dfx_importer:
         obj = bpy.data.objects.new("2dfx_light", data)
 
         if entry.lookDirection is not None:
-            obj.rotation_euler = [i / 127 * math.pi for i in entry.lookDirection]
+            settings.view_vector = entry.lookDirection
             settings.export_view_vector = True
 
         return obj

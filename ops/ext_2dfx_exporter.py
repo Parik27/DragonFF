@@ -37,7 +37,7 @@ class ext_2dfx_exporter:
 
         entry = dff.Light2dfx(obj.location)
         if settings.export_view_vector:
-            entry.lookDirection = [int(i / math.pi * 127) for i in obj.rotation_euler]
+            entry.lookDirection = settings.view_vector
         entry.color = dff.RGBA._make(
                 list(int(255 * x) for x in list(obj.data.color) + [settings.alpha])
             )
