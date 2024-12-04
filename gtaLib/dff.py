@@ -1223,6 +1223,35 @@ class TriggerPoint2dfx:
         return pack("<I", self.point_id)
 
 #######################################################
+class CoverPoint2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 9
+        self.direction_x = 0
+        self.direction_y = 0
+        self.cover_type = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = CoverPoint2dfx(loc)
+        self.direction_x, self.direction_y, \
+        self.cover_type = unpack_from("<ffI", data, offset)
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = pack(
+            "<ffI",
+            self.direction_x, self.direction_y,
+            self.cover_type
+        )
+        return data
+
+#######################################################
 class Extension2dfx:
 
     #######################################################
@@ -1254,6 +1283,7 @@ class Extension2dfx:
                 3: PedAttractor2dfx,
                 4: SunGlare2dfx,
                 8: TriggerPoint2dfx,
+                9: CoverPoint2dfx,
             }
 
             loc = Sections.read(Vector, data, pos)

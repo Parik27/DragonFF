@@ -15,9 +15,49 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
-import math
+
+from mathutils import Vector
 
 from ..gtaLib import dff
+
+#######################################################
+def create_arrow_mesh(name):
+    arrow_mesh = bpy.data.meshes.get(name)
+    if arrow_mesh is None:
+        arrow_mesh = bpy.data.meshes.new(name=name)
+        verts = [
+            (-0.0100, 0.0000, 0.0100),
+            (-0.0100, 0.2500, 0.0100),
+            (-0.0100, 0.0000, -0.0100),
+            (-0.0100, 0.2500, -0.0100),
+            (0.0100, 0.0000, 0.0100),
+            (0.0100, 0.2500, 0.0100),
+            (0.0100, 0.0000, -0.0100),
+            (0.0100, 0.2500, -0.0100),
+            (-0.0350, 0.2500, 0.0350),
+            (-0.0350, 0.2500, -0.0350),
+            (0.0350, 0.2500, 0.0350),
+            (0.0350, 0.2500, -0.0350),
+            (0.0000, 0.5000, 0.0000),
+        ]
+        edges = []
+        faces = [
+            (0, 1, 3, 2),
+            (2, 3, 7, 6),
+            (6, 7, 5, 4),
+            (4, 5, 1, 0),
+            (3, 1, 8, 9),
+            (10, 11, 12),
+            (1, 5, 10, 8),
+            (7, 3, 9, 11),
+            (5, 7, 11, 10),
+            (9, 8, 12),
+            (8, 10, 12),
+            (11, 9, 12),
+        ]
+        arrow_mesh.from_pydata(verts, edges, faces)
+
+    return arrow_mesh
 
 #######################################################
 class ext_2dfx_importer:
@@ -97,6 +137,21 @@ class ext_2dfx_importer:
         return obj
 
     #######################################################
+    def import_cover_point(self, entry):
+        mesh = create_arrow_mesh("_2dfx_cover_point")
+        obj = bpy.data.objects.new("2dfx_cover_point", mesh)
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+
+        settings = obj.dff.ext_2dfx
+        settings.val_int_1 = entry.cover_type
+
+        direction = Vector((entry.direction_x, entry.direction_y, 0))
+        obj.rotation_euler = direction.to_track_quat('Y', 'Z').to_euler()
+
+        return obj
+
+    #######################################################
     def get_objects(self):
 
         """ Import and return the list of imported objects """
@@ -106,6 +161,7 @@ class ext_2dfx_importer:
             1: self.import_particle,
             4: self.import_sun_glare,
             8: self.import_trigger_point,
+            9: self.import_cover_point,
         }
 
         objects = []

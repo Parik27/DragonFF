@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import math
+from mathutils import Vector
 
 from ..gtaLib import dff
 
@@ -115,6 +115,26 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
+    def export_cover_point(self, obj):
+        settings = obj.dff.ext_2dfx
+
+        entry = dff.CoverPoint2dfx(obj.location)
+        entry.cover_type = settings.val_int_1
+
+        if obj.rotation_mode in ('QUATERNION', 'AXIS_ANGLE'):
+            direction = obj.rotation_quaternion @ Vector((0.0, 1.0, 0.0))
+        else:
+            direction = obj.rotation_euler.to_quaternion() @ Vector((0.0, 1.0, 0.0))
+
+        direction.z = 0
+        direction.normalize()
+
+        entry.direction_x = direction.x
+        entry.direction_y = direction.y
+
+        return entry
+
+    #######################################################
     def export_objects(self, objects):
 
         """ Export objects and fill 2dfx entries """
@@ -124,6 +144,7 @@ class ext_2dfx_exporter:
             1: self.export_particle,
             4: self.export_sun_glare,
             8: self.export_trigger_point,
+            9: self.export_cover_point,
         }
 
         for obj in objects:
