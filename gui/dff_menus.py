@@ -1,5 +1,6 @@
 import bpy
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
+    IMPORT_OT_txd, \
     OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
@@ -603,6 +604,21 @@ compatibiility with DFF Viewers"
     #######################################################    
     def register():
         bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
+
+#######################################################
+class TXDImportPanel(bpy.types.Panel):
+
+    bl_label       = "DragonFF - TXD Import"
+    bl_idname      = "SCENE_PT_txdImport"
+    bl_space_type  = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context     = "scene"
+    bl_options     = {'DEFAULT_CLOSED'}
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+        layout.operator(IMPORT_OT_txd.bl_idname)
 
 #######################################################
 class DFF_UL_FrameItems(bpy.types.UIList):
