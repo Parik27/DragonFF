@@ -1,5 +1,42 @@
 import bpy
 
+from bpy_extras.io_utils import ImportHelper
+
+from ..gtaLib import txd
+
+particle_txd_names = [
+    'wincrack_32', 'white', 'waterwake', 'waterclear256', 'txgrassbig1',
+    'txgrassbig0', 'target256', 'shad_rcbaron', 'shad_ped', 'shad_heli',
+    'shad_exp', 'shad_car', 'shad_bike', 'seabd32', 'roadsignfont',
+    'particleskid', 'lunar', 'lockonFire', 'lockon', 'lamp_shad_64',
+    'headlight1', 'headlight', 'handman', 'finishFlag', 'coronastar',
+    'coronaringb', 'coronareflect', 'coronamoon', 'coronaheadlightline', 'cloudmasked',
+    'cloudhigh', 'cloud1', 'carfx1', 'bloodpool_64'
+]
+
+#######################################################
+def particle_txd_search_func(props, context, edit_text):
+    return particle_txd_names
+
+#######################################################
+class IMPORT_OT_ParticleTXDNames(bpy.types.Operator, ImportHelper):
+
+    bl_idname = "import.particle_txd_names"
+    bl_label = "Import texture names from particle.txd"
+    bl_description = 'Import texture names from particle.txd'
+
+    filename : bpy.props.StringProperty(subtype='FILE_PATH')
+
+    filter_glob : bpy.props.StringProperty(default="*.txd",
+                                              options={'HIDDEN'})
+
+    def execute(self, context):
+        global particle_txd_names
+        txd_file = txd.txd()
+        txd_file.load_file(self.filepath)
+        particle_txd_names = [tex.name for tex in txd_file.native_textures]
+        return {'FINISHED'}
+
 #######################################################
 class EXT2DFXObjectProps(bpy.types.PropertyGroup):
 
@@ -81,12 +118,14 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
 
     corona_tex_name : bpy.props.StringProperty(
         maxlen = 23,
-        description = "Corona texture name in particle.txd"
+        description = "Corona texture name in particle.txd",
+        search = particle_txd_search_func
     )
 
     shadow_tex_name : bpy.props.StringProperty(
         maxlen = 23,
-        description = "Shadow texture name in particle.txd"
+        description = "Shadow texture name in particle.txd",
+        search = particle_txd_search_func
     )
 
     shadow_z_distance : bpy.props.IntProperty(
@@ -190,6 +229,9 @@ class EXT2DFXMenus:
         box.prop(settings, "flag1_blinking1", text="Blinking 1")
         box.prop(settings, "flag2_blinking2", text="Blinking 2")
         box.prop(settings, "flag2_blinking3", text="Blinking 3")
+
+        box = layout.box()
+        box.operator(IMPORT_OT_ParticleTXDNames.bl_idname)
 
     #######################################################
     def draw_particle_menu(layout, context):

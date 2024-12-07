@@ -47,6 +47,7 @@ _classes = [
     gui.OBJECT_PT_dffObjects,
     gui.EXT2DFXObjectProps,
     gui.Light2DFXObjectProps,
+    gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
     gui.MapImportPanel,
