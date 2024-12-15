@@ -96,12 +96,12 @@ class State(metaclass=_StateMeta):
 
     @classmethod
     def hook_events(cls):
-        if not cls.update_scene in depsgraph_update_post:
+        if not cls._onDepsgraphUpdate in depsgraph_update_post:
             depsgraph_update_post.append(cls._onDepsgraphUpdate)
             load_post.append(cls._onLoad)
 
     @classmethod
     def unhook_events(cls):
-        if cls.update_scene in depsgraph_update_post:
+        if cls._onDepsgraphUpdate in depsgraph_update_post:
             depsgraph_update_post.remove(cls._onDepsgraphUpdate)
             load_post.remove(cls._onLoad)
