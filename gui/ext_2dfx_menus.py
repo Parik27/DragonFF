@@ -1,6 +1,9 @@
 import bpy
+import gpu
 
 from bpy_extras.io_utils import ImportHelper
+from gpu_extras.batch import batch_for_shader
+from mathutils import Vector
 
 from ..gtaLib import txd
 
@@ -45,6 +48,7 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
             ('0', 'Light', 'Light'),
             ('1', 'Particle', 'Particle'),
             ('4', 'Sun Glare', 'Sun Glare'),
+            ('7', 'Road Sign', 'Road Sign'),
             ('8', 'Trigger Point', 'Trigger Point'),
             ('9', 'Cover Point', 'Cover Point'),
         )
@@ -192,6 +196,50 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
         bpy.types.Light.ext_2dfx = bpy.props.PointerProperty(type=Light2DFXObjectProps)
 
 #######################################################
+class RoadSign2DFXObjectProps(bpy.types.PropertyGroup):
+
+    size : bpy.props.FloatVectorProperty(
+        size = 2,
+        min = 0,
+        description = "Scale"
+    )
+
+    color : bpy.props.EnumProperty(
+        items = (
+            ('0', 'White', ''),
+            ('1', 'Black', ''),
+            ('2', 'Grey', ''),
+            ('3', 'Red', ''),
+        ),
+        description = "Text color"
+    )
+
+    #######################################################
+    def draw_size():
+        obj = bpy.context.active_object
+        if obj and obj.select_get() and obj.type == 'FONT' and obj.dff.type == '2DFX' and obj.dff.ext_2dfx.effect == '7':
+            settings = obj.data.ext_2dfx
+
+            size_x, size_y = settings.size
+            x, y = size_x * 0.5, size_y * 0.5
+
+            p0 = obj.matrix_world @ Vector((-x, -y, 0))
+            p1 = obj.matrix_world @ Vector((x, -y, 0))
+            p2 = obj.matrix_world @ Vector((-x, y, 0))
+            p3 = obj.matrix_world @ Vector((x, y, 0))
+
+            coords = [p0, p1, p0, p2, p1, p3, p2, p3]
+            shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+            batch = batch_for_shader(shader, 'LINES', {"pos": coords})
+
+            shader.uniform_float("color", (1, 1, 0, 1))
+            batch.draw(shader)
+
+    #######################################################
+    def register():
+        bpy.types.TextCurve.ext_2dfx = bpy.props.PointerProperty(type=RoadSign2DFXObjectProps)
+
+#######################################################
 class EXT2DFXMenus:
 
     #######################################################
@@ -260,6 +308,20 @@ class EXT2DFXMenus:
         pass
 
     #######################################################
+    def draw_road_sign_menu(layout, context):
+        obj = context.object
+        box = layout.box()
+
+        if obj.type != 'FONT':
+            box.label(text="This effect is only available for text objects", icon="ERROR")
+            return
+
+        settings = obj.data.ext_2dfx
+
+        box.prop(settings, "size", text="Size")
+        box.prop(settings, "color", text="Color")
+
+    #######################################################
     def draw_trigger_point_menu(layout, context):
         obj = context.object
         settings = obj.dff.ext_2dfx
@@ -283,6 +345,7 @@ class EXT2DFXMenus:
             0: self.draw_light_menu,
             1: self.draw_particle_menu,
             4: self.draw_sun_glare_menu,
+            7: self.draw_road_sign_menu,
             8: self.draw_trigger_point_menu,
             9: self.draw_cover_point_menu,
         }

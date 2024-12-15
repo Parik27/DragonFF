@@ -48,6 +48,7 @@ _classes = [
     gui.OBJECT_PT_dffObjects,
     gui.EXT2DFXObjectProps,
     gui.Light2DFXObjectProps,
+    gui.RoadSign2DFXObjectProps,
     gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
@@ -71,6 +72,7 @@ _draw_3d_handler = None
 #######################################################
 def draw_3d_callback():
     gui.DFFSceneProps.draw_fg()
+    gui.RoadSign2DFXObjectProps.draw_size()
 
 #######################################################
 def register():

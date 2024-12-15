@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import math
+
 from mathutils import Vector
 
 from ..gtaLib import dff
@@ -106,6 +108,56 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
+    def export_road_sign(self, obj):
+        if obj.type != 'FONT':
+            return
+
+        lines = obj.data.body.split("\n")[:4]
+        if not lines:
+            return
+
+        lines_num = len(lines)
+        while len(lines) < 4:
+            lines.append("_" * 16)
+
+        max_chars_num = 2
+        for i, line in enumerate(lines):
+            if len(line) < 16:
+                line += (16 - len(line)) * "_"
+            line = line.replace(" ", "_")[:16]
+            lines[i] = line
+
+            line_chars_num = len(line.rstrip("_"))
+            if max_chars_num < line_chars_num:
+                max_chars_num = line_chars_num
+
+        max_chars_num = next((i for i in (2, 4, 8, 16) if max_chars_num <= i), max_chars_num)
+
+        settings = obj.data.ext_2dfx
+
+        flags = {1:1, 2:2, 3:3, 4:0}[lines_num]
+        flags |= {2:1, 4:2, 8:3, 16:0}[max_chars_num] << 2
+        flags |= int(settings.color) << 4
+
+        rotation = obj.matrix_local.to_euler('ZXY')
+
+        entry = dff.RoadSign2dfx(obj.location)
+
+        entry.rotation = Vector((
+            rotation.x * (180 / math.pi),
+            rotation.y * (180 / math.pi),
+            rotation.z * (180 / math.pi)
+        ))
+
+        entry.text1, entry.text2, \
+        entry.text3, entry.text4 = lines
+
+        entry.size = settings.size
+        entry.flags = flags
+
+        return entry
+
+    #######################################################
     def export_trigger_point(self, obj):
         settings = obj.dff.ext_2dfx
 
@@ -139,6 +191,7 @@ class ext_2dfx_exporter:
             0: self.export_light,
             1: self.export_particle,
             4: self.export_sun_glare,
+            7: self.export_road_sign,
             8: self.export_trigger_point,
             9: self.export_cover_point,
         }

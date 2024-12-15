@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
+import math
 
 from mathutils import Vector
 
@@ -128,6 +129,35 @@ class ext_2dfx_importer:
         return obj
 
     #######################################################
+    def import_road_sign(self, entry):
+        lines_num = {0:4, 1:1, 2:2, 3:3}[entry.flags & 0b11]
+        max_chars_num = {0:16, 1:2, 2:4, 3:8}[(entry.flags >> 2) & 0b11]
+
+        body = ""
+        for line in (entry.text1, entry.text2, entry.text3, entry.text4)[:lines_num]:
+            body = body + "\n" if body else body
+            body += line.replace("_", " ")[:max_chars_num]
+
+        data = bpy.data.curves.new(name="2dfx_road_sign", type='FONT')
+        data.body = body
+        data.align_x = data.align_y = 'CENTER'
+        data.size = 0.5
+
+        settings = data.ext_2dfx
+        settings.size = entry.size
+        settings.color = str((entry.flags >> 4) & 0b11)
+
+        obj = bpy.data.objects.new("2dfx_road_sign", data)
+        obj.rotation_mode = 'ZXY'
+        obj.rotation_euler = Vector((
+            entry.rotation.x * (math.pi / 180),
+            entry.rotation.y * (math.pi / 180),
+            entry.rotation.z * (math.pi / 180)
+        ))
+
+        return obj
+
+    #######################################################
     def import_trigger_point(self, entry):
         obj = bpy.data.objects.new("2dfx_trigger_point", None)
 
@@ -160,6 +190,7 @@ class ext_2dfx_importer:
             0: self.import_light,
             1: self.import_particle,
             4: self.import_sun_glare,
+            7: self.import_road_sign,
             8: self.import_trigger_point,
             9: self.import_cover_point,
         }

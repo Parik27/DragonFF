@@ -1202,6 +1202,52 @@ class SunGlare2dfx:
         return b''
 
 #######################################################
+class RoadSign2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 7
+        self.size = [1, 1]
+        self.rotation = [0, 0, 0]
+        self.flags = 0
+        self.text1 = ""
+        self.text2 = ""
+        self.text3 = ""
+        self.text4 = ""
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = RoadSign2dfx(loc)
+        self.size = unpack_from("<ff", data, offset)
+        self.rotation = Sections.read(Vector, data, offset + 8)
+        self.flags, \
+        self.text1, self.text2, \
+        self.text3, self.text4 = unpack_from("<H16s16s16s16s2x", data, offset + 20)
+
+        self.text1 = self.text1.decode('ascii')
+        self.text2 = self.text2.decode('ascii')
+        self.text3 = self.text3.decode('ascii')
+        self.text4 = self.text4.decode('ascii')
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = pack("<ff", *self.size)
+        data += Sections.write(Vector, self.rotation)
+        data += pack(
+            "<H16s16s16s16s2x",
+            self.flags,
+            self.text1.encode(), self.text2.encode(),
+            self.text3.encode(), self.text4.encode()
+        )
+
+        return data
+
+#######################################################
 class TriggerPoint2dfx:
 
     #######################################################
@@ -1282,6 +1328,7 @@ class Extension2dfx:
                 1: Particle2dfx,
                 3: PedAttractor2dfx,
                 4: SunGlare2dfx,
+                7: RoadSign2dfx,
                 8: TriggerPoint2dfx,
                 9: CoverPoint2dfx,
             }
