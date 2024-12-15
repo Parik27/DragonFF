@@ -79,8 +79,8 @@ class ext_2dfx_exporter:
         if settings.flag2_blinking2:
             entry.set_flag2(FL2.BLINKING2.value)
 
-        if settings.flag2_udpdate_height_above_ground:
-            entry.set_flag2(FL2.UDPDATE_HEIGHT_ABOVE_GROUND.value)
+        if settings.flag2_update_height_above_ground:
+            entry.set_flag2(FL2.UPDATE_HEIGHT_ABOVE_GROUND.value)
 
         if settings.flag2_check_view_vector:
             entry.set_flag2(FL2.CHECK_DIRECTION.value)
@@ -121,11 +121,7 @@ class ext_2dfx_exporter:
         entry = dff.CoverPoint2dfx(obj.location)
         entry.cover_type = settings.val_int_1
 
-        if obj.rotation_mode in ('QUATERNION', 'AXIS_ANGLE'):
-            direction = obj.rotation_quaternion @ Vector((0.0, 1.0, 0.0))
-        else:
-            direction = obj.rotation_euler.to_quaternion() @ Vector((0.0, 1.0, 0.0))
-
+        direction = obj.matrix_local.to_quaternion() @ Vector((0.0, 1.0, 0.0))
         direction.z = 0
         direction.normalize()
 

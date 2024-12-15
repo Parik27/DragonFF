@@ -100,7 +100,7 @@ class ext_2dfx_importer:
 
         settings.flag2_corona_only_from_below = entry.check_flag2(FL2.CORONA_ONLY_FROM_BELOW)
         settings.flag2_blinking2 = entry.check_flag2(FL2.BLINKING2)
-        settings.flag2_udpdate_height_above_ground = entry.check_flag2(FL2.UDPDATE_HEIGHT_ABOVE_GROUND)
+        settings.flag2_update_height_above_ground = entry.check_flag2(FL2.UPDATE_HEIGHT_ABOVE_GROUND)
         settings.flag2_check_view_vector = entry.check_flag2(FL2.CHECK_DIRECTION)
         settings.flag2_blinking3 = entry.check_flag2(FL2.BLINKING3)
 

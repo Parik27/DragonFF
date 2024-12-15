@@ -116,17 +116,30 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
         description = "Enable corona reflection on wet asphalt"
     )
 
-    corona_tex_name : bpy.props.StringProperty(
-        maxlen = 23,
-        description = "Corona texture name in particle.txd",
-        search = particle_txd_search_func
-    )
+    # NOTE: bpy.props.StringProperty supports a search argument since version 3.3
+    if bpy.app.version < (3, 3, 0):
+        corona_tex_name : bpy.props.StringProperty(
+            maxlen = 23,
+            description = "Corona texture name in particle.txd"
+        )
 
-    shadow_tex_name : bpy.props.StringProperty(
-        maxlen = 23,
-        description = "Shadow texture name in particle.txd",
-        search = particle_txd_search_func
-    )
+        shadow_tex_name : bpy.props.StringProperty(
+            maxlen = 23,
+            description = "Shadow texture name in particle.txd"
+        )
+
+    else:
+        corona_tex_name : bpy.props.StringProperty(
+            maxlen = 23,
+            description = "Corona texture name in particle.txd",
+            search = particle_txd_search_func
+        )
+
+        shadow_tex_name : bpy.props.StringProperty(
+            maxlen = 23,
+            description = "Shadow texture name in particle.txd",
+            search = particle_txd_search_func
+        )
 
     shadow_z_distance : bpy.props.IntProperty(
         min = 0,
@@ -164,7 +177,7 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
         description = "Blinks (very fast)"
     )
 
-    flag2_udpdate_height_above_ground : bpy.props.BoolProperty()
+    flag2_update_height_above_ground : bpy.props.BoolProperty()
 
     flag2_check_view_vector : bpy.props.BoolProperty(
         description = "Works only if the camera is in a certain position (View Vector)"
@@ -224,14 +237,15 @@ class EXT2DFXMenus:
         box.prop(settings, "flag2_corona_only_from_below", text="Corona Only From Below")
         box.prop(settings, "flag1_at_day", text="At Day")
         box.prop(settings, "flag1_at_night", text="At Night")
-        box.prop(settings, "flag2_udpdate_height_above_ground", text="Udpdate Height Above Ground")
+        box.prop(settings, "flag2_update_height_above_ground", text="Update Height Above Ground")
         box.prop(settings, "flag2_check_view_vector", text="Check View Vector")
         box.prop(settings, "flag1_blinking1", text="Blinking 1")
         box.prop(settings, "flag2_blinking2", text="Blinking 2")
         box.prop(settings, "flag2_blinking3", text="Blinking 3")
 
-        box = layout.box()
-        box.operator(IMPORT_OT_ParticleTXDNames.bl_idname)
+        if bpy.app.version >= (3, 3, 0):
+            box = layout.box()
+            box.operator(IMPORT_OT_ParticleTXDNames.bl_idname)
 
     #######################################################
     def draw_particle_menu(layout, context):

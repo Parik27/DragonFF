@@ -1015,7 +1015,7 @@ class Light2dfx:
     class Flags2(Enum):
         CORONA_ONLY_FROM_BELOW = 1
         BLINKING2 = 2
-        UDPDATE_HEIGHT_ABOVE_GROUND = 4
+        UPDATE_HEIGHT_ABOVE_GROUND = 4
         CHECK_DIRECTION = 8
         BLINKING3 = 16
         
