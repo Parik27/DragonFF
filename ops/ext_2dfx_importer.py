@@ -16,6 +16,7 @@
 
 import bpy
 import math
+import os
 
 from mathutils import Vector
 
@@ -138,10 +139,19 @@ class ext_2dfx_importer:
             body = body + "\n" if body else body
             body += line.replace("_", " ")[:max_chars_num]
 
+        font = bpy.data.fonts.get("DejaVu Sans Mono Book")
+        if not font:
+            font_path = os.path.join(bpy.utils.system_resource('DATAFILES'), "fonts", "DejaVuSansMono.woff2")
+            if os.path.isfile(font_path):
+                font = bpy.data.fonts.load(font_path)
+
         data = bpy.data.curves.new(name="2dfx_road_sign", type='FONT')
         data.body = body
         data.align_x = data.align_y = 'CENTER'
         data.size = 0.5
+
+        if font:
+            data.font = font
 
         settings = data.ext_2dfx
         settings.size = entry.size
