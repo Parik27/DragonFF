@@ -148,7 +148,8 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
         if len(lil_groups) > 1:
             # Create a face groups attribute for the mesh if there isn't one already
             if not mesh.attributes.get("face group"):
-                mesh.attributes.new(name="face group", type="INT", domain="FACE")
+                attribute_domain = "POLYGON" if (2, 93, 0) > bpy.app.version else "FACE"
+                mesh.attributes.new(name="face group", type="INT", domain=attribute_domain)
 
             # Sort the face list by face group index
             bm = bmesh.new()
