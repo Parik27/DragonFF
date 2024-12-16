@@ -34,6 +34,7 @@ bl_info = {
 # Class list to register
 _classes = [
     gui.IMPORT_OT_dff,
+    gui.IMPORT_OT_txd,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
     gui.SCENE_OT_dff_frame_move,
@@ -50,6 +51,7 @@ _classes = [
     gui.DFFObjectProps,
     gui.DFFCollectionProps,
     gui.MapImportPanel,
+    gui.TXDImportPanel,
     gui.DFFFrameProps,
     gui.DFFAtomicProps,
     gui.DFFSceneProps,
@@ -62,6 +64,13 @@ _classes = [
     gui.SCENE_PT_dffAtomics,
     map_importer.Map_Import_Operator
 ]
+
+_draw_3d_handler = None
+
+#######################################################
+def draw_3d_callback():
+    gui.DFFSceneProps.draw_fg()
+
 #######################################################
 def register():
 
@@ -69,10 +78,10 @@ def register():
     for cls in _classes:
         register_class(cls)
 
-    if (2, 80, 0) > bpy.app.version:        
+    if (2, 80, 0) > bpy.app.version:
         bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
         bpy.types.INFO_MT_file_export.append(gui.export_dff_func)
-        
+
     else:
         bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
         bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
@@ -80,7 +89,9 @@ def register():
         bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
         bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
         bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
-        bpy.types.SpaceView3D.draw_handler_add(gui.DFFSceneProps.draw_fg, (), 'WINDOW', 'POST_VIEW')
+
+        global _draw_3d_handler
+        _draw_3d_handler = bpy.types.SpaceView3D.draw_handler_add(draw_3d_callback, (), 'WINDOW', 'POST_VIEW')
 
     gui.State.hook_events()
 
@@ -99,8 +110,10 @@ def unregister():
         bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
         bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
 
+        bpy.types.SpaceView3D.draw_handler_remove(_draw_3d_handler, 'WINDOW')
+
     gui.State.unhook_events()
 
     # Unregister all the classes
     for cls in _classes:
-        unregister_class(cls)      
+        unregister_class(cls)

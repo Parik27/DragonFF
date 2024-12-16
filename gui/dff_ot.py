@@ -3,7 +3,7 @@ import os
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 import time
 
-from ..ops import dff_exporter, dff_importer, col_importer
+from ..ops import dff_exporter, dff_importer, col_importer, txd_importer
 from ..ops.state import State
 
 #######################################################
@@ -396,12 +396,107 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     context.scene['dragonff_custom_version'] = "{}.{}.{}.{}".format(
                         *(version[i] for i in [2,3,4,6])
                     ) #convert hex to x.x.x.x format
-                
+
         return {'FINISHED'}
 
     #######################################################
     def invoke(self, context, event):
-        
+
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+#######################################################
+class IMPORT_OT_txd(bpy.types.Operator, ImportHelper):
+
+    bl_idname      = "import_scene.txd"
+    bl_description = 'Import a Renderware TXD File'
+    bl_label       = "Import TXD (.txd)"
+
+    filter_glob   : bpy.props.StringProperty(default="*.txd",
+                                              options={'HIDDEN'})
+
+    directory     : bpy.props.StringProperty(maxlen=1024,
+                                              default="",
+                                              subtype='FILE_PATH',
+                                              options={'HIDDEN'})
+
+    # Stores all the file names to read (not just the firsst)
+    files : bpy.props.CollectionProperty(
+        type    = bpy.types.OperatorFileListElement,
+        options = {'HIDDEN'}
+    )
+
+    # Stores a single file path
+    filepath : bpy.props.StringProperty(
+         name        = "File Path",
+         description = "Filepath used for importing the TXD file",
+         maxlen      = 1024,
+         default     = "",
+         options     = {'HIDDEN'}
+     )
+
+    skip_mipmaps :  bpy.props.BoolProperty(
+        name        = "Skip Mipmaps",
+        default     = True
+    )
+
+    pack : bpy.props.BoolProperty(
+        name        = "Pack Images",
+        description = "Pack images as embedded data into the .blend file",
+        default     = True
+    )
+
+    apply_to_objects : bpy.props.BoolProperty(
+        name        = "Apply To Objects",
+        description = "Apply to objects with missing textures in the scene",
+        default     = True
+    )
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "skip_mipmaps")
+        layout.prop(self, "pack")
+        layout.prop(self, "apply_to_objects")
+
+    #######################################################
+    def execute(self, context):
+
+        for file in [os.path.join(self.directory, file.name) for file in self.files] if self.files else [self.filepath]:
+
+            txd_images = txd_importer.import_txd(
+                {
+                    'file_name'      : file,
+                    'skip_mipmaps'   : self.skip_mipmaps,
+                    'pack'           : self.pack
+                }
+            ).images
+
+            if self.apply_to_objects:
+                for obj in context.scene.objects:
+                    for mat_slot in obj.material_slots:
+                        mat = mat_slot.material
+                        if not mat:
+                            continue
+
+                        node_tree = mat.node_tree
+                        if not node_tree:
+                            continue
+
+                        for node in node_tree.nodes:
+                            if node.type != 'TEX_IMAGE':
+                                continue
+
+                            txd_img = txd_images.get(node.label)
+                            if txd_img and (not node.image or not node.image.pixels):
+                                node.image = txd_img[0]
+
+        return {'FINISHED'}
+
+    #######################################################
+    def invoke(self, context, event):
+
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 

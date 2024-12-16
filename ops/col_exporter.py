@@ -299,12 +299,13 @@ def export_col(options):
     else:
         root_collections = [col_exporter.collection]
 
+    exported_collections = []
     for root_collection in root_collections:
-        collections = root_collection.children.values() + [root_collection]
-
-        for collection in collections:
-            name = get_col_collection_name(collection, root_collection)
-            output += col_exporter.export_col(collection, name)
+        for c in root_collection.children.values() + [root_collection]:
+            if c not in exported_collections:
+                name = get_col_collection_name(c, root_collection)
+                output += col_exporter.export_col(c, name)
+                exported_collections.append(c)
 
     if file_name:
         with open(file_name, mode='wb') as file:
