@@ -2318,7 +2318,11 @@ class dff:
     #######################################################
     def read_clump(self, root_chunk):
         chunk = self.read_chunk()
-        root_end = self.pos + root_chunk.size
+
+        if root_chunk.size > 0:
+            root_end = self.pos + root_chunk.size
+        else:
+            root_end = len(self.data)
 
         # STRUCT
         if chunk.type == types["Struct"]:  
