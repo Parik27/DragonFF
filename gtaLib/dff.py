@@ -643,7 +643,8 @@ class Frame:
         'creation_flags',
         'name',
         'bone_data',
-        'user_data'
+        'user_data',
+        'animation_data'
     ]
     
     ##################################################################
@@ -655,6 +656,7 @@ class Frame:
         self.name            = None
         self.bone_data       = None
         self.user_data       = None
+        self.animation_data  = None
 
     ##################################################################
     def from_mem(data):
@@ -739,6 +741,28 @@ class HAnimPLG:
             data += Sections.write(Bone, bone)
 
         return Sections.write_chunk(data, types["HAnim PLG"])
+
+#######################################################
+# TODO: AnimationPLG data
+class AnimationPLG:
+
+    __slots__ = [
+        'id'
+    ]
+
+    #######################################################
+    def __init__(self):
+        self.id = -1
+
+    #######################################################
+    def from_mem(data):
+
+        self = AnimationPLG()
+
+        _data = unpack_from("<iI", data)
+        self.id, num = _data
+
+        return self
 
 #######################################################
 class UVAnim:
@@ -887,9 +911,57 @@ class SkinPLG:
 
     ##################################################################
     @staticmethod
-    def from_mem(data, geometry):
+    def from_mem(data, geometry, frame=None):
 
         self = SkinPLG()
+
+        # legacy Skin PLG
+        if frame:
+            _data = unpack_from("<2I", data)
+            self.num_bones, vertices_count = _data
+            self.max_weights_per_vertex = 4
+
+            # Read vertex bone indices
+            pos = 8
+            _data = unpack_from("<%dB" % (vertices_count * 4), data, pos)
+            self.vertex_bone_indices = list(
+                _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
+            )
+            pos += vertices_count * 4
+
+            # Read vertex bone weights
+            _data = unpack_from("<%df" % (vertices_count * 4), data, pos)
+            self.vertex_bone_weights = list(
+                _data[i : i+4] for i in range(0, 4 * vertices_count, 4)
+            )
+            pos += vertices_count * 4 * 4 #floats have size 4 bytes
+
+            bone_data = HAnimPLG()
+            bone_data.header = HAnimHeader(None, 0, self.num_bones)
+
+            # Read bones
+            for _ in range(self.num_bones):
+                _data = unpack_from(Sections.formats[Bone], data, pos)
+                bone = Bone(_data[0], _data[1], _data[2] & 3)
+                bone_data.bones.append(bone)
+                pos += 12
+
+                _data = list(unpack_from("<16f", data, pos))
+                _data[ 3] = 0.0
+                _data[ 7] = 0.0
+                _data[11] = 0.0
+                _data[15] = 1.0
+
+                self.bone_matrices.append(
+                    [_data[0:4], _data[4:8], _data[8:12],
+                    _data[12:16]]
+                )
+
+                pos += 64
+
+            frame.bone_data = bone_data
+
+            return self
 
         if geometry.flags & rpGEOMETRYNATIVE == 0:
             _data = unpack_from("<3Bx", data)
@@ -1782,6 +1854,7 @@ class dff:
                 name = None
                 bone_data = None
                 user_data = None
+                animation_data = None
 
                 if chunk.type == types["Frame"]:
                     name = self.raw(strlen(self.data,self.pos)).decode("utf-8")
@@ -1791,6 +1864,9 @@ class dff:
 
                 elif chunk.type == types["User Data PLG"]:
                     user_data = UserData.from_mem(self.raw(chunk.size))
+
+                elif chunk.type == types["Animation PLG"]:
+                    animation_data = AnimationPLG.from_mem(self.data[self.pos:])
 
                 self._read(chunk.size)
                 if name is not None:
@@ -1803,6 +1879,8 @@ class dff:
                         if section.name == "name\0":
                             self.frame_list[i].name = section.data[0]
                             break
+                if animation_data is not None:
+                    self.frame_list[i].animation_data = animation_data
 
             if self.frame_list[i].name is None:
                 self.frame_list[i].name = "unnamed"
@@ -2303,6 +2381,23 @@ class dff:
                     elif chunk.type == types["Pipeline Set"]:
                         pipeline = unpack_from("<I", self.data, self._read(chunk.size))[0]
                         atomic.extensions["pipeline"] = pipeline
+
+                    # legacy Skin PLG
+                    elif chunk.type == types["Skin PLG"]:
+                        frame = self.frame_list[atomic.frame]
+                        geometry = self.geometry_list[atomic.geometry]
+
+                        skin = SkinPLG.from_mem(self.data[self.pos:], geometry, frame)
+                        geometry.extensions["skin"] = skin
+
+                        bone_frames = self.frame_list[atomic.frame + 1:]
+                        for bone in frame.bone_data.bones[1:]:
+                            for frame in bone_frames:
+                                if frame.animation_data and frame.animation_data.id == bone.id:
+                                    frame.bone_data = HAnimPLG()
+                                    frame.bone_data.header = HAnimHeader(None, bone.id, 0)
+
+                        self._read(chunk.size)
 
                     else:
                         self._read(chunk.size)
