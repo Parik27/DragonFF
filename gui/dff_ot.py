@@ -303,7 +303,8 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
             ("TGA", ".TGA", "Load a TGA image"),
             ("BMP", ".BMP", "Load a BMP image"),
             ("TIF", ".TIF", "Load a TIF image"),
-            ("TIFF", ".TIFF", "Load a TIFF image")
+            ("TIFF", ".TIFF", "Load a TIFF image"),
+            ("DDS", ".DDS", "Load a DDS image")
         ),
         name        = "Extension",
         description = "Image extension to search textures in"
