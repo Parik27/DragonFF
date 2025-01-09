@@ -99,7 +99,7 @@ class Map_Import_Operator(bpy.types.Operator):
                     new_objects[obj].parent = new_objects[obj.parent]
 
             # Position root object
-            for obj in new_objects:
+            for obj in new_objects.values():
                 if not obj.parent:
                     Map_Import_Operator.apply_transformation_to_object(
                         obj, inst
