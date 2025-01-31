@@ -207,8 +207,9 @@ class col_importer:
             )            
 
             # Store the import bounds as a custom property of the collection
-            collection['bounds min'] = model.bounds.min
-            collection['bounds max'] = model.bounds.max
+            collection.dff.auto_bounds = False
+            collection.dff.bounds_min = model.bounds.min
+            collection.dff.bounds_max = model.bounds.max
 
             self.__add_spheres(collection, model.spheres)
             self.__add_boxes(collection, model.boxes)

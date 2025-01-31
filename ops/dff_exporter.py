@@ -1146,14 +1146,10 @@ class dff_exporter:
         objects = {}
 
         # Export collections
-        if bpy.app.version < (2, 80, 0):
-            collections = [bpy.data]
-
+        if self.from_outliner:
+            collections = [bpy.context.view_layer.objects.active.users_collection[0]]
         else:
-            if self.from_outliner:
-                collections = [bpy.context.view_layer.objects.active.users_collection[0]]
-            else:
-                collections = [c for c in bpy.data.collections] + [bpy.context.scene.collection]
+            collections = [c for c in bpy.data.collections if c.dff.type != 'NON'] + [bpy.context.scene.collection]
 
         for collection in collections:
             for obj in collection.objects:

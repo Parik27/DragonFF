@@ -166,8 +166,9 @@ class dff_importer:
                             bm.verts[f.c]
                         ])
 
-                    face.material_index = mat_indices[f.material]
-                    
+                    if len(mat_indices) > 0:
+                        face.material_index = mat_indices[f.material]
+
                     # Setting UV coordinates
                     for loop in face.loops:
                         if use_face_loops:

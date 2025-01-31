@@ -124,6 +124,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default=False
     )
 
+    draw_bounds: bpy.props.BoolProperty(
+        name="Draw Bounds",
+        description = "Display the bounds of the active collection in the viewport",
+        default = False
+    )
+
     face_group_min : bpy.props.IntProperty(
         name = 'Face Group Minimum Size',
         description="Don't generate groups below this size",
