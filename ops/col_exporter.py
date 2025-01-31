@@ -28,6 +28,7 @@ class col_exporter:
     filename = "" # Whether it will return a bytes file (not write to a file), if no file name is specified
     version = None
     only_selected = False
+    native_bounds = False
 
     #######################################################
     def _process_mesh(obj, verts, faces, face_groups=None):
@@ -107,12 +108,15 @@ class col_exporter:
 
     #######################################################
     def _update_bounds(obj):
+        self = col_exporter
+
+        # Don't calculate for native bounds
+        if self.native_bounds:
+            return
 
         # Don't include shadow meshes in bounds calculations
         if obj.dff.type == 'SHA':
             return
-
-        self = col_exporter
 
         if self.coll.bounds is None:
             self.coll.bounds = [
@@ -248,13 +252,14 @@ class col_exporter:
         self.coll = col.ColModel()
         self.coll.version = self.version
         self.coll.model_name = os.path.basename(name)
+        self.native_bounds = not collection.dff.auto_bounds
 
         bounds_found = False
 
-        # Get original import bounds from collection (some collisions come in as just bounds with no other items)
-        if collection.get('bounds min') and collection.get('bounds max'):
+        # Get native bounds from collection (some collisions come in as just bounds with no other items)
+        if self.native_bounds:
             bounds_found = True
-            self.coll.bounds = [collection['bounds min'], collection['bounds max']]
+            self.coll.bounds = [collection.dff.bounds_min, collection.dff.bounds_max]
 
         total_objects = 0
         for obj in collection.objects:
@@ -301,7 +306,13 @@ def export_col(options):
 
     exported_collections = []
     for root_collection in root_collections:
+        if root_collection.dff.type == 'NON':
+            continue
+
         for c in root_collection.children.values() + [root_collection]:
+            if c.dff.type == 'NON':
+                continue
+
             if c not in exported_collections:
                 name = get_col_collection_name(c, root_collection)
                 output += col_exporter.export_col(c, name)

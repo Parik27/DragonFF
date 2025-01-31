@@ -46,8 +46,10 @@ _classes = [
     gui.OBJECT_OT_facegoups_col,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
+    gui.OBJECT_PT_dffCollections,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
+    gui.DFFCollectionProps,
     gui.MapImportPanel,
     gui.TXDImportPanel,
     gui.DFFFrameProps,
@@ -68,6 +70,7 @@ _draw_3d_handler = None
 #######################################################
 def draw_3d_callback():
     gui.DFFSceneProps.draw_fg()
+    gui.DFFCollectionProps.draw_bounds()
 
 #######################################################
 def register():
