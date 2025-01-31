@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from struct import unpack_from, calcsize, pack
+from struct import error as StructError
 from collections import namedtuple
 from .dff import strlen
 
@@ -305,7 +306,10 @@ class coll:
                                        "model_id"
                                    ]
         )
-        header = header_format._make(self.__read_struct("4sI22sH"))
+        try:
+            header = header_format._make(self.__read_struct("4sI22sH"))
+        except StructError:
+            raise RuntimeError("Unexpected EOF")
 
         magic_number = header.magic_number.decode("ascii")
 

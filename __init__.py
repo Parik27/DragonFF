@@ -70,6 +70,7 @@ _draw_3d_handler = None
 #######################################################
 def draw_3d_callback():
     gui.DFFSceneProps.draw_fg()
+    gui.DFFCollectionProps.draw_bounds()
 
 #######################################################
 def register():
