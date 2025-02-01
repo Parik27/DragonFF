@@ -419,11 +419,18 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 #######################################################
 class OBJECT_PT_dffCollections(bpy.types.Panel):
 
-    bl_idname      = "OBJECT_PT_dffCollections"
-    bl_label       = "DragonFF - Export Collection"
-    bl_space_type  = "PROPERTIES"
-    bl_region_type = "WINDOW"
-    bl_context     = "collection"
+    bl_idname = "OBJECT_PT_dffCollections"
+    bl_label  = "DragonFF - Export Collection"
+
+    # Collections Properties panel was introduced in Blender 3.0
+    if (3, 0, 0) > bpy.app.version:
+        bl_space_type  = "VIEW_3D"
+        bl_region_type = "UI"
+        bl_category    = "DragonFF"
+    else:
+        bl_space_type  = "PROPERTIES"
+        bl_region_type = "WINDOW"
+        bl_context     = "collection"
 
     #######################################################
     def draw_labelled_prop(self, row, settings, props, label, text=""):
@@ -712,9 +719,14 @@ class DFFCollectionProps(bpy.types.PropertyGroup):
                 (bounds_max[0], bounds_max[1], bounds_max[2]),
             )
 
-            shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+            if (4, 0, 0) > bpy.app.version:
+                shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+            else:
+                shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+
             batch = batch_for_shader(shader, 'LINES', {"pos": coords}, indices=box_indices)
 
+            shader.bind()
             shader.uniform_float("color", (0.84, 0.84, 0.54, 1))
             batch.draw(shader)
 
