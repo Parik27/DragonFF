@@ -28,7 +28,6 @@ class col_exporter:
     filename = "" # Whether it will return a bytes file (not write to a file), if no file name is specified
     version = None
     only_selected = False
-    native_bounds = False
 
     #######################################################
     def _process_mesh(obj, verts, faces, face_groups=None):
@@ -107,50 +106,6 @@ class col_exporter:
                 ))
 
     #######################################################
-    def _update_bounds(obj):
-        self = col_exporter
-
-        # Don't calculate for native bounds
-        if self.native_bounds:
-            return
-
-        # Don't include shadow meshes in bounds calculations
-        if obj.dff.type == 'SHA':
-            return
-
-        if self.coll.bounds is None:
-            self.coll.bounds = [
-                [-math.inf] * 3,
-                [math.inf] * 3
-            ]
-
-        dimensions = obj.dimensions
-        center = obj.location
-            
-        # Empties don't have a dimensions array
-        if obj.type == 'EMPTY':
-
-            if obj.empty_display_type == 'SPHERE':
-                # Multiplied by 2 because empty_display_size is a radius
-                dimensions = [
-                    max(x * obj.empty_display_size * 2 for x in obj.scale)] * 3
-            else:
-                dimensions = obj.scale
-
-        # And Meshes require their proper center to be calculated because their transform is identity
-        else:
-            local_center = sum((mathutils.Vector(b) for b in obj.bound_box), mathutils.Vector()) / 8.0
-            center = obj.matrix_world @ local_center
-
-        upper_bounds = [x + (y/2) for x, y in zip(center, dimensions)]
-        lower_bounds = [x - (y/2) for x, y in zip(center, dimensions)]
-
-        self.coll.bounds = [
-            [max(x, y) for x,y in zip(self.coll.bounds[0], upper_bounds)],
-            [min(x, y) for x,y in zip(self.coll.bounds[1], lower_bounds)]
-        ]
-
-    #######################################################
     def _convert_bounds():
         self = col_exporter
 
@@ -160,21 +115,18 @@ class col_exporter:
         rect_max = [0, 0, 0]
 
         if self.coll.bounds is not None:
-            rect_min = self.coll.bounds[0]
-            rect_max = self.coll.bounds[1]
+            rect_max, rect_min = self.coll.bounds
             center = [(x + y) / 2 for x, y in zip(*self.coll.bounds)]
             radius = (
-                mathutils.Vector(rect_min) - mathutils.Vector(rect_max)
+                mathutils.Vector(rect_max) - mathutils.Vector(rect_min)
             ).magnitude / 2
 
-        self.coll.bounds = col.TBounds(max = col.TVector(*rect_min),
-                                       min = col.TVector(*rect_max),
+        self.coll.bounds = col.TBounds(max = col.TVector(*rect_max),
+                                       min = col.TVector(*rect_min),
                                        center = col.TVector(*center),
                                        radius = radius
-        )   
-        
-        pass
-        
+        )
+
     #######################################################
     def _process_spheres(obj):
         self = col_exporter
@@ -241,8 +193,6 @@ class col_exporter:
             else:
                 self._process_boxes(obj)
 
-        self._update_bounds(obj)
-
     #######################################################
     def export_col(collection, name):
         self = col_exporter
@@ -252,26 +202,30 @@ class col_exporter:
         self.coll = col.ColModel()
         self.coll.version = self.version
         self.coll.model_name = os.path.basename(name)
-        self.native_bounds = not collection.dff.auto_bounds
-
-        bounds_found = False
-
-        # Get native bounds from collection (some collisions come in as just bounds with no other items)
-        if self.native_bounds:
-            bounds_found = True
-            self.coll.bounds = [collection.dff.bounds_min, collection.dff.bounds_max]
 
         total_objects = 0
+        bounds_objects = []
         for obj in collection.objects:
+            if self.only_selected and not obj.select_get():
+                continue
+
             if obj.dff.type == 'COL' or obj.dff.type == 'SHA':
-                if not self.only_selected or obj.select_get():
-                    self._process_obj(obj)
-                    total_objects += 1
+                self._process_obj(obj)
+                total_objects += 1
+
+            if obj.dff.type == 'COL':
+                bounds_objects.append(obj)
+
+        if total_objects == 0 and (col_exporter.only_selected or collection.dff.auto_bounds):
+            return b''
+
+        # Get native bounds from collection (some collisions come in as just bounds with no other items)
+        if collection.dff.auto_bounds:
+            self.coll.bounds = calculate_bounds(bounds_objects)
+        else:
+            self.coll.bounds = [collection.dff.bounds_max, collection.dff.bounds_min]
 
         self._convert_bounds()
-
-        if total_objects == 0 and (col_exporter.only_selected or not bounds_found):
-            return b''
 
         return col.coll(self.coll).write_memory()
 
@@ -287,6 +241,45 @@ def get_col_collection_name(collection, parent_collection=None):
             name = name[len(prefix):]
 
     return name
+
+#######################################################
+def calculate_bounds(objects):
+    if not objects:
+        return [[0, 0, 0], [0, 0, 0]]
+
+    bounds = [
+        [-math.inf] * 3,
+        [math.inf] * 3
+    ]
+
+    for obj in objects:
+        dimensions = obj.dimensions
+        center = obj.location
+
+        # Empties don't have a dimensions array
+        if obj.type == 'EMPTY':
+
+            if obj.empty_display_type == 'SPHERE':
+                # Multiplied by 2 because empty_display_size is a radius
+                dimensions = [
+                    max(x * obj.empty_display_size * 2 for x in obj.scale)] * 3
+            else:
+                dimensions = obj.scale
+
+        # And Meshes require their proper center to be calculated because their transform is identity
+        else:
+            local_center = sum((mathutils.Vector(b) for b in obj.bound_box), mathutils.Vector()) / 8.0
+            center = obj.matrix_world @ local_center
+
+        upper_bounds = [x + (y/2) for x, y in zip(center, dimensions)]
+        lower_bounds = [x - (y/2) for x, y in zip(center, dimensions)]
+
+        bounds = [
+            [max(x, y) for x,y in zip(bounds[0], upper_bounds)],
+            [min(x, y) for x,y in zip(bounds[1], lower_bounds)]
+        ]
+
+    return bounds
 
 #######################################################
 def export_col(options):
