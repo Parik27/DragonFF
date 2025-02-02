@@ -111,16 +111,17 @@ class Map_Import_Operator(bpy.types.Operator):
                     'file_name'      : "%s/%s.dff" % (
                         self.settings.dff_folder, model
                     ),
-                    'load_txd'       : self.settings.load_txd,
-                    'txd_filename'   : "%s.txd" % txd,
-                    'skip_mipmaps'   : True,
-                    'txd_pack'       : False,
-                    'image_ext'      : 'PNG',
-                    'connect_bones'  : False,
-                    'use_mat_split'  : self.settings.read_mat_split,
-                    'remove_doubles' : True,
-                    'group_materials': True,
-                    'import_normals' : True
+                    'load_txd'         : self.settings.load_txd,
+                    'txd_filename'     : "%s.txd" % txd,
+                    'skip_mipmaps'     : True,
+                    'txd_pack'         : False,
+                    'image_ext'        : 'PNG',
+                    'connect_bones'    : False,
+                    'use_mat_split'    : self.settings.read_mat_split,
+                    'remove_doubles'   : True,
+                    'group_materials'  : True,
+                    'import_normals'   : True,
+                    "materials_naming" : "DEF",
                 }
             )
 
