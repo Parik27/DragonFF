@@ -289,6 +289,16 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         default     = True
     )
 
+    materials_naming :  bpy.props.EnumProperty(
+        items =
+        (
+            ("DEF", "Default", "Use the object name and material properties"),
+            ("TEX", "Texture", "Use the name of the first texture")
+        ),
+        name        = "Materials Naming",
+        description = "How to name materials"
+    )
+
     import_normals  :  bpy.props.BoolProperty(
         name        = "Import Custom Normals",
         default     = False
@@ -332,6 +342,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         layout.prop(self, "remove_doubles")
         layout.prop(self, "import_normals")
         layout.prop(self, "group_materials")
+        layout.prop(self, "materials_naming")
         
     #######################################################
     def execute(self, context):
@@ -354,17 +365,18 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     
                 importer = dff_importer.import_dff(
                     {
-                        'file_name'      : file,
-                        'load_txd'       : self.load_txd,
-                        'txd_filename'   : self.txd_filename,
-                        'skip_mipmaps'   : self.skip_mipmaps,
-                        'txd_pack'       : self.txd_pack,
-                        'image_ext'      : image_ext,
-                        'connect_bones'  : self.connect_bones,
-                        'use_mat_split'  : self.read_mat_split,
-                        'remove_doubles' : self.remove_doubles,
-                        'group_materials': self.group_materials,
-                        'import_normals' : self.import_normals
+                        'file_name'        : file,
+                        'load_txd'         : self.load_txd,
+                        'txd_filename'     : self.txd_filename,
+                        'skip_mipmaps'     : self.skip_mipmaps,
+                        'txd_pack'         : self.txd_pack,
+                        'image_ext'        : image_ext,
+                        'connect_bones'    : self.connect_bones,
+                        'use_mat_split'    : self.read_mat_split,
+                        'remove_doubles'   : self.remove_doubles,
+                        'group_materials'  : self.group_materials,
+                        'import_normals'   : self.import_normals,
+                        'materials_naming' : self.materials_naming,
                     }
                 )
 

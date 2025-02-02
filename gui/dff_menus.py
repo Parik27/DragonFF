@@ -6,7 +6,7 @@ from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
     OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
-from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col
+from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col, COLLECTION_OT_dff_generate_bounds
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 
 texture_filters_items = (
@@ -455,6 +455,7 @@ class OBJECT_PT_dffCollections(bpy.types.Panel):
             box.prop(context.scene.dff, "draw_bounds", text="Display Bounds")
             box.prop(settings, "bounds_min", text="Min")
             box.prop(settings, "bounds_max", text="Max")
+            box.operator(COLLECTION_OT_dff_generate_bounds.bl_idname, text="Generate")
 
     #######################################################
     def draw(self, context):

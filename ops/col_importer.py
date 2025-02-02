@@ -207,7 +207,6 @@ class col_importer:
             )            
 
             # Store the import bounds as a custom property of the collection
-            collection.dff.auto_bounds = False
             collection.dff.bounds_min = model.bounds.min
             collection.dff.bounds_max = model.bounds.max
 
@@ -228,7 +227,9 @@ class col_importer:
                                 model.shadow_faces,
                                 None,
                                 True)
-                        
+
+            collection.dff.auto_bounds = len(collection.objects) > 0
+
             collection_list.append(collection)
 
         return collection_list
