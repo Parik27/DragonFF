@@ -47,6 +47,7 @@ _classes = [
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
+    gui.COLLECTION_OT_dff_generate_bounds,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
     gui.DFFCollectionProps,

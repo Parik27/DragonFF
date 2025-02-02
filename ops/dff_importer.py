@@ -72,6 +72,7 @@ class dff_importer:
     skip_mipmaps       = True
     txd_pack           = True
     image_ext          = "png"
+    materials_naming   = "DEF"
     use_bone_connect   = False
     current_collection = None
     use_mat_split      = False
@@ -323,6 +324,7 @@ class dff_importer:
     ##################################################################
     def generate_material_name(material, fallback):
 
+        self = dff_importer
         name = None
         
         patterns = {
@@ -333,6 +335,9 @@ class dff_importer:
 
         if material.is_textured:
             texture = material.textures[0].name
+
+            if texture and self.materials_naming == "TEX":
+                return texture
 
             for pattern in patterns:
                 if pattern in texture:
@@ -1012,6 +1017,7 @@ def import_dff(options):
     dff_importer.remove_doubles   = options['remove_doubles']
     dff_importer.group_materials  = options['group_materials']
     dff_importer.import_normals   = options['import_normals']
+    dff_importer.materials_naming = options['materials_naming']
     dff_importer.clumps_to_dm     = options['clumps_to_dm']
 
     dff_importer.import_dff(options['file_name'])

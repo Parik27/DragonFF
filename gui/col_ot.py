@@ -184,3 +184,28 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
                 area.tag_redraw()
 
         return {'FINISHED'}
+
+#######################################################
+class COLLECTION_OT_dff_generate_bounds(bpy.types.Operator):
+
+    bl_idname           = "collection.dff_generate_bounds"
+    bl_description      = "Generate bounds for active collection"
+    bl_label            = "Generate Bounds"
+
+    #######################################################
+    def execute(self, context):
+        collection = context.collection
+
+        if not collection:
+            return {'CANCELLED'}
+
+        bounds_objects = [obj for obj in collection.objects if obj.dff.type == 'COL']
+        bounds = col_exporter.calculate_bounds(bounds_objects)
+        collection.dff.bounds_max, collection.dff.bounds_min = bounds
+
+        if context.scene.dff.draw_bounds:
+            for area in context.window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
+
+        return {'FINISHED'}
