@@ -130,6 +130,27 @@ class ext_2dfx_importer:
         return obj
 
     #######################################################
+    def import_enter_exit(self, entry):
+        obj = bpy.data.objects.new("2dfx_enter_exit", None)
+
+        settings = obj.dff.ext_2dfx
+        settings.val_degree_1 = math.degrees(entry.enter_angle)
+        settings.val_float_1 = entry.approximation_radius_x
+        settings.val_float_2 = entry.approximation_radius_y
+        settings.val_vector_1 = entry.exit_location
+        settings.val_degree_2 = entry.exit_angle
+        settings.val_short_1 = entry.interior
+        settings.val_byte_1 = entry._flags1
+        settings.val_byte_2 = entry.sky_color
+        settings.val_str8_1 = entry.interior_name
+        settings.val_hour_1 = entry.time_on
+        settings.val_hour_2 = entry.time_off
+        settings.val_byte_3 = entry._flags2
+        settings.val_byte_4 = entry.unk
+
+        return obj
+
+    #######################################################
     def import_road_sign(self, entry):
         lines_num = {0:4, 1:1, 2:2, 3:3}[entry.flags & 0b11]
         max_chars_num = {0:16, 1:2, 2:4, 3:8}[(entry.flags >> 2) & 0b11]
@@ -200,6 +221,7 @@ class ext_2dfx_importer:
             0: self.import_light,
             1: self.import_particle,
             4: self.import_sun_glare,
+            6: self.import_enter_exit,
             7: self.import_road_sign,
             8: self.import_trigger_point,
             9: self.import_cover_point,

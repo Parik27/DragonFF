@@ -1138,7 +1138,7 @@ class Light2dfx:
 
         self.coronaTexName = self.coronaTexName.decode('ascii')
         self.shadowTexName = self.shadowTexName.decode('ascii')
-            
+
         return self
 
     #######################################################
@@ -1195,9 +1195,10 @@ class Particle2dfx:
     #######################################################
     @staticmethod
     def from_mem(loc, data, offset, size):
+        effect = unpack_from("<24s", data, offset)[0]
 
         self = Particle2dfx(loc)
-        self.effect = unpack_from("<24s", data, offset)[0].decode('ascii')
+        self.effect = effect[:strlen(effect)].decode('ascii')
         return self
 
     #######################################################
@@ -1272,6 +1273,93 @@ class SunGlare2dfx:
     #######################################################
     def to_mem(self):
         return b''
+
+#######################################################
+class EnterExit2dfx:
+
+    #######################################################
+    class Flags1(Enum):
+        UNKNOWN_INTERIOR = 1
+        UNKNOWN_PAIRING = 2
+        CREATE_LINKED_PAIRING = 4
+        REWARD_INTERIOR = 8
+        USED_REWARD_ENTRANCE = 16
+        CARS_AND_AIRCRAFT = 32
+        BIKES_AND_MOTORCYCLES = 64
+        DISABLE_ON_FOOT = 128
+
+    #######################################################
+    class Flags2(Enum):
+        ACCEPT_NPC_GROUP = 1
+        FOOD_DATE_FLAG = 2
+        UNKNOWN_BURGLARY = 4
+        DISABLE_EXIT = 8
+        BURGLARY_ACCESS = 16
+        ENTERED_WITHOUT_EXIT = 32
+        ENABLE_ACCESS = 64
+        DELETE_ENEX = 128
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 6
+        self.enter_angle = 0
+        self.approximation_radius_x = 0
+        self.approximation_radius_y = 0
+        self.exit_location = [0, 0, 0]
+        self.exit_angle = 0
+        self.interior = 0
+        self._flags1 = 0
+        self.sky_color = 0
+        self.interior_name = ""
+        self.time_on = 0
+        self.time_off = 0
+        self._flags2 = 0
+        self.unk = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = EnterExit2dfx(loc)
+
+        self.enter_angle, self.approximation_radius_x, \
+        self.approximation_radius_y = unpack_from("<fff", data, offset)
+
+        self.exit_location = Sections.read(Vector, data, offset + 12)
+
+        self.exit_angle, self.interior, \
+        self._flags1, self.sky_color, \
+        interior_name = unpack_from("<fHBB8s", data, offset + 24)
+
+        self.time_on, self.time_off ,\
+        self._flags2, self.unk = unpack_from("<4B", data, offset + 40)
+
+        self.interior_name = interior_name[:strlen(interior_name)].decode('ascii')
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = pack(
+            "<fff",
+            self.enter_angle,
+            self.approximation_radius_x,
+            self.approximation_radius_y
+        )
+        data += Sections.write(Vector, self.exit_location)
+        data += pack(
+            "<fHBB8s4B",
+            self.exit_angle,
+            self.interior,
+            self._flags1,
+            self.sky_color,
+            self.interior_name.encode(),
+            self.time_on, self.time_off,
+            self._flags2, self.unk
+        )
+
+        return data
 
 #######################################################
 class RoadSign2dfx:
@@ -1400,6 +1488,7 @@ class Extension2dfx:
                 1: Particle2dfx,
                 3: PedAttractor2dfx,
                 4: SunGlare2dfx,
+                6: EnterExit2dfx,
                 7: RoadSign2dfx,
                 8: TriggerPoint2dfx,
                 9: CoverPoint2dfx,

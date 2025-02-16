@@ -108,6 +108,27 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
+    def export_enter_exit(self, obj):
+        settings = obj.dff.ext_2dfx
+
+        entry = dff.EnterExit2dfx(obj.location)
+        entry.enter_angle = math.radians(settings.val_degree_1)
+        entry.approximation_radius_x = settings.val_float_1
+        entry.approximation_radius_y = settings.val_float_2
+        entry.exit_location = settings.val_vector_1
+        entry.exit_angle = settings.val_degree_2
+        entry.interior = settings.val_short_1
+        entry._flags1 = settings.val_byte_1
+        entry.sky_color = settings.val_byte_2
+        entry.interior_name = settings.val_str8_1
+        entry.time_on = settings.val_hour_1
+        entry.time_off = settings.val_hour_2
+        entry._flags2 = settings.val_byte_3
+        entry.unk = settings.val_byte_4
+
+        return entry
+
+    #######################################################
     def export_road_sign(self, obj):
         if obj.type != 'FONT':
             return
@@ -191,6 +212,7 @@ class ext_2dfx_exporter:
             0: self.export_light,
             1: self.export_particle,
             4: self.export_sun_glare,
+            6: self.export_enter_exit,
             7: self.export_road_sign,
             8: self.export_trigger_point,
             9: self.export_cover_point,

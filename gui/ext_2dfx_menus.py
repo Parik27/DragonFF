@@ -48,22 +48,51 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
             ('0', 'Light', 'Light'),
             ('1', 'Particle', 'Particle'),
             ('4', 'Sun Glare', 'Sun Glare'),
+            ('6', 'Enter Exit', 'Enter Exit'),
             ('7', 'Road Sign', 'Road Sign'),
             ('8', 'Trigger Point', 'Trigger Point'),
             ('9', 'Cover Point', 'Cover Point'),
         )
     )
 
+    val_byte_1 : bpy.props.IntProperty(min = 0, max = 255)
+    val_byte_2 : bpy.props.IntProperty(min = 0, max = 255)
+    val_byte_3 : bpy.props.IntProperty(min = 0, max = 255)
+    val_byte_4 : bpy.props.IntProperty(min = 0, max = 255)
+
+    val_short_1 : bpy.props.IntProperty(min = 0, max = 65535)
+
     val_int_1 : bpy.props.IntProperty()
 
+    val_float_1 : bpy.props.FloatProperty()
+    val_float_2 : bpy.props.FloatProperty()
+
+    val_str8_1 : bpy.props.StringProperty(maxlen = 7)
+
     val_str24_1 : bpy.props.StringProperty(maxlen = 23)
+
+    val_vector_1 : bpy.props.FloatVectorProperty(default = [0, 0, 0])
+
+    val_degree_1 : bpy.props.FloatProperty(
+        min = -180,
+        max = 180
+    )
+
+    val_degree_2 : bpy.props.FloatProperty(
+        min = -180,
+        max = 180
+    )
+
+    val_hour_1 : bpy.props.IntProperty(min = 0, max = 24)
+    val_hour_2 : bpy.props.IntProperty(min = 0, max = 24)
 
 #######################################################
 class Light2DFXObjectProps(bpy.types.PropertyGroup):
 
     alpha : bpy.props.FloatProperty(
         min = 0,
-        max = 1
+        max = 1,
+        default = 200 / 255
     )
 
     corona_far_clip : bpy.props.FloatProperty(
@@ -78,7 +107,8 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
 
     view_vector : bpy.props.IntVectorProperty(
         min = -128,
-        max = 127
+        max = 127,
+        default = [0, 0, 100]
     )
 
     corona_size : bpy.props.FloatProperty()
@@ -308,6 +338,26 @@ class EXT2DFXMenus:
         pass
 
     #######################################################
+    def draw_enter_exit_menu(layout, context):
+        obj = context.object
+        settings = obj.dff.ext_2dfx
+
+        box = layout.box()
+        box.prop(settings, "val_degree_1", text="Enter Angle")
+        box.prop(settings, "val_float_1", text="Approximation Radius X")
+        box.prop(settings, "val_float_2", text="Approximation Radius Y")
+        box.prop(settings, "val_vector_1", text="Exit Location")
+        box.prop(settings, "val_degree_2", text="Exit Angle")
+        box.prop(settings, "val_short_1", text="Interior")
+        box.prop(settings, "val_byte_1", text="Flags")
+        box.prop(settings, "val_byte_2", text="Sky Color")
+        box.prop(settings, "val_str8_1", text="Interior Name")
+        box.prop(settings, "val_hour_1", text="Time On")
+        box.prop(settings, "val_hour_2", text="Time Off")
+        box.prop(settings, "val_byte_3", text="Flags 2")
+        box.prop(settings, "val_byte_4", text="Unknown")
+
+    #######################################################
     def draw_road_sign_menu(layout, context):
         obj = context.object
         box = layout.box()
@@ -345,6 +395,7 @@ class EXT2DFXMenus:
             0: self.draw_light_menu,
             1: self.draw_particle_menu,
             4: self.draw_sun_glare_menu,
+            6: self.draw_enter_exit_menu,
             7: self.draw_road_sign_menu,
             8: self.draw_trigger_point_menu,
             9: self.draw_cover_point_menu,
