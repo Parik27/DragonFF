@@ -7,6 +7,7 @@ from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
 from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col, COLLECTION_OT_dff_generate_bounds
+from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -371,8 +372,14 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "col_brightness", text="Brightness")
         box.prop(settings, "col_light", text="Light")
 
-        pass
-            
+    #######################################################
+    def draw_2dfx_menu(self, context):
+        layout = self.layout
+        settings = context.object.dff.ext_2dfx
+
+        layout.prop(settings, "effect", text="Effect")
+        EXT2DFXMenus.draw_menu(int(settings.effect), layout, context)
+
     #######################################################
     def draw_obj_menu(self, context):
 
@@ -397,6 +404,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
                 box.prop(settings, 'face_group_max', slider=True)
                 box.prop(settings, 'face_group_avoid_smalls')
                 box.operator(OBJECT_OT_facegoups_col.bl_idname, text=OBJECT_OT_facegoups_col.bl_label)
+
+        elif settings.type == '2DFX':
+            self.draw_2dfx_menu(context)
 
     #######################################################
     def draw(self, context):
@@ -544,6 +554,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('OBJ', 'Object', 'Object will be exported as a mesh or a dummy'),
             ('COL', 'Collision Object', 'Object is a collision object'),
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
+            ('2DFX', '2DFX', 'Object is a 2D effect'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
@@ -660,6 +671,9 @@ compatibiility with DFF Viewers"
         max = 2**31-1,
         options = {'SKIP_SAVE', 'HIDDEN'}
     )
+
+    # 2DFX properties
+    ext_2dfx : bpy.props.PointerProperty(type=EXT2DFXObjectProps)
 
     # Miscellaneous properties
     is_frame_locked : bpy.props.BoolProperty()

@@ -48,6 +48,10 @@ _classes = [
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
     gui.COLLECTION_OT_dff_generate_bounds,
+    gui.EXT2DFXObjectProps,
+    gui.Light2DFXObjectProps,
+    gui.RoadSign2DFXObjectProps,
+    gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
     gui.DFFCollectionProps,
@@ -71,6 +75,7 @@ _draw_3d_handler = None
 #######################################################
 def draw_3d_callback():
     gui.DFFSceneProps.draw_fg()
+    gui.RoadSign2DFXObjectProps.draw_size()
     gui.DFFCollectionProps.draw_bounds()
 
 #######################################################

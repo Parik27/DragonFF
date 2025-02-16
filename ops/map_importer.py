@@ -70,9 +70,10 @@ class Map_Import_Operator(bpy.types.Operator):
         if inst.id in self._model_cache:
 
             # Get model from memory
-            model_cache = self._model_cache[inst.id]
-            cached_objects = model_cache.values()
             new_objects = {}
+            model_cache = self._model_cache[inst.id]
+
+            cached_objects = [obj for obj in model_cache if obj.dff.type == "OBJ"]
             for obj in cached_objects:
                 new_obj = bpy.data.objects.new(model, obj.data)
                 new_obj.location = obj.location
@@ -91,15 +92,43 @@ class Map_Import_Operator(bpy.types.Operator):
                 else:
                     context.collection.objects.link(new_obj)
                 new_objects[obj] = new_obj
+
             # Parenting
             for obj in cached_objects:
                 if obj.parent in cached_objects:
                     new_objects[obj].parent = new_objects[obj.parent]
+
             # Position root object
-            if len(new_objects) > 0:
-                Map_Import_Operator.apply_transformation_to_object(
-                    new_objects[model_cache[0]], inst
-                )
+            for obj in new_objects.values():
+                if not obj.parent:
+                    Map_Import_Operator.apply_transformation_to_object(
+                        obj, inst
+                    )
+
+            cached_2dfx = [obj for obj in model_cache if obj.dff.type == "2DFX"]
+            for obj in cached_2dfx:
+                new_obj = bpy.data.objects.new(obj.name, obj.data)
+                new_obj.location = obj.location
+                new_obj.rotation_mode = obj.rotation_mode
+                new_obj.lock_rotation = obj.lock_rotation
+                new_obj.rotation_quaternion = obj.rotation_quaternion
+                new_obj.rotation_euler = obj.rotation_euler
+                new_obj.scale = obj.scale
+
+                if obj.parent:
+                    new_obj.parent = new_objects[obj.parent]
+
+                for prop in obj.dff.keys():
+                    new_obj.dff[prop] = obj.dff[prop]
+
+                if '{}.dff'.format(model) in bpy.data.collections:
+                    bpy.data.collections['{}.dff'.format(model)].objects.link(
+                        new_obj
+                    )
+                else:
+                    context.collection.objects.link(new_obj)
+                new_objects[obj] = new_obj
+
             print(str(inst.id) + ' loaded from cache')
         else:
 
@@ -126,17 +155,27 @@ class Map_Import_Operator(bpy.types.Operator):
                 }
             )
 
-            if len(importer.objects) > 0:
+            collection_objects = list(importer.current_collection.objects)
+            root_objects = [obj for obj in collection_objects if obj.dff.type == "OBJ" and not obj.parent]
+
+            for obj in root_objects:
                 Map_Import_Operator.apply_transformation_to_object(
-                    importer.objects[0], inst
+                    obj, inst
                 )
+
+            # Set root object as 2DFX parent
+            if root_objects:
+                for obj in collection_objects:
+                    # Skip Road Signs
+                    if obj.dff.type == "2DFX" and obj.dff.ext_2dfx.effect != '7':
+                        obj.parent = root_objects[0]
 
             # Move dff collection to a top collection named for the file it came from
             context.scene.collection.children.unlink(importer.current_collection)
             self._ipl_collection.children.link(importer.current_collection)
 
             # Save into buffer
-            self._model_cache[inst.id] = importer.objects
+            self._model_cache[inst.id] = collection_objects
             print(str(inst.id) + ' loaded new')
     
         # Look for collision mesh

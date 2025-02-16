@@ -29,41 +29,9 @@ from .importer_common import (
     hide_object)
 from .col_importer import import_col_mem
 from ..ops import txd_importer
+from ..ops.ext_2dfx_importer import ext_2dfx_importer
 from ..ops.state import State
 
-#######################################################
-class ext_2dfx_importer:
-
-    """ Helper class for 2dfx importing """
-    # Basically I didn't want to have such functions in
-    # the main dfff_importer, as the functions wouldn't
-    # make any sense being there.
-    
-    #######################################################
-    def __init__(self, effects):
-        self.effects = effects
-
-    #######################################################
-    def import_light(self, entry):
-        pass
-    
-    #######################################################
-    def get_objects(self):
-
-        """ Import and return the list of imported objects """
-
-        functions = {
-            0: self.import_light
-        }
-
-        objects = []
-        
-        for entry in self.effects.entries:
-            if entry.effect_id in functions:
-                objects.append(functions[entry.effect_id](entry))
-
-        return objects
-    
 #######################################################
 class dff_importer:
 
@@ -313,13 +281,6 @@ class dff_importer:
         else:
             empty.empty_display_type = 'CUBE'
             empty.empty_display_size = 0.05
-        pass
-
-    ##################################################################
-    def import_2dfx(self, effects):
-        
-        for effect in effects.entries:
-            pass
 
     ##################################################################
     def generate_material_name(material, fallback):
@@ -724,8 +685,7 @@ class dff_importer:
 
         # Initialise bone indices for use in armature construction
         self.construct_bone_dict()
-        #self.import_2dfx(self.dff.ext_2dfx)
-        
+
         for index, frame in enumerate(self.current_clump.frame_list):
 
             # Check if the meshes for the frame has been loaded
@@ -850,6 +810,15 @@ class dff_importer:
                         hide_object(object)
 
     #######################################################
+    def import_2dfx():
+        self = dff_importer
+
+        importer = ext_2dfx_importer(self.current_clump.ext_2dfx)
+
+        for obj in importer.get_objects():
+            link_object(obj, self.current_collection)
+
+    #######################################################
     def import_dff(file_name):
         self = dff_importer
         self._init()
@@ -920,6 +889,7 @@ class dff_importer:
 
             self.import_atomics()
             self.import_frames()
+            self.import_2dfx()
             self.import_collisions()
 
         # Set imported version

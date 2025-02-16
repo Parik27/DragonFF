@@ -1087,7 +1087,7 @@ class Light2dfx:
     class Flags2(Enum):
         CORONA_ONLY_FROM_BELOW = 1
         BLINKING2 = 2
-        UDPDATE_HEIGHT_ABOVE_GROUND = 4
+        UPDATE_HEIGHT_ABOVE_GROUND = 4
         CHECK_DIRECTION = 8
         BLINKING3 = 16
         
@@ -1097,7 +1097,7 @@ class Light2dfx:
         self.effect_id = 0
 
         self.loc = loc
-        self.color = [0,0,0]
+        self.color = [0,0,0,0]
         self.coronaFarClip = 0
         self.pointlightRange = 0
         self.coronaSize = 0
@@ -1130,7 +1130,7 @@ class Light2dfx:
 
         # 80 bytes structure
         if size > 76:
-            self.lookDirection = unpack_from("<BBB", data, offset + 76)
+            self.lookDirection = unpack_from("<bbb", data, offset + 75)
 
         # Convert byte arrays to strings here
         self.coronaTexName = self.coronaTexName[:strlen(self.coronaTexName)]
@@ -1138,7 +1138,7 @@ class Light2dfx:
 
         self.coronaTexName = self.coronaTexName.decode('ascii')
         self.shadowTexName = self.shadowTexName.decode('ascii')
-            
+
         return self
 
     #######################################################
@@ -1148,32 +1148,40 @@ class Light2dfx:
         # 76 bytes
         data += pack(
             "<ffffBBBBB24s24sBB",
-            self.coronaFarClip   , self.pointlightRange,
-            self.coronaSize      , self.shadowSize,
-            self.coronaShowMode  , self.coronaEnableReflection,
-            self.coronaFlareType , self.shadowColorMultiplier,
-            self._flags1         , self.coronaTexName,
-            self.shadowTexName   , self.shadowZDistance,
+            self.coronaFarClip          , self.pointlightRange,
+            self.coronaSize             , self.shadowSize,
+            self.coronaShowMode         , self.coronaEnableReflection,
+            self.coronaFlareType        , self.shadowColorMultiplier,
+            self._flags1                , self.coronaTexName.encode(),
+            self.shadowTexName.encode() , self.shadowZDistance,
             self._flags2
         )
 
         # 80 bytes
         if self.lookDirection is not None:
-            data += pack("<BBB2x", *self.lookDirection)
+            data += pack("<bbb2x", *self.lookDirection)
 
         # 76 bytes (padding)
         else:
             data += pack("<x")
 
         return data
-    
+
+    #######################################################
+    def check_flag(self, flag):
+        return (self._flags1 & flag.value) != 0
+
+    #######################################################
+    def check_flag2(self, flag):
+        return (self._flags2 & flag.value) != 0
+
     #######################################################
     def set_flag(self, flag):
-        self._flag |= flag
+        self._flags1 |= flag
 
     #######################################################
     def set_flag2(self, flag):
-        self._flag2 |= flag
+        self._flags2 |= flag
 
 #######################################################
 class Particle2dfx:
@@ -1187,15 +1195,15 @@ class Particle2dfx:
     #######################################################
     @staticmethod
     def from_mem(loc, data, offset, size):
+        effect = unpack_from("<24s", data, offset)[0]
 
         self = Particle2dfx(loc)
-        self.effect = data[offset:strlen(data, offset)].decode('ascii')
-                
+        self.effect = effect[:strlen(effect)].decode('ascii')
         return self
 
     #######################################################
     def to_mem(self):
-        return pack("<24s", self.effect)
+        return pack("<24s", self.effect.encode())
 
 #######################################################
 class PedAttractor2dfx:
@@ -1265,7 +1273,190 @@ class SunGlare2dfx:
     #######################################################
     def to_mem(self):
         return b''
-        
+
+#######################################################
+class EnterExit2dfx:
+
+    #######################################################
+    class Flags1(Enum):
+        UNKNOWN_INTERIOR = 1
+        UNKNOWN_PAIRING = 2
+        CREATE_LINKED_PAIRING = 4
+        REWARD_INTERIOR = 8
+        USED_REWARD_ENTRANCE = 16
+        CARS_AND_AIRCRAFT = 32
+        BIKES_AND_MOTORCYCLES = 64
+        DISABLE_ON_FOOT = 128
+
+    #######################################################
+    class Flags2(Enum):
+        ACCEPT_NPC_GROUP = 1
+        FOOD_DATE_FLAG = 2
+        UNKNOWN_BURGLARY = 4
+        DISABLE_EXIT = 8
+        BURGLARY_ACCESS = 16
+        ENTERED_WITHOUT_EXIT = 32
+        ENABLE_ACCESS = 64
+        DELETE_ENEX = 128
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 6
+        self.enter_angle = 0
+        self.approximation_radius_x = 0
+        self.approximation_radius_y = 0
+        self.exit_location = [0, 0, 0]
+        self.exit_angle = 0
+        self.interior = 0
+        self._flags1 = 0
+        self.sky_color = 0
+        self.interior_name = ""
+        self.time_on = 0
+        self.time_off = 0
+        self._flags2 = 0
+        self.unk = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = EnterExit2dfx(loc)
+
+        self.enter_angle, self.approximation_radius_x, \
+        self.approximation_radius_y = unpack_from("<fff", data, offset)
+
+        self.exit_location = Sections.read(Vector, data, offset + 12)
+
+        self.exit_angle, self.interior, \
+        self._flags1, self.sky_color, \
+        interior_name = unpack_from("<fHBB8s", data, offset + 24)
+
+        self.time_on, self.time_off ,\
+        self._flags2, self.unk = unpack_from("<4B", data, offset + 40)
+
+        self.interior_name = interior_name[:strlen(interior_name)].decode('ascii')
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = pack(
+            "<fff",
+            self.enter_angle,
+            self.approximation_radius_x,
+            self.approximation_radius_y
+        )
+        data += Sections.write(Vector, self.exit_location)
+        data += pack(
+            "<fHBB8s4B",
+            self.exit_angle,
+            self.interior,
+            self._flags1,
+            self.sky_color,
+            self.interior_name.encode(),
+            self.time_on, self.time_off,
+            self._flags2, self.unk
+        )
+
+        return data
+
+#######################################################
+class RoadSign2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 7
+        self.size = [1, 1]
+        self.rotation = [0, 0, 0]
+        self.flags = 0
+        self.text1 = ""
+        self.text2 = ""
+        self.text3 = ""
+        self.text4 = ""
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = RoadSign2dfx(loc)
+        self.size = unpack_from("<ff", data, offset)
+        self.rotation = Sections.read(Vector, data, offset + 8)
+        self.flags, \
+        self.text1, self.text2, \
+        self.text3, self.text4 = unpack_from("<H16s16s16s16s2x", data, offset + 20)
+
+        self.text1 = self.text1.decode('ascii')
+        self.text2 = self.text2.decode('ascii')
+        self.text3 = self.text3.decode('ascii')
+        self.text4 = self.text4.decode('ascii')
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = pack("<ff", *self.size)
+        data += Sections.write(Vector, self.rotation)
+        data += pack(
+            "<H16s16s16s16s2x",
+            self.flags,
+            self.text1.encode(), self.text2.encode(),
+            self.text3.encode(), self.text4.encode()
+        )
+
+        return data
+
+#######################################################
+class TriggerPoint2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 8
+        self.point_id = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = TriggerPoint2dfx(loc)
+        self.point_id = unpack_from("<I", data, offset)[0]
+        return self
+
+    #######################################################
+    def to_mem(self):
+        return pack("<I", self.point_id)
+
+#######################################################
+class CoverPoint2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 9
+        self.direction_x = 0
+        self.direction_y = 0
+        self.cover_type = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = CoverPoint2dfx(loc)
+        self.direction_x, self.direction_y, \
+        self.cover_type = unpack_from("<ffI", data, offset)
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = pack(
+            "<ffI",
+            self.direction_x, self.direction_y,
+            self.cover_type
+        )
+        return data
+
 #######################################################
 class Extension2dfx:
 
@@ -1278,6 +1469,10 @@ class Extension2dfx:
         self.entries.append(entry)
 
     #######################################################
+    def is_empty(self):
+        return len(self.entries) == 0
+
+    #######################################################
     @staticmethod
     def from_mem(data, offset):
 
@@ -1285,16 +1480,20 @@ class Extension2dfx:
         entries_count = unpack_from("<I", data, offset)[0]
 
         pos = 4 + offset
-        for i in range(entries_count):
+        for _ in range(entries_count):
 
             # Stores classes for each effect
             entries_funcs = {
                 0: Light2dfx,
                 1: Particle2dfx,
                 3: PedAttractor2dfx,
-                4: SunGlare2dfx
+                4: SunGlare2dfx,
+                6: EnterExit2dfx,
+                7: RoadSign2dfx,
+                8: TriggerPoint2dfx,
+                9: CoverPoint2dfx,
             }
-            
+
             loc = Sections.read(Vector, data, pos)
             entry_type, size = unpack_from("<II", data, pos + 12)
 
@@ -1314,21 +1513,23 @@ class Extension2dfx:
     def to_mem(self):
 
         # Write only if there are entries
-        if len(self.entries) == 0:
+        if self.is_empty():
             return b''
-        
+
         # Entries length
         data = pack("<I", len(self.entries))
 
         # Entries
         for entry in self.entries:
+            data += Sections.write(Vector, entry.loc)
+
             entry_data = entry.to_mem()
 
-            data += pack("<II", entry.effect_id)
+            data += pack("<II", entry.effect_id, len(entry_data))
             data += entry_data
 
         return Sections.write_chunk(data, types['2d Effect'])
-            
+
     #######################################################
     def __add__(self, other):
         self.entries += other.entries # concatinate entries
@@ -2485,7 +2686,6 @@ class Clump:
 
     #######################################################
     def write_geometry_list(self):
-
         data = b''
         data += pack("<I", len(self.geometry_list))
 
@@ -2495,10 +2695,10 @@ class Clump:
 
             # Append 2dfx to extra extensions in the last geometry
             extra_extensions = []
-            if index == len(self.geometry_list):
+            if index == len(self.geometry_list) - 1 and not self.ext_2dfx.is_empty():
                 extra_extensions.append(self.ext_2dfx)
             
-            data += geometry.to_mem()
+            data += geometry.to_mem(extra_extensions)
         
         return Sections.write_chunk(data, types["Geometry List"])
 

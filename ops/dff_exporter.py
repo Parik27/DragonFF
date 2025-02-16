@@ -22,6 +22,7 @@ import mathutils
 from collections import OrderedDict
 
 from ..gtaLib import dff
+from ..ops.ext_2dfx_exporter import ext_2dfx_exporter
 from ..ops.state import State
 from .col_exporter import export_col
 
@@ -1147,6 +1148,9 @@ class dff_exporter:
 
             for mesh, frame_index in atomics_data:
                 self.populate_atomic(mesh, frame_index)
+
+            # 2DFX
+            ext_2dfx_exporter(self.current_clump.ext_2dfx).export_objects(objects)
 
             self.dff.clumps.append(self.current_clump)
 
