@@ -18,7 +18,7 @@ The following is a list of supported features by the addon
   - [ ] Export
 - [X] Collision files (including the ones packed in dff)
   - [X] Import
-  - [X] Export *(Partial)*
+  - [X] Export
 - [ ] Map files (.ipl, .ide)
   - [X] Import *(Partial, experimental)*
   - [ ] Export
