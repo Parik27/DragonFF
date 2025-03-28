@@ -67,7 +67,7 @@ class NativePS2Skin:
         weights = geometry._vertex_bone_weights
         indices = []
 
-        if not geometry.normals and not geometry.uv_layers[0] and not geometry.prelit_colors:
+        if not geometry.normals and not geometry.uv_layers and not geometry.prelit_colors:
             index_div = 3
         else:
             index_div = 4

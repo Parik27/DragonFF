@@ -1157,10 +1157,11 @@ class dff_exporter:
         # Collision
         if self.export_coll:
             mem = export_col({
-                'file_name'     : None,
-                'version'       : 3,
-                'collection'    : self.collection,
-                'only_selected' : self.selected
+                'file_name'             : None,
+                'version'               : 3,
+                'collection'            : self.collection,
+                'apply_transformations' : False,
+                'only_selected'         : self.selected
             })
 
             if len(mem) != 0:

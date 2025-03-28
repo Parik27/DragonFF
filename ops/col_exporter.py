@@ -27,10 +27,12 @@ class col_exporter:
     coll = None
     filename = "" # Whether it will return a bytes file (not write to a file), if no file name is specified
     version = None
+    apply_transformations = False
     only_selected = False
 
     #######################################################
     def _process_mesh(obj, verts, faces, face_groups=None):
+        self = col_exporter
 
         mesh = obj.data
 
@@ -39,6 +41,15 @@ class col_exporter:
         else:
             bm = bmesh.new()
             bm.from_mesh(mesh)
+
+        if self.apply_transformations:
+            matrix = mathutils.Matrix.Identity(4)
+            matrix[0][0], matrix[1][1], matrix[2][2] = obj.scale
+        else:
+            matrix = obj.matrix_world
+
+        bm = bm.copy()
+        bm.transform(matrix)
 
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
 
@@ -221,7 +232,7 @@ class col_exporter:
 
         # Get native bounds from collection (some collisions come in as just bounds with no other items)
         if collection.dff.auto_bounds:
-            self.coll.bounds = calculate_bounds(bounds_objects)
+            self.coll.bounds = calculate_bounds(bounds_objects, self.apply_transformations)
         else:
             self.coll.bounds = [collection.dff.bounds_max, collection.dff.bounds_min]
 
@@ -243,7 +254,7 @@ def get_col_collection_name(collection, parent_collection=None):
     return name
 
 #######################################################
-def calculate_bounds(objects):
+def calculate_bounds(objects, apply_transformation=False):
     if not objects:
         return [[0, 0, 0], [0, 0, 0]]
 
@@ -269,7 +280,10 @@ def calculate_bounds(objects):
         # And Meshes require their proper center to be calculated because their transform is identity
         else:
             local_center = sum((mathutils.Vector(b) for b in obj.bound_box), mathutils.Vector()) / 8.0
-            center = obj.matrix_world @ local_center
+            if apply_transformation:
+                center = local_center
+            else:
+                center = obj.matrix_world @ local_center
 
         upper_bounds = [x + (y/2) for x, y in zip(center, dimensions)]
         lower_bounds = [x - (y/2) for x, y in zip(center, dimensions)]
@@ -286,14 +300,18 @@ def export_col(options):
 
     col_exporter.version = options['version']
     col_exporter.collection = options['collection']
+    col_exporter.apply_transformations = options['apply_transformations']
     col_exporter.only_selected = options['only_selected']
 
     file_name = options['file_name']
     output = b''
 
     if not col_exporter.collection:
-        scene_collection = bpy.context.scene.collection
-        root_collections = scene_collection.children.values() + [scene_collection]
+        if col_exporter.only_selected:
+            root_collections = {c for obj in bpy.context.selected_objects for c in obj.users_collection}
+        else:
+            scene_collection = bpy.context.scene.collection
+            root_collections = scene_collection.children.values() + [scene_collection]
     else:
         root_collections = [col_exporter.collection]
 
