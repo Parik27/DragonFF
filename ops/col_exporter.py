@@ -292,8 +292,11 @@ def export_col(options):
     output = b''
 
     if not col_exporter.collection:
-        scene_collection = bpy.context.scene.collection
-        root_collections = scene_collection.children.values() + [scene_collection]
+        if col_exporter.only_selected:
+            root_collections = {c for obj in bpy.context.selected_objects for c in obj.users_collection}
+        else:
+            scene_collection = bpy.context.scene.collection
+            root_collections = scene_collection.children.values() + [scene_collection]
     else:
         root_collections = [col_exporter.collection]
 

@@ -48,7 +48,8 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "export_version")
-        layout.prop(self, "only_selected")
+        if not self.use_active_collection:
+            layout.prop(self, "only_selected")
         return None
 
     #######################################################
