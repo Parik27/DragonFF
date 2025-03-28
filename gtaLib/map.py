@@ -230,22 +230,33 @@ class MapDataUtility:
         return sections
 
     ########################################################################
-    def getMapData(gameID, gameRoot, iplSection):
-        
+    def getMapData(gameID, gameRoot, iplSection, isCustomIPL):
+
         data = map_data.data[gameID].copy()
 
-        # Prune IDEs unrelated to current IPL section (SA only). First, make IDE_paths a mutable list, then iterate
-        # over a copy so we can remove elements during iteration. This is a naive pruning which keeps all ides with a
-        # few generic keywords in their name and culls anything else with a prefix different from the given iplSection
-        if gameID == game_version.SA:
-            data['IDE_paths'] = list(data['IDE_paths'])
-            for p in data['IDE_paths'].copy():
-                if p.startswith('DATA/MAPS/generic/') or p.startswith('DATA/MAPS/leveldes/') or 'xref' in p:
-                    continue
-                ide_prefix = p.split('/')[-1].lower()
-                ipl_prefix = iplSection.split('/')[-1].lower()[:3]
-                if not ide_prefix.startswith(ipl_prefix):
-                    data['IDE_paths'].remove(p)
+        if isCustomIPL:
+            # Find paths to all IDEs
+            ide_paths = []
+            for root_path, _, files in os.walk(os.path.join(gameRoot, "DATA/MAPS")):
+                for file in files:
+                    if file.lower().endswith(".ide"):
+                        full_path = os.path.join(root_path, file)
+                        ide_paths.append(os.path.relpath(full_path, gameRoot))
+            data['IDE_paths'] = ide_paths
+
+        else:
+            # Prune IDEs unrelated to current IPL section (SA only). First, make IDE_paths a mutable list, then iterate
+            # over a copy so we can remove elements during iteration. This is a naive pruning which keeps all ides with a
+            # few generic keywords in their name and culls anything else with a prefix different from the given iplSection
+            if gameID == game_version.SA:
+                data['IDE_paths'] = list(data['IDE_paths'])
+                for p in data['IDE_paths'].copy():
+                    if p.startswith('DATA/MAPS/generic/') or p.startswith('DATA/MAPS/leveldes/') or 'xref' in p:
+                        continue
+                    ide_prefix = p.split('/')[-1].lower()
+                    ipl_prefix = iplSection.split('/')[-1].lower()[:3]
+                    if not ide_prefix.startswith(ipl_prefix):
+                        data['IDE_paths'].remove(p)
 
         ide = {}
 

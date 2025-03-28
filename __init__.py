@@ -40,6 +40,7 @@ _classes = [
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
+    gui.SCENE_OT_ipl_select,
     gui.OBJECT_OT_dff_generate_bone_props,
     gui.OBJECT_OT_dff_set_parent_bone,
     gui.OBJECT_OT_dff_clear_parent_bone,
