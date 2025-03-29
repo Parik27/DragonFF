@@ -393,6 +393,7 @@ class dff_exporter:
     frame_objects = {}
     collection = None
     export_coll = False
+    apply_coll_trans = True
     exclude_geo_faces = False
     from_outliner = False
 
@@ -1114,7 +1115,7 @@ class dff_exporter:
                 'file_name'             : None,
                 'version'               : 3,
                 'collection'            : self.collection,
-                'apply_transformations' : False,
+                'apply_transformations' : self.apply_coll_trans,
                 'only_selected'         : self.selected
             })
 
@@ -1186,6 +1187,7 @@ def export_dff(options):
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
     dff_exporter.export_coll        = options['export_coll']
+    dff_exporter.apply_coll_trans   = options['apply_coll_trans']
     dff_exporter.from_outliner      = options['from_outliner']
 
     dff_exporter.export_dff(options['file_name'])
