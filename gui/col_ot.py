@@ -41,7 +41,7 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
 
     apply_transformations : bpy.props.BoolProperty(
         name = "Apply Transformations",
-        default = False
+        default = True
     )
 
     use_active_collection : bpy.props.BoolProperty(

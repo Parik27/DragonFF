@@ -35,7 +35,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         name            = "Export Collision",
         default         = True
     )
-    
+
+    apply_coll_trans    : bpy.props.BoolProperty(
+        name            = "Apply Collision Transformations",
+        default         = True
+    )
+
     export_frame_names  : bpy.props.BoolProperty(
         name            = "Export Frame Names",
         default         = True
@@ -58,13 +63,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         default         = False
     )
     
-    preserve_positions     : bpy.props.BoolProperty(
+    preserve_positions  : bpy.props.BoolProperty(
         name            = "Preserve Positions",
         description     = "Don't set object positions to (0,0,0)",
         default         = True
     )
 
-    preserve_rotations     : bpy.props.BoolProperty(
+    preserve_rotations  : bpy.props.BoolProperty(
         name            = "Preserve Rotations",
         description     = "Don't set object rotations to (0,0,0)",
         default         = True
@@ -126,6 +131,8 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
 
         layout.prop(self, "only_selected")
         layout.prop(self, "export_coll")
+        if self.export_coll:
+            layout.prop(self, "apply_coll_trans")
         layout.prop(self, "export_frame_names")
         layout.prop(self, "exclude_geo_faces")
         layout.prop(self, "dm_to_clumps")
@@ -174,6 +181,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "dm_to_clumps"       : self.dm_to_clumps,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
+                    "apply_coll_trans"   : self.apply_coll_trans,
                     "export_frame_names" : self.export_frame_names,
                     "exclude_geo_faces"  : self.exclude_geo_faces,
                     "from_outliner"      : self.from_outliner
@@ -201,6 +209,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
 
             self.only_selected = False
             self.export_coll = False
+            self.apply_coll_trans = False
             self.preserve_positions = False
             self.preserve_rotations = False
 

@@ -272,17 +272,17 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
         options={'HIDDEN'})
 
     def invoke(self, context, event):
-        if not context.scene.dff.game_root:
-            self.report({'WARNING'}, "Specify game root folder first")
-            return {'CANCELLED'}
-
         self.filepath = context.scene.dff.game_root + "/DATA/MAPS/"
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
         if os.path.splitext(self.filepath)[-1] == self.filename_ext:
-            context.scene.dff.custom_ipl_path = os.path.relpath(self.filepath, context.scene.dff.game_root)
+            filepath = os.path.normpath(self.filepath)
+            sep_pos = filepath.upper().find(f"DATA{os.sep}MAPS")
+            game_root = filepath[:sep_pos]
+            context.scene.dff.game_root = game_root
+            context.scene.dff.custom_ipl_path = os.path.relpath(filepath, game_root)
         return {'FINISHED'}
 
 #######################################################

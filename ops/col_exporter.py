@@ -27,7 +27,7 @@ class col_exporter:
     coll = None
     filename = "" # Whether it will return a bytes file (not write to a file), if no file name is specified
     version = None
-    apply_transformations = False
+    apply_transformations = True
     only_selected = False
 
     #######################################################
@@ -43,10 +43,10 @@ class col_exporter:
             bm.from_mesh(mesh)
 
         if self.apply_transformations:
+            matrix = obj.matrix_world
+        else:
             matrix = mathutils.Matrix.Identity(4)
             matrix[0][0], matrix[1][1], matrix[2][2] = obj.scale
-        else:
-            matrix = obj.matrix_world
 
         bm = bm.copy()
         bm.transform(matrix)
@@ -254,7 +254,7 @@ def get_col_collection_name(collection, parent_collection=None):
     return name
 
 #######################################################
-def calculate_bounds(objects, apply_transformation=False):
+def calculate_bounds(objects, apply_transformations=True):
     if not objects:
         return [[0, 0, 0], [0, 0, 0]]
 
@@ -280,10 +280,10 @@ def calculate_bounds(objects, apply_transformation=False):
         # And Meshes require their proper center to be calculated because their transform is identity
         else:
             local_center = sum((mathutils.Vector(b) for b in obj.bound_box), mathutils.Vector()) / 8.0
-            if apply_transformation:
-                center = local_center
-            else:
+            if apply_transformations:
                 center = obj.matrix_world @ local_center
+            else:
+                center = local_center
 
         upper_bounds = [x + (y/2) for x, y in zip(center, dimensions)]
         lower_bounds = [x - (y/2) for x, y in zip(center, dimensions)]
