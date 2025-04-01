@@ -59,7 +59,8 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         props = [["col_mat_index", "Material"],
                  ["col_flags", "Flags"],
                  ["col_brightness", "Brightness"],
-                 ["col_light", "Light"]]
+                 ["col_day_light", "Day Light"],
+                 ["col_night_light", "Night Light"]]
         
         for prop in props:
             self.draw_labelled_prop(layout.row(), settings, [prop[0]], prop[1])
@@ -370,7 +371,8 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "col_material", text="Material")
         box.prop(settings, "col_flags", text="Flags")
         box.prop(settings, "col_brightness", text="Brightness")
-        box.prop(settings, "col_light", text="Light")
+        box.prop(settings, "col_day_light", text="Day Light")
+        box.prop(settings, "col_night_light", text="Night Light")
 
     #######################################################
     def draw_2dfx_menu(self, context):
@@ -498,10 +500,11 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     specular_texture : bpy.props.StringProperty ()
 
     # Collision Data
-    col_flags       : bpy.props.IntProperty()
-    col_brightness  : bpy.props.IntProperty()
-    col_light       : bpy.props.IntProperty()
-    col_mat_index   : bpy.props.IntProperty()
+    col_flags       : bpy.props.IntProperty(min=0, max=255)
+    col_brightness  : bpy.props.IntProperty(min=0, max=255)
+    col_day_light   : bpy.props.IntProperty(min=0, max=15)
+    col_night_light : bpy.props.IntProperty(min=0, max=15)
+    col_mat_index   : bpy.props.IntProperty(min=0, max=255)
 
     # UV Animation
     export_animation : bpy.props.BoolProperty   (name="UV Animation")
@@ -614,22 +617,37 @@ compatibiility with DFF Viewers"
 
     col_material : bpy.props.IntProperty(
         default = 12,
+        min = 0,
+        max = 255,
         description = "Material used for the Sphere/Cone"
     )
 
     col_flags : bpy.props.IntProperty(
         default = 0,
+        min = 0,
+        max = 255,
         description = "Flags for the Sphere/Cone"
     )
 
     col_brightness : bpy.props.IntProperty(
         default = 0,
+        min = 0,
+        max = 255,
         description = "Brightness used for the Sphere/Cone"
     )
-    
-    col_light : bpy.props.IntProperty(
+
+    col_day_light : bpy.props.IntProperty(
         default = 0,
-        description = "Light used for the Sphere/Cone"
+        min = 0,
+        max = 15,
+        description = "Day Light used for the Sphere/Cone"
+    )
+
+    col_night_light : bpy.props.IntProperty(
+        default = 0,
+        min = 0,
+        max = 15,
+        description = "Night Light used for the Sphere/Cone"
     )
 
     # Atomic properties

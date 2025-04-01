@@ -97,7 +97,7 @@ class col_exporter:
                 surface[0] = mat.dff.col_mat_index
                 surface[1] = mat.dff.col_flags
                 surface[2] = mat.dff.col_brightness
-                surface[3] = mat.dff.col_light
+                surface[3] = mat.dff.col_day_light | (mat.dff.col_night_light << 4)
 
             except (IndexError, AttributeError):
                 pass
@@ -148,7 +148,7 @@ class col_exporter:
             obj.dff.col_material,
             obj.dff.col_flags,
             obj.dff.col_brightness,
-            obj.dff.col_light
+            obj.dff.col_day_light | (obj.dff.col_night_light << 4)
         )
 
         self.coll.spheres.append(col.TSphere(radius=radius,
@@ -169,7 +169,7 @@ class col_exporter:
             obj.dff.col_material,
             obj.dff.col_flags,
             obj.dff.col_brightness,
-            obj.dff.col_light
+            obj.dff.col_day_light | (obj.dff.col_night_light << 4)
         )
 
         self.coll.boxes.append(col.TBox(min=min,
