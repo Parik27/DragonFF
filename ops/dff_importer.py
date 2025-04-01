@@ -782,8 +782,6 @@ class dff_importer:
 
             self.objects[index] = obj
 
-            # Set a collision model used for export
-            obj["gta_coll"] = self.dff.collisions
             if frame.user_data is not None:
                 obj["dff_user_data"] = frame.user_data.to_mem()[12:]
 
@@ -853,8 +851,8 @@ class dff_importer:
         
         # Add collisions
         for collision in self.dff.collisions:
-            col = import_col_mem(collision, os.path.basename(file_name), False)
-            
+            col = import_col_mem(collision.data, os.path.basename(file_name), False)
+
             if (2, 80, 0) <= bpy.app.version:
                 for collection in col:
                     self.current_collection.children.link(collection)

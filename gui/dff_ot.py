@@ -36,6 +36,15 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         default         = True
     )
 
+    coll_ext_type       : bpy.props.EnumProperty(
+        items =
+        (
+            ('39056122', "Default", "Default collision extension type"),
+            ('39056127', "SA-MP", "SA-MP collision extension type")
+        ),
+        name            = "Collision type"
+    )
+
     apply_coll_trans    : bpy.props.BoolProperty(
         name            = "Apply Collision Transformations",
         default         = True
@@ -124,9 +133,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             layout.prop(self, "preserve_rotations")
 
         layout.prop(self, "only_selected")
-        layout.prop(self, "export_coll")
+
+        box = layout.box()
+        box.prop(self, "export_coll")
         if self.export_coll:
-            layout.prop(self, "apply_coll_trans")
+            box.prop(self, "coll_ext_type")
+            box.prop(self, "apply_coll_trans")
+
         layout.prop(self, "export_frame_names")
         layout.prop(self, "exclude_geo_faces")
         layout.prop(self, "export_version")
@@ -135,7 +148,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             col = layout.column()
             col.alert = not self.verify_rw_version()
             icon = "ERROR" if col.alert else "NONE"
-            
+
             col.prop(self, "custom_version", icon=icon)
         return None
 
@@ -173,6 +186,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "preserve_rotations" : self.preserve_rotations,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
+                    "coll_ext_type"      : int(self.coll_ext_type),
                     "apply_coll_trans"   : self.apply_coll_trans,
                     "export_frame_names" : self.export_frame_names,
                     "exclude_geo_faces"  : self.exclude_geo_faces,
