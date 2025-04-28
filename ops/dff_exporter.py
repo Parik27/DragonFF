@@ -1108,7 +1108,7 @@ class dff_exporter:
             self.populate_atomic(mesh, frame_index)
 
         # 2DFX
-        ext_2dfx_exporter(self.dff.ext_2dfx).export_objects(objects)
+        ext_2dfx_exporter(self.dff.ext_2dfx).export_objects(objects, not self.preserve_positions)
 
         # Collision
         if self.export_coll:

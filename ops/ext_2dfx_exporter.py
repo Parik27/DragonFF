@@ -30,14 +30,15 @@ class ext_2dfx_exporter:
         self.effects = effects
 
     #######################################################
-    def export_light(self, obj):
+    def export_light(self, obj, use_local_position):
         if obj.type != 'LIGHT':
             return
 
         FL1, FL2 = dff.Light2dfx.Flags1, dff.Light2dfx.Flags2
         settings = obj.data.ext_2dfx
+        loc = obj.location if use_local_position else obj.matrix_world.translation
 
-        entry = dff.Light2dfx(obj.location)
+        entry = dff.Light2dfx(loc)
         if settings.export_view_vector:
             entry.lookDirection = settings.view_vector
         entry.color = dff.RGBA._make(
@@ -93,25 +94,29 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
-    def export_particle(self, obj):
+    def export_particle(self, obj, use_local_position):
         settings = obj.dff.ext_2dfx
+        loc = obj.location if use_local_position else obj.matrix_world.translation
 
-        entry = dff.Particle2dfx(obj.location)
+        entry = dff.Particle2dfx(loc)
         entry.effect = settings.val_str24_1
 
         return entry
 
     #######################################################
-    def export_sun_glare(self, obj):
-        entry = dff.SunGlare2dfx(obj.location)
+    def export_sun_glare(self, obj, use_local_position):
+        loc = obj.location if use_local_position else obj.matrix_world.translation
+
+        entry = dff.SunGlare2dfx(loc)
 
         return entry
 
     #######################################################
-    def export_enter_exit(self, obj):
+    def export_enter_exit(self, obj, use_local_position):
         settings = obj.dff.ext_2dfx
+        loc = obj.location if use_local_position else obj.matrix_world.translation
 
-        entry = dff.EnterExit2dfx(obj.location)
+        entry = dff.EnterExit2dfx(loc)
         entry.enter_angle = math.radians(settings.val_degree_1)
         entry.approximation_radius_x = settings.val_float_1
         entry.approximation_radius_y = settings.val_float_2
@@ -129,7 +134,7 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
-    def export_road_sign(self, obj):
+    def export_road_sign(self, obj, use_local_position):
         if obj.type != 'FONT':
             return
 
@@ -160,9 +165,9 @@ class ext_2dfx_exporter:
         flags |= {2:1, 4:2, 8:3, 16:0}[max_chars_num] << 2
         flags |= int(settings.color) << 4
 
-        rotation = obj.matrix_local.to_euler('ZXY')
+        rotation = obj.matrix_world.to_euler('ZXY')
 
-        entry = dff.RoadSign2dfx(obj.location)
+        entry = dff.RoadSign2dfx(obj.matrix_world.translation)
 
         entry.rotation = Vector((
             rotation.x * (180 / math.pi),
@@ -179,22 +184,24 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
-    def export_trigger_point(self, obj):
+    def export_trigger_point(self, obj, use_local_position):
         settings = obj.dff.ext_2dfx
+        loc = obj.location if use_local_position else obj.matrix_world.translation
 
-        entry = dff.TriggerPoint2dfx(obj.location)
+        entry = dff.TriggerPoint2dfx(loc)
         entry.point_id = settings.val_int_1
 
         return entry
 
     #######################################################
-    def export_cover_point(self, obj):
+    def export_cover_point(self, obj, use_local_position):
         settings = obj.dff.ext_2dfx
+        loc = obj.location if use_local_position else obj.matrix_world.translation
 
-        entry = dff.CoverPoint2dfx(obj.location)
+        entry = dff.CoverPoint2dfx(loc)
         entry.cover_type = settings.val_int_1
 
-        direction = obj.matrix_local.to_quaternion() @ Vector((0.0, 1.0, 0.0))
+        direction = obj.matrix_world.to_quaternion() @ Vector((0.0, 1.0, 0.0))
         direction.z = 0
         direction.normalize()
 
@@ -204,7 +211,7 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
-    def export_objects(self, objects):
+    def export_objects(self, objects, use_local_position=False):
 
         """ Export objects and fill 2dfx entries """
 
@@ -222,6 +229,6 @@ class ext_2dfx_exporter:
             if obj.dff.type != '2DFX':
                 continue
 
-            entry = functions[int(obj.dff.ext_2dfx.effect)](obj)
+            entry = functions[int(obj.dff.ext_2dfx.effect)](obj, use_local_position)
             if entry:
                 self.effects.append_entry(entry)
