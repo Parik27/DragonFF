@@ -277,7 +277,7 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        if os.path.splitext(self.filepath)[-1] == self.filename_ext:
+        if os.path.splitext(self.filepath)[-1].lower() == self.filename_ext:
             filepath = os.path.normpath(self.filepath)
             sep_pos = filepath.upper().find(f"DATA{os.sep}MAPS")
             game_root = filepath[:sep_pos]
