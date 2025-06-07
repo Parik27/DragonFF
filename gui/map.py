@@ -1,6 +1,5 @@
 import bpy
 import gpu
-import numpy as np
 import os
 import random
 from bpy_extras.io_utils import ImportHelper
@@ -215,14 +214,14 @@ class DFFSceneProps(bpy.types.PropertyGroup):
             # As the face groups are stored as face attributes, we'll generate unique vertices across the whole overlay
             # because the colors of different faces can't be shared across vertices
             size = 3 * len(mesh.loop_triangles)
-            vertices = np.empty((size, 3), 'f')
-            vertex_colors = np.empty((size, 4), 'f')
-            indices = np.arange(0, size, dtype='i')
+            vertices = [[0.0,0.0,0.0]] * size
+            vertex_colors = [(0.0,0.0,0.0,0.0)] * size
+            indices = list(range(size))
 
             # Each face group gets a random color, but set an explicit seed so the resulting color array remains
             # deterministic across redraws
             random.seed(10)
-            color = []
+            color = (0.0, 0.0, 0.0, 0.0)
             grp = -1
             idx = 0
             for i, face in enumerate(mesh.loop_triangles):
