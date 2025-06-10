@@ -93,20 +93,15 @@ def register():
     bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
     bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
 
-    if (2, 80, 0) > bpy.app.version:
-        bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
-        bpy.types.INFO_MT_file_export.append(gui.export_dff_func)
+    bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
+    bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
+    bpy.types.OUTLINER_MT_collection.append(gui.export_col_outliner)
+    bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
+    bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
+    bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
 
-    else:
-        bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
-        bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
-        bpy.types.OUTLINER_MT_collection.append(gui.export_col_outliner)
-        bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
-        bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
-        bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
-
-        global _draw_3d_handler
-        _draw_3d_handler = bpy.types.SpaceView3D.draw_handler_add(draw_3d_callback, (), 'WINDOW', 'POST_VIEW')
+    global _draw_3d_handler
+    _draw_3d_handler = bpy.types.SpaceView3D.draw_handler_add(draw_3d_callback, (), 'WINDOW', 'POST_VIEW')
 
     gui.State.hook_events()
 
@@ -120,19 +115,14 @@ def unregister():
     del bpy.types.Object.dff
     del bpy.types.Collection.dff
 
-    if (2, 80, 0) > bpy.app.version:
-        bpy.types.INFO_MT_file_import.remove(gui.import_dff_func)
-        bpy.types.INFO_MT_file_export.remove(gui.export_dff_func)
+    bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
+    bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
+    bpy.types.OUTLINER_MT_collection.remove(gui.export_col_outliner)
+    bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
+    bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
+    bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
 
-    else:
-        bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
-        bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
-        bpy.types.OUTLINER_MT_collection.remove(gui.export_col_outliner)
-        bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
-        bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
-        bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
-
-        bpy.types.SpaceView3D.draw_handler_remove(_draw_3d_handler, 'WINDOW')
+    bpy.types.SpaceView3D.draw_handler_remove(_draw_3d_handler, 'WINDOW')
 
     gui.State.unhook_events()
 

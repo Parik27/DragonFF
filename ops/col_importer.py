@@ -58,10 +58,7 @@ class col_importer:
             obj.location = entity.center
             obj.scale = [entity.radius] * 3
 
-            if (2, 80, 0) > bpy.app.version:
-                obj.empty_draw_type = 'SPHERE'
-            else:
-                obj.empty_display_type = 'SPHERE'
+            obj.empty_display_type = 'SPHERE'
 
             obj.dff.type = 'COL'
             obj.dff.col_material = entity.surface.material
@@ -86,10 +83,7 @@ class col_importer:
             obj.location = mn + half
             obj.scale = half
 
-            if (2, 80, 0) > bpy.app.version:
-                obj.empty_draw_type = 'CUBE'
-            else:
-                obj.empty_display_type = 'CUBE'
+            obj.empty_display_type = 'CUBE'
 
             obj.dff.type = 'COL'
             obj.dff.col_material = entity.surface.material

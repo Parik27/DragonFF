@@ -349,11 +349,10 @@ class material_helper:
         self.material = material
         self.principled = None
 
-        if bpy.app.version >= (2, 80, 0):
-            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-            
-            self.principled = PrincipledBSDFWrapper(self.material,
-                                                    is_readonly=False)
+        from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+
+        self.principled = PrincipledBSDFWrapper(self.material,
+                                                is_readonly=False)
         
         
 
@@ -401,9 +400,6 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def multiply_matrix(a, b):
-        # For compatibility with 2.79
-        if bpy.app.version < (2, 80, 0):
-            return a * b
         return a @ b
 
     #######################################################
@@ -861,13 +857,9 @@ class dff_exporter:
                 key_shape_values[kb] = kb.value
                 kb.value = 0.0
 
-        if bpy.app.version < (2, 80, 0):
-            mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
-        else:
-            
-            depsgraph   = bpy.context.evaluated_depsgraph_get()
-            object_eval = obj.evaluated_get(depsgraph)
-            mesh        = object_eval.to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
+        depsgraph   = bpy.context.evaluated_depsgraph_get()
+        object_eval = obj.evaluated_get(depsgraph)
+        mesh        = object_eval.to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
             
 
         # Re enable disabled modifiers
@@ -1135,8 +1127,6 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def is_selected(obj):
-        if bpy.app.version < (2, 80, 0):
-            return obj.select
         return obj.select_get()
             
     #######################################################

@@ -61,9 +61,6 @@ class dff_importer:
 
     #######################################################
     def multiply_matrix(a, b):
-        # For compatibility with 2.79
-        if bpy.app.version < (2, 80, 0):
-            return a * b
         return a @ b
     
     #######################################################
@@ -273,12 +270,8 @@ class dff_importer:
                 
     #######################################################
     def set_empty_draw_properties(empty):
-        if (2, 80, 0) > bpy.app.version:
-            empty.empty_draw_type = 'CUBE'
-            empty.empty_draw_size = 0.05
-        else:
-            empty.empty_display_type = 'CUBE'
-            empty.empty_display_size = 0.05
+        empty.empty_display_type = 'CUBE'
+        empty.empty_display_size = 0.05
 
     ##################################################################
     def generate_material_name(material, fallback):
@@ -853,13 +846,12 @@ class dff_importer:
         for collision in self.dff.collisions:
             col = import_col_mem(collision.data, os.path.basename(file_name), False)
 
-            if (2, 80, 0) <= bpy.app.version:
-                for collection in col:
-                    self.current_collection.children.link(collection)
+            for collection in col:
+                self.current_collection.children.link(collection)
 
-                    # Hide objects
-                    for object in collection.objects:
-                        hide_object(object)
+                # Hide objects
+                for object in collection.objects:
+                    hide_object(object)
 
         State.update_scene()
 

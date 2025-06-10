@@ -160,13 +160,9 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         
         try:
 
-            if bpy.app.version >= (2, 80, 0):
-                node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
-                prop = node.inputs[0]
-                prop_val = "default_value"
-            else:
-                prop = context.material
-                prop_val = "diffuse_color"
+            node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
+            prop = node.inputs[0]
+            prop_val = "default_value"
                 
             row = layout.row()
             row.prop(
@@ -199,9 +195,8 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             color = eval(context.material.dff.preset_mat_cols)
             color = [i / 255 for i in color]
                 
-            if bpy.app.version >= (2, 80, 0):
-                node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
-                node.inputs[0].default_value = color
+            node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
+            node.inputs[0].default_value = color
 
             # Viewport color in Blender 2.8 and Material color in 2.79.
             context.material.diffuse_color = color[:-1]

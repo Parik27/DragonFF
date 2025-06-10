@@ -27,37 +27,25 @@ game_version.VCS = 'VCS'
 #######################################################            
 def set_object_mode(obj, mode):
         
-    # Blender 2.79 compatibility
-    if (2, 80, 0) > bpy.app.version:
-        bpy.context.scene.objects.active = obj
-    else:
-        bpy.context.view_layer.objects.active = obj
+    bpy.context.view_layer.objects.active = obj
         
     bpy.ops.object.mode_set(mode=mode, toggle=False)
 
 #######################################################
 def link_object(obj, collection):
     collection.objects.link(obj)
-    if (2, 80, 0) > bpy.app.version:
-        bpy.context.scene.objects.link(obj)
-        
+
 #######################################################        
 def create_collection(name, link=True):
-    if (2, 80, 0) > bpy.app.version:
-        return bpy.data.groups.new(name)
-    else:
-        collection = bpy.data.collections.new(name)
-        if link:
-            bpy.context.scene.collection.children.link(collection)
-            
-        return collection        
+    collection = bpy.data.collections.new(name)
+    if link:
+        bpy.context.scene.collection.children.link(collection)
+
+    return collection
         
 #######################################################
 def hide_object(object, hide=True):
-    if (2, 80, 0) > bpy.app.version:
-        object.hide = hide
-    else:
-        object.hide_set(hide)
+    object.hide_set(hide)
 
 
 #######################################################
@@ -250,11 +238,10 @@ class material_helper:
         self.principled = None
 
         # Init Principled Wrapper for Blender 2.8
-        if bpy.app.version >= (2, 80, 0):
-            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-            
-            self.principled = PrincipledBSDFWrapper(self.material,
-                                                    is_readonly=False)
+        from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+
+        self.principled = PrincipledBSDFWrapper(self.material,
+                                                is_readonly=False)
 
 #######################################################
 class object_helper:
