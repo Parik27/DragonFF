@@ -86,6 +86,13 @@ def register():
     for cls in _classes:
         register_class(cls)
 
+    bpy.types.Scene.dff = bpy.props.PointerProperty(type=gui.DFFSceneProps)
+    bpy.types.Light.ext_2dfx = bpy.props.PointerProperty(type=gui.Light2DFXObjectProps)
+    bpy.types.TextCurve.ext_2dfx = bpy.props.PointerProperty(type=gui.RoadSign2DFXObjectProps)
+    bpy.types.Material.dff = bpy.props.PointerProperty(type=gui.DFFMaterialProps)
+    bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
+    bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
+
     if (2, 80, 0) > bpy.app.version:
         bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
         bpy.types.INFO_MT_file_export.append(gui.export_dff_func)
@@ -105,6 +112,13 @@ def register():
 
 #######################################################
 def unregister():
+
+    del bpy.types.Scene.dff
+    del bpy.types.Light.ext_2dfx
+    del bpy.types.TextCurve.ext_2dfx
+    del bpy.types.Material.dff
+    del bpy.types.Object.dff
+    del bpy.types.Collection.dff
 
     if (2, 80, 0) > bpy.app.version:
         bpy.types.INFO_MT_file_import.remove(gui.import_dff_func)

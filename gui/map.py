@@ -254,10 +254,6 @@ class DFFSceneProps(bpy.types.PropertyGroup):
             gpu.matrix.pop()
             gpu.state.depth_mask_set(False)
 
-    #######################################################
-    def register():
-        bpy.types.Scene.dff = bpy.props.PointerProperty(type=DFFSceneProps)
-
 #######################################################
 class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
 

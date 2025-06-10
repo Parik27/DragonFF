@@ -542,9 +542,6 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
         ),
         update = MATERIAL_PT_dffMaterials.set_preset_color
     )
-    
-    def register():
-        bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
         
 #######################################################
 class DFFObjectProps(bpy.types.PropertyGroup):
@@ -694,10 +691,6 @@ compatibiility with DFF Viewers"
     # Miscellaneous properties
     is_frame_locked : bpy.props.BoolProperty()
 
-    #######################################################    
-    def register():
-        bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
-
 #######################################################
 class DFFCollectionProps(bpy.types.PropertyGroup):
 
@@ -749,10 +742,6 @@ class DFFCollectionProps(bpy.types.PropertyGroup):
             shader.bind()
             shader.uniform_float("color", (0.84, 0.84, 0.54, 1))
             batch.draw(shader)
-
-    #######################################################
-    def register():
-        bpy.types.Collection.dff = bpy.props.PointerProperty(type=DFFCollectionProps)
 
 #######################################################
 class TXDImportPanel(bpy.types.Panel):

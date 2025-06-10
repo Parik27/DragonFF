@@ -221,10 +221,6 @@ class Light2DFXObjectProps(bpy.types.PropertyGroup):
         description = "Blinks (randomly)"
     )
 
-    #######################################################
-    def register():
-        bpy.types.Light.ext_2dfx = bpy.props.PointerProperty(type=Light2DFXObjectProps)
-
 #######################################################
 class RoadSign2DFXObjectProps(bpy.types.PropertyGroup):
 
@@ -264,10 +260,6 @@ class RoadSign2DFXObjectProps(bpy.types.PropertyGroup):
 
             shader.uniform_float("color", (1, 1, 0, 1))
             batch.draw(shader)
-
-    #######################################################
-    def register():
-        bpy.types.TextCurve.ext_2dfx = bpy.props.PointerProperty(type=RoadSign2DFXObjectProps)
 
 #######################################################
 class EXT2DFXMenus:
