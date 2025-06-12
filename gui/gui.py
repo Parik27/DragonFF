@@ -19,3 +19,4 @@ from .dff_menus import *
 from .ext_2dfx_menus import *
 from .dff_ot import *
 from .map import *
+from .gizmos import *

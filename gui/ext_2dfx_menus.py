@@ -1,9 +1,6 @@
 import bpy
-import gpu
 
 from bpy_extras.io_utils import ImportHelper
-from gpu_extras.batch import batch_for_shader
-from mathutils import Vector
 
 from ..gtaLib import txd
 
@@ -239,27 +236,6 @@ class RoadSign2DFXObjectProps(bpy.types.PropertyGroup):
         ),
         description = "Text color"
     )
-
-    #######################################################
-    def draw_size():
-        obj = bpy.context.active_object
-        if obj and obj.select_get() and obj.type == 'FONT' and obj.dff.type == '2DFX' and obj.dff.ext_2dfx.effect == '7':
-            settings = obj.data.ext_2dfx
-
-            size_x, size_y = settings.size
-            x, y = size_x * 0.5, size_y * 0.5
-
-            p0 = obj.matrix_world @ Vector((-x, -y, 0))
-            p1 = obj.matrix_world @ Vector((x, -y, 0))
-            p2 = obj.matrix_world @ Vector((-x, y, 0))
-            p3 = obj.matrix_world @ Vector((x, y, 0))
-
-            coords = [p0, p1, p0, p2, p1, p3, p2, p3]
-            shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-            batch = batch_for_shader(shader, 'LINES', {"pos": coords})
-
-            shader.uniform_float("color", (1, 1, 0, 1))
-            batch.draw(shader)
 
 #######################################################
 class EXT2DFXMenus:

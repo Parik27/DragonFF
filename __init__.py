@@ -68,6 +68,11 @@ _classes = [
     gui.DFF_UL_AtomicItems,
     gui.SCENE_PT_dffFrames,
     gui.SCENE_PT_dffAtomics,
+    gui.Bounds3DGizmo,
+    gui.Bound2DWidthGizmo,
+    gui.Bound2DHeightGizmo,
+    gui.CollisionCollectionGizmoGroup,
+    gui.RoadSign2DFXGizmoGroup,
     map_importer.Map_Import_Operator
 ]
 
@@ -76,8 +81,6 @@ _draw_3d_handler = None
 #######################################################
 def draw_3d_callback():
     gui.DFFSceneProps.draw_fg()
-    gui.RoadSign2DFXObjectProps.draw_size()
-    gui.DFFCollectionProps.draw_bounds()
 
 #######################################################
 def register():

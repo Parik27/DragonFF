@@ -1,6 +1,4 @@
 import bpy
-import gpu
-from gpu_extras.batch import batch_for_shader
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
     IMPORT_OT_txd, \
     OBJECT_OT_dff_generate_bone_props, \
@@ -703,40 +701,6 @@ class DFFCollectionProps(bpy.types.PropertyGroup):
 
     bounds_min: bpy.props.FloatVectorProperty()
     bounds_max: bpy.props.FloatVectorProperty()
-
-    #######################################################
-    def draw_bounds():
-        if not bpy.context.scene.dff.draw_bounds:
-            return
-
-        col = bpy.context.collection
-        if col and not col.dff.auto_bounds:
-            settings = col.dff
-
-            bounds_min = settings.bounds_min
-            bounds_max= settings.bounds_max
-
-            coords = (
-                (bounds_min[0], bounds_min[1], bounds_min[2]),
-                (bounds_min[0], bounds_min[1], bounds_max[2]),
-                (bounds_min[0], bounds_max[1], bounds_min[2]),
-                (bounds_min[0], bounds_max[1], bounds_max[2]),
-                (bounds_max[0], bounds_min[1], bounds_min[2]),
-                (bounds_max[0], bounds_min[1], bounds_max[2]),
-                (bounds_max[0], bounds_max[1], bounds_min[2]),
-                (bounds_max[0], bounds_max[1], bounds_max[2]),
-            )
-
-            if (4, 0, 0) > bpy.app.version:
-                shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
-            else:
-                shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-
-            batch = batch_for_shader(shader, 'LINES', {"pos": coords}, indices=box_indices)
-
-            shader.bind()
-            shader.uniform_float("color", (0.84, 0.84, 0.54, 1))
-            batch.draw(shader)
 
 #######################################################
 class TXDImportPanel(bpy.types.Panel):
