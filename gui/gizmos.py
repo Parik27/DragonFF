@@ -16,7 +16,7 @@
 
 import bpy
 from bpy.types import Gizmo, GizmoGroup
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 #######################################################
 class Bounds3DGizmo(Gizmo):
@@ -218,6 +218,45 @@ class Bound2DHeightGizmo(Gizmo):
         return {'RUNNING_MODAL'}
 
 #######################################################
+class VectorPlaneGizmo(Gizmo):
+
+    bl_idname = "VIEW3D_GT_vector_plane"
+    bl_target_properties = (
+        {"id": "vector", "type": 'FLOAT', "array_length": 3},
+    )
+
+    __slots__ = (
+        "custom_shape",
+    )
+
+    #######################################################
+    def draw(self, context):
+        vector = Vector(self.target_get_value("vector"))
+
+        matrix_basis = self.matrix_basis
+
+        matrix_scale = Matrix.Identity(4)
+        matrix_scale[0][0], matrix_scale[1][1], matrix_scale[2][2] = 1, 1, vector.length
+
+        matrix = vector.normalized().to_track_quat("Z", "Y").to_matrix().to_4x4() @ matrix_scale
+        matrix[0][3] = matrix_basis[0][3]
+        matrix[1][3] = matrix_basis[1][3]
+        matrix[2][3] = matrix_basis[2][3]
+
+        self.draw_custom_shape(self.custom_shape, matrix=matrix)
+
+    #######################################################
+    def setup(self):
+        shape_verts = (
+            (-1, 0, 0),
+            (-1, 0, 1),
+            (1, 0, 0),
+            (1, 0, 1),
+        )
+        if not hasattr(self, "custom_shape"):
+            self.custom_shape = self.new_custom_shape('TRI_STRIP', shape_verts)
+
+#######################################################
 class CollisionCollectionGizmoGroup(GizmoGroup):
 
     bl_idname = "OBJECT_GGT_collision_collection"
@@ -306,3 +345,115 @@ class RoadSign2DFXGizmoGroup(GizmoGroup):
         if self.width_gizmo.target_get_value("size") != tuple(obj.data.ext_2dfx.size):
             self.width_gizmo.target_set_prop("size", obj.data.ext_2dfx, "size")
             self.height_gizmo.target_set_prop("size", obj.data.ext_2dfx, "size")
+
+#######################################################
+class Escalator2DFXGizmoGroup(GizmoGroup):
+
+    bl_idname = "OBJECT_GGT_2dfx_escalator"
+    bl_label = "2DFX Escalator Widget"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'WINDOW'
+    bl_options = {'3D', 'PERSISTENT'}
+
+    #######################################################
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return (obj and obj.type == 'EMPTY' and obj.dff.type == '2DFX' and obj.dff.ext_2dfx.effect == '10')
+
+    #######################################################
+    def setup(self, context):
+
+        def get_bottom_vector():
+            return context.object.dff.ext_2dfx.val_vector_1
+
+        def get_top_vector():
+            v1 = context.object.dff.ext_2dfx.val_vector_1
+            v2 = context.object.dff.ext_2dfx.val_vector_2
+            return (v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2])
+
+        def get_end_vector():
+            v1 = context.object.dff.ext_2dfx.val_vector_2
+            v2 = context.object.dff.ext_2dfx.val_vector_3
+            return (v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2])
+
+        def get_bottom_z():
+            return context.object.dff.ext_2dfx.val_vector_1[2]
+
+        def get_top_z():
+            return context.object.dff.ext_2dfx.val_vector_2[2]
+
+        def get_end_z():
+            return context.object.dff.ext_2dfx.val_vector_3[2]
+
+        def set_bottom_z(value):
+            context.object.dff.ext_2dfx.val_vector_1[2] = value
+
+        def set_top_z(value):
+            context.object.dff.ext_2dfx.val_vector_2[2] = value
+
+        def set_end_z(value):
+            context.object.dff.ext_2dfx.val_vector_3[2] = value
+
+        def dummy(value):
+            pass
+
+        gz = self.gizmos.new("GIZMO_GT_arrow_3d")
+        gz.target_set_handler("offset", get=get_bottom_z, set=set_bottom_z)
+        self.bottom_gizmo = gz
+
+        gz = self.gizmos.new("GIZMO_GT_arrow_3d")
+        gz.target_set_handler("offset", get=get_top_z, set=set_top_z)
+        gz.color = 1.0, 0.5, 0.0
+        self.top_gizmo = gz
+
+        gz = self.gizmos.new("GIZMO_GT_arrow_3d")
+        gz.target_set_handler("offset", get=get_end_z, set=set_end_z)
+        self.end_gizmo = gz
+
+        for gz in (self.bottom_gizmo, self.top_gizmo, self.end_gizmo):
+            gz.draw_style = 'BOX'
+            gz.length = 0
+            gz.color_highlight = 1.0, 0.5, 1.0
+            gz.alpha_highlight = 0.5
+            gz.use_draw_scale = False
+
+        gz = self.gizmos.new(VectorPlaneGizmo.bl_idname)
+        gz.target_set_handler("vector", get=get_bottom_vector, set=dummy)
+        self.bottom_plane_gizmo = gz
+
+        gz = self.gizmos.new(VectorPlaneGizmo.bl_idname)
+        gz.target_set_handler("vector", get=get_top_vector, set=dummy)
+        gz.color = 1.0, 0.5, 0.0
+        self.top_plane_gizmo = gz
+
+        gz = self.gizmos.new(VectorPlaneGizmo.bl_idname)
+        gz.target_set_handler("vector", get=get_end_vector, set=dummy)
+        self.end_plane_gizmo = gz
+
+        for gz in self.gizmos:
+            gz.alpha = 0.5
+
+    #######################################################
+    def refresh(self, context):
+        obj = context.object
+        matrix = obj.matrix_world.normalized()
+
+        bottom = obj.dff.ext_2dfx.val_vector_1
+        top = obj.dff.ext_2dfx.val_vector_2
+        end = obj.dff.ext_2dfx.val_vector_3
+
+        self.bottom_gizmo.matrix_basis = matrix @ Matrix.Translation((bottom[0], bottom[1], 0))
+        self.top_gizmo.matrix_basis = matrix @ Matrix.Translation((top[0], top[1], 0))
+        self.end_gizmo.matrix_basis = matrix @ Matrix.Translation((end[0], end[1], 0))
+
+        self.bottom_plane_gizmo.matrix_basis = matrix
+        self.top_plane_gizmo.matrix_basis = matrix @ Matrix.Translation(bottom)
+        self.end_plane_gizmo.matrix_basis = matrix @ Matrix.Translation(top)
+
+        if obj.dff.ext_2dfx.escalator_direction == '0':
+            self.bottom_gizmo.color = self.bottom_plane_gizmo.color = 1, 0, 0
+            self.end_gizmo.color = self.end_plane_gizmo.color = 0, 1, 0
+        else:
+            self.bottom_gizmo.color = self.bottom_plane_gizmo.color = 0, 1, 0
+            self.end_gizmo.color = self.end_plane_gizmo.color = 1, 0, 0

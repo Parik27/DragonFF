@@ -1459,6 +1459,37 @@ class CoverPoint2dfx:
         return data
 
 #######################################################
+class Escalator2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 10
+        self.bottom = [0, 0, 0]
+        self.top = [0, 0, 0]
+        self.end = [0, 0, 0]
+        self.direction = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = Escalator2dfx(loc)
+        self.bottom = Sections.read(Vector, data, offset)
+        self.top = Sections.read(Vector, data, offset + 12)
+        self.end = Sections.read(Vector, data, offset + 24)
+        self.direction = unpack_from("<I", data, offset + 36)[0]
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = Sections.write(Vector, self.bottom)
+        data += Sections.write(Vector, self.top)
+        data += Sections.write(Vector, self.end)
+        data += pack("<I", self.direction)
+        return data
+
+#######################################################
 class Extension2dfx:
 
     #######################################################
@@ -1493,6 +1524,7 @@ class Extension2dfx:
                 7: RoadSign2dfx,
                 8: TriggerPoint2dfx,
                 9: CoverPoint2dfx,
+                10: Escalator2dfx,
             }
 
             loc = Sections.read(Vector, data, pos)

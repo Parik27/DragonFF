@@ -71,8 +71,10 @@ _classes = [
     gui.Bounds3DGizmo,
     gui.Bound2DWidthGizmo,
     gui.Bound2DHeightGizmo,
+    gui.VectorPlaneGizmo,
     gui.CollisionCollectionGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
+    gui.Escalator2DFXGizmoGroup,
     map_importer.Map_Import_Operator
 ]
 

@@ -49,6 +49,7 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
             ('7', 'Road Sign', 'Road Sign'),
             ('8', 'Trigger Point', 'Trigger Point'),
             ('9', 'Cover Point', 'Cover Point'),
+            ('10', 'Escalator', 'Escalator'),
         )
     )
 
@@ -69,6 +70,8 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
     val_str24_1 : bpy.props.StringProperty(maxlen = 23)
 
     val_vector_1 : bpy.props.FloatVectorProperty(default = [0, 0, 0])
+    val_vector_2 : bpy.props.FloatVectorProperty(default = [0, 0, 0])
+    val_vector_3 : bpy.props.FloatVectorProperty(default = [0, 0, 0])
 
     val_degree_1 : bpy.props.FloatProperty(
         min = -180,
@@ -82,6 +85,13 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
 
     val_hour_1 : bpy.props.IntProperty(min = 0, max = 24)
     val_hour_2 : bpy.props.IntProperty(min = 0, max = 24)
+
+    escalator_direction : bpy.props.EnumProperty(
+        items = (
+            ('0', 'Down', 'Down Direction'),
+            ('1', 'Up', 'Up Direction'),
+        )
+    )
 
 #######################################################
 class Light2DFXObjectProps(bpy.types.PropertyGroup):
@@ -356,6 +366,17 @@ class EXT2DFXMenus:
         box.prop(settings, "val_int_1", text="Cover Type")
 
     #######################################################
+    def draw_escalator_menu(layout, context):
+        obj = context.object
+        settings = obj.dff.ext_2dfx
+
+        box = layout.box()
+        box.prop(settings, "val_vector_1", text="Bottom")
+        box.prop(settings, "val_vector_2", text="Top")
+        box.prop(settings, "val_vector_3", text="End")
+        box.prop(settings, "escalator_direction", text="Direction")
+
+    #######################################################
     def draw_menu(effect, layout, context):
         self = EXT2DFXMenus
 
@@ -367,6 +388,7 @@ class EXT2DFXMenus:
             7: self.draw_road_sign_menu,
             8: self.draw_trigger_point_menu,
             9: self.draw_cover_point_menu,
+            10: self.draw_escalator_menu,
         }
 
         functions[effect](layout, context)

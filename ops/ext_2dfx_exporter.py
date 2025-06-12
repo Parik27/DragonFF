@@ -211,6 +211,19 @@ class ext_2dfx_exporter:
         return entry
 
     #######################################################
+    def export_escalator(self, obj, use_local_position):
+        settings = obj.dff.ext_2dfx
+        loc = obj.location if use_local_position else obj.matrix_world.translation
+
+        entry = dff.Escalator2dfx(loc)
+        entry.bottom = tuple(loc[i] + settings.val_vector_1[i] for i in range(3))
+        entry.top = tuple(loc[i] + settings.val_vector_2[i] for i in range(3))
+        entry.end = tuple(loc[i] + settings.val_vector_3[i] for i in range(3))
+        entry.direction = int(settings.escalator_direction)
+
+        return entry
+
+    #######################################################
     def export_objects(self, objects, use_local_position=False):
 
         """ Export objects and fill 2dfx entries """
@@ -223,6 +236,7 @@ class ext_2dfx_exporter:
             7: self.export_road_sign,
             8: self.export_trigger_point,
             9: self.export_cover_point,
+            10: self.export_escalator,
         }
 
         for obj in objects:

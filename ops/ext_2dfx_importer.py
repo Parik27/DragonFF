@@ -213,6 +213,25 @@ class ext_2dfx_importer:
         return obj
 
     #######################################################
+    def import_escalator(self, entry):
+        obj = bpy.data.objects.new("2dfx_escalator", None)
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+        obj.lock_rotation[2] = True
+        obj.lock_rotation_w = True
+        obj.lock_scale[0] = True
+        obj.lock_scale[1] = True
+        obj.lock_scale[2] = True
+
+        settings = obj.dff.ext_2dfx
+        settings.val_vector_1 = tuple(entry.bottom[i] - entry.loc[i] for i in range(3))
+        settings.val_vector_2 = tuple(entry.top[i] - entry.loc[i] for i in range(3))
+        settings.val_vector_3 = tuple(entry.end[i] - entry.loc[i] for i in range(3))
+        settings.escalator_direction = str(entry.direction)
+
+        return obj
+
+    #######################################################
     def get_objects(self):
 
         """ Import and return the list of imported objects """
@@ -225,6 +244,7 @@ class ext_2dfx_importer:
             7: self.import_road_sign,
             8: self.import_trigger_point,
             9: self.import_cover_point,
+            10: self.import_escalator,
         }
 
         objects = []
