@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "dragonff"
-version = "1.0.0"
+version = "1.0.3"
 name = "DragonFF"
-tagline = "Blender Add-on to edit RenderWare Formats (.dff, .txd, .col)"
+tagline = "Add-on to edit RenderWare Formats (.dff, .txd, .col)"
 maintainer = "Parik27"
 type = "add-on"
 
