@@ -19,6 +19,7 @@ from ..data import map_data
 from ..ops.importer_common import game_version
 from collections import namedtuple
 import struct
+import re
 
 Vector = namedtuple("Vector", "x y z")
 
@@ -135,31 +136,78 @@ specialSections = {
 #######################################################
 class MapDataUtility:
 
-    # Returns a dictionary of sections found in the given file
+    # Check if a filename indicates a binary IPL file
     #######################################################
-    def readFile(filepath, filename, dataStructures):
+    @staticmethod
+    def isBinaryIPL(filename):
+        # Binary IPL files end with _stream.ipl or _stream[number].ipl
+        basename = os.path.basename(filename).lower()
+        return bool(re.match(r'.*_stream\d*\.ipl$', basename))
 
+    # Read binary IPL data from a file stream (credit to Allerek)
+    #######################################################
+    @staticmethod
+    def readBinaryIPLFromStream(fileStream, dataStructures):
+        sections = {}
+        
+        # Read and unpack the header
+        header = fileStream.read(32)
+        if len(header) < 32:
+            print("Error: Invalid binary IPL file - header too short")
+            return sections
+            
+        _, num_of_instances, _, _, _, _, _, instances_offset = struct.unpack('4siiiiiii', header)
+        
+        # Read and process instance definitions
+        item_size = 40
+        insts = []
+        fileStream.seek(instances_offset)
+        
+        for i in range(num_of_instances):
+            instances = fileStream.read(40)
+            if len(instances) < 40:
+                print(f"Warning: Could not read instance {i}, reached end of file")
+                break
+                
+            # Read binary instance
+            x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, obj_id, interior, lod = struct.unpack('fffffffiii', instances)
+            
+            # Create value list (with values as strings) and map to the data struct
+            vals = [obj_id, "", interior, x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, lod]
+            insts.append(dataStructures['inst'](*[str(v) for v in vals]))
+        
+        sections["inst"] = insts
+        return sections
+
+    # Read binary IPL from standalone file or from gta3.img
+    #######################################################
+    @staticmethod
+    def readBinaryIPL(filepath, filename, dataStructures):
+        sections = {}
+        
         # Check if filename is already an absolute path
         if os.path.isabs(filename):
             fullpath = filename
         else:
-            fullpath = "%s%s" % (filepath, filename)
-        print('\nMapDataUtility reading: ' + fullpath)
-
-        sections = {}
-
+            fullpath = os.path.join(filepath, filename)
+        
+        # Try to read as standalone binary file first
         try:
-            fileStream = open(fullpath, 'r', encoding='latin-1')
-
+            with open(fullpath, 'rb') as fileStream:
+                sections = MapDataUtility.readBinaryIPLFromStream(fileStream, dataStructures)
+                print(f"Read binary IPL from standalone file: {fullpath}")
+                return sections
         except FileNotFoundError:
-
-            # If file doesn't exist, look for binary file inside gta3.img file (credit to Allerek)
-            fullpath = "%s%s" % (filepath, 'models/gta3.img')
-            with open(fullpath, 'rb') as img_file:
+            pass
+        
+        # If not found, look for it inside gta3.img (credit to Allerek)
+        img_path = os.path.join(filepath, 'models/gta3.img')
+        try:
+            with open(img_path, 'rb') as img_file:
                 # Read the first 8 bytes for the header and unpack
                 header = img_file.read(8)
                 magic, num_entries = struct.unpack('4sI', header)
-
+                
                 # Read and process directory entries
                 entry_size = 32
                 entries = []
@@ -168,68 +216,82 @@ class MapDataUtility:
                     offset, streaming_size, _, name = struct.unpack('IHH24s', entry_data)
                     name = name.split(b'\x00', 1)[0].decode('utf-8')
                     entries.append((offset, streaming_size, name))
-
+                
                 # Look for ipl file in gta3.img
+                basename = os.path.basename(filename)
                 for offset, streaming_size, name in entries:
-                    if name == filename:
-
-                        # Read and unpack the header
+                    if name == basename:
+                        # Seek to the file location in the archive
                         img_file.seek(offset * 2048)
-                        header = img_file.read(32)
-                        _, num_of_instances, _, _, _, _, _, instances_offset = struct.unpack('4siiiiiii', header)
+                        sections = MapDataUtility.readBinaryIPLFromStream(img_file, dataStructures)
+                        print(f"Read binary IPL from gta3.img: {basename}")
+                        return sections
+                
+                print(f"Binary IPL file not found: {filename}")
+        except FileNotFoundError:
+            print(f"gta3.img not found at: {img_path}")
+        
+        return sections
 
-                        # Read and process instance definitions
-                        item_size = 40
-                        read_base = offset * 2048 + instances_offset
-                        insts = []
-                        current_offset = read_base
-                        for i in range(num_of_instances):
-                            img_file.seek(current_offset)
-                            instances = img_file.read(40)
-
-                            # Read binary instance
-                            x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, obj_id, interior, lod = struct.unpack('fffffffiii', instances)
-
-                            # Create value list (with values as strings) and map to the data struct
-                            vals = [obj_id, "", interior, x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, lod]
-                            insts.append(dataStructures['inst'](*[str(v) for v in vals]))
-
-                            # Prepare for reading of next instance inside of .ipl
-                            current_offset = read_base + i * item_size
-
-                        sections["inst"] = insts
-
-        else:
-            with fileStream:
+    # Read text-based IPL/IDE file
+    #######################################################
+    @staticmethod
+    def readTextFile(fullpath, dataStructures):
+        sections = {}
+        
+        with open(fullpath, 'r', encoding='latin-1') as fileStream:
+            line = fileStream.readline().strip()
+            
+            while line:
+                # Presume we have a section start
+                sectionName = line
+                sectionUtility = None
+                
+                if line in specialSections:
+                    # Section requires some special reading / writing procedures
+                    sectionUtility = specialSections[sectionName](
+                        sectionName, dataStructures
+                    )
+                elif line in dataStructures:
+                    # Section is generic,
+                    # can be read / written to with the default utility
+                    sectionUtility = GenericSectionUtility(
+                        sectionName, dataStructures
+                    )
+                
+                if sectionUtility is not None:
+                    sections[sectionName] = sectionUtility.read(fileStream)
+                    print("%s: %d entries" % (
+                        sectionName, len(sections[sectionName])
+                    ))
+                
+                # Get next section
                 line = fileStream.readline().strip()
+        
+        return sections
 
-                while line:
+    # Returns a dictionary of sections found in the given file
+    #######################################################
+    def readFile(filepath, filename, dataStructures):
 
-                    # Presume we have a section start
-                    sectionName = line
-                    sectionUtility = None
+        # Check if filename is already an absolute path
+        if os.path.isabs(filename):
+            fullpath = filename
+        else:
+            fullpath = os.path.join(filepath, filename)
+        print('\nMapDataUtility reading: ' + fullpath)
 
-                    if line in specialSections:
-                        # Section requires some special reading / writing procedures
-                        sectionUtility = specialSections[sectionName](
-                            sectionName, dataStructures
-                        )
-                    elif line in dataStructures:
-                        # Section is generic,
-                        # can be read / written to with the default utility
-                        sectionUtility = GenericSectionUtility(
-                            sectionName, dataStructures
-                        )
+        sections = {}
 
-                    if sectionUtility is not None:
-                        sections[sectionName] = sectionUtility.read(fileStream)
-                        print("%s: %d entries" % (
-                            sectionName, len(sections[sectionName]
-                            )
-                        ))
-
-                    # Get next section
-                    line = fileStream.readline().strip()
+        # Check if this is a binary IPL file based on filename
+        if MapDataUtility.isBinaryIPL(filename):
+            sections = MapDataUtility.readBinaryIPL(filepath, filename, dataStructures)
+        else:
+            # Read as text file (IPL or IDE)
+            try:
+                sections = MapDataUtility.readTextFile(fullpath, dataStructures)
+            except FileNotFoundError:
+                print(f"File not found: {fullpath}")
 
         return sections
 
