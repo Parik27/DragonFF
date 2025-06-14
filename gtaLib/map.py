@@ -139,7 +139,11 @@ class MapDataUtility:
     #######################################################
     def readFile(filepath, filename, dataStructures):
 
-        fullpath = "%s%s" % (filepath, filename)
+        # Check if filename is already an absolute path
+        if os.path.isabs(filename):
+            fullpath = filename
+        else:
+            fullpath = "%s%s" % (filepath, filename)
         print('\nMapDataUtility reading: ' + fullpath)
 
         sections = {}
