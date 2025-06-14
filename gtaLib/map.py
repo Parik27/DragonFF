@@ -150,6 +150,9 @@ class MapDataUtility:
     def readBinaryIPLFromStream(fileStream, dataStructures):
         sections = {}
         
+        # Save the starting position (where the IPL file begins)
+        start_pos = fileStream.tell()
+        
         # Read and unpack the header
         header = fileStream.read(32)
         if len(header) < 32:
@@ -161,7 +164,8 @@ class MapDataUtility:
         # Read and process instance definitions
         item_size = 40
         insts = []
-        fileStream.seek(instances_offset)
+        # Seek relative to the start of the IPL file
+        fileStream.seek(start_pos + instances_offset)
         
         for i in range(num_of_instances):
             instances = fileStream.read(40)
