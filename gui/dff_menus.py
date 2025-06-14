@@ -190,14 +190,14 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
     # Callback function from preset_mat_cols enum
     def set_preset_color(self, context):
         try:
-            color = eval(context.material.dff.preset_mat_cols)
+            color = (int(x) for x in context.material.dff.preset_mat_cols[1:-1].split(","))
             color = [i / 255 for i in color]
                 
             node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
             node.inputs[0].default_value = color
 
             # Viewport color in Blender 2.8 and Material color in 2.79.
-            context.material.diffuse_color = color[:-1]
+            context.material.diffuse_color = color
 
         except Exception as e:
             print(e)

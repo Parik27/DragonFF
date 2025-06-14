@@ -62,6 +62,8 @@ class material_helper:
             # Set Alpha
             node = self.principled.node_principled_bsdf.inputs["Base Color"]
             node.default_value[3] = color[3] / 255
+
+            self.material.diffuse_color = [i / 255 for i in color]
             
         else:
             self.material.diffuse_color = [i / 255 for i in color[:3]]

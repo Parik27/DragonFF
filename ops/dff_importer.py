@@ -300,33 +300,33 @@ class dff_importer:
             name = "glass"
 
         colors = {
-            "[255, 60, 0, 255]": "right rear light",
-            "[185, 255, 0, 255]": "left rear light",
-            "[0, 255, 200, 255]": "right front light",
-            "[255, 175, 0, 255]": "left front light",
-            "[255, 0, 255, 255]": "fourth",
-            "[0, 255, 255, 255]": "third",
-            "[255, 0, 175, 255]": "secondary",
-            "[60, 255, 0, 255]": "primary",
-            "[184, 255, 0, 255]": "breaklight l",
-            "[255, 59, 0, 255]": "breaklight r",
-            "[255, 173, 0, 255]": "revlight L",
-            "[0, 255, 198, 255]": "revlight r",
-            "[255, 174, 0, 255]": "foglight l",
-            "[0, 255, 199, 255]": "foglight r",
-            "[183, 255, 0, 255]": "indicator lf",
-            "[255, 58, 0, 255]": "indicator rf",
-            "[182, 255, 0, 255]": "indicator lm",
-            "[255, 57, 0, 255]": "indicator rm",
-            "[181, 255, 0, 255]": "indicator lr",
-            "[255, 56, 0, 255]": "indicator rr",
-            "[0, 16, 255, 255]": "light night",
-            "[0, 17, 255, 255]": "light all-day",
-            "[0, 18, 255, 255]": "default day"
+            (255, 60, 0, 255): "right rear light",
+            (185, 255, 0, 255): "left rear light",
+            (0, 255, 200, 255): "right front light",
+            (255, 175, 0, 255): "left front light",
+            (255, 0, 255, 255): "fourth",
+            (0, 255, 255, 255): "third",
+            (255, 0, 175, 255): "secondary",
+            (60, 255, 0, 255): "primary",
+            (184, 255, 0, 255): "breaklight l",
+            (255, 59, 0, 255): "breaklight r",
+            (255, 173, 0, 255): "revlight L",
+            (0, 255, 198, 255): "revlight r",
+            (255, 174, 0, 255): "foglight l",
+            (0, 255, 199, 255): "foglight r",
+            (183, 255, 0, 255): "indicator lf",
+            (255, 58, 0, 255): "indicator rf",
+            (182, 255, 0, 255): "indicator lm",
+            (255, 57, 0, 255): "indicator rm",
+            (181, 255, 0, 255): "indicator lr",
+            (255, 56, 0, 255): "indicator rr",
+            (0, 16, 255, 255): "light night",
+            (0, 17, 255, 255): "light all-day",
+            (0, 18, 255, 255): "default day"
         }
 
         for color in colors:
-            if eval(color) == list(mat_color):
+            if color == tuple(mat_color):
                 name = colors[color]
                 
         return name if name else fallback
