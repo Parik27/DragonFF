@@ -437,7 +437,7 @@ class Escalator2DFXGizmoGroup(GizmoGroup):
     #######################################################
     def refresh(self, context):
         obj = context.object
-        matrix = obj.matrix_world.normalized()
+        matrix = Matrix.Translation(obj.matrix_world.to_translation())
 
         bottom = obj.dff.ext_2dfx.val_vector_1
         top = obj.dff.ext_2dfx.val_vector_2

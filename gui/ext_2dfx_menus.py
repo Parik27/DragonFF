@@ -368,9 +368,14 @@ class EXT2DFXMenus:
     #######################################################
     def draw_escalator_menu(layout, context):
         obj = context.object
+        box = layout.box()
+
+        if obj.type != 'EMPTY':
+            box.label(text="This effect is only available for empty objects", icon="ERROR")
+            return
+
         settings = obj.dff.ext_2dfx
 
-        box = layout.box()
         box.prop(settings, "val_vector_1", text="Bottom")
         box.prop(settings, "val_vector_2", text="Top")
         box.prop(settings, "val_vector_3", text="End")
