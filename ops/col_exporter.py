@@ -274,6 +274,8 @@ def calculate_bounds(objects, apply_transformations=True):
                 # Multiplied by 2 because empty_display_size is a radius
                 dimensions = [
                     max(x * obj.empty_display_size * 2 for x in obj.scale)] * 3
+            elif obj.empty_display_type == 'CUBE':
+                dimensions = obj.scale * 2
             else:
                 dimensions = obj.scale
 

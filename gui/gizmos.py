@@ -263,7 +263,7 @@ class CollisionCollectionGizmoGroup(GizmoGroup):
     bl_label = "Collision Collection Widget"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'WINDOW'
-    bl_options = {'3D', 'PERSISTENT'}
+    bl_options = {'3D', 'PERSISTENT', 'SHOW_MODAL_ALL'}
 
     #######################################################
     @classmethod

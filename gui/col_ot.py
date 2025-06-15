@@ -201,15 +201,18 @@ class COLLECTION_OT_dff_generate_bounds(bpy.types.Operator):
     bl_label            = "Generate Bounds"
 
     #######################################################
+    @classmethod
+    def poll(cls, context):
+        col = context.collection
+        return (col and not col.dff.auto_bounds)
+
+    #######################################################
     def execute(self, context):
-        collection = context.collection
+        col = context.collection
 
-        if not collection:
-            return {'CANCELLED'}
-
-        bounds_objects = [obj for obj in collection.objects if obj.dff.type == 'COL']
+        bounds_objects = [obj for obj in col.objects if obj.dff.type == 'COL']
         bounds = col_exporter.calculate_bounds(bounds_objects)
-        collection.dff.bounds_max, collection.dff.bounds_min = bounds
+        col.dff.bounds_max, col.dff.bounds_min = bounds
 
         if context.scene.dff.draw_bounds:
             for area in context.window.screen.areas:
