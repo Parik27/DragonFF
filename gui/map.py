@@ -79,7 +79,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     custom_ipl_path : bpy.props.StringProperty(
         name        = "IPL path",
         default     = '',
-        description = "Custom IPL path"
+        description = "Custom IPL path (supports both relative paths from game root and absolute paths)"
     )
 
     use_custom_map_section : bpy.props.BoolProperty(
@@ -274,10 +274,18 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         if os.path.splitext(self.filepath)[-1].lower() == self.filename_ext:
             filepath = os.path.normpath(self.filepath)
+            # Try to find if the file is within the game directory structure
             sep_pos = filepath.upper().find(f"DATA{os.sep}MAPS")
-            game_root = filepath[:sep_pos]
-            context.scene.dff.game_root = game_root
-            context.scene.dff.custom_ipl_path = os.path.relpath(filepath, game_root)
+            
+            if sep_pos != -1:
+                # File is within game directory, use relative path
+                game_root = filepath[:sep_pos]
+                context.scene.dff.game_root = game_root
+                context.scene.dff.custom_ipl_path = os.path.relpath(filepath, game_root)
+            else:
+                # File is outside game directory, use absolute path
+                # Don't change game_root, keep the existing one
+                context.scene.dff.custom_ipl_path = filepath
         return {'FINISHED'}
 
 #######################################################
