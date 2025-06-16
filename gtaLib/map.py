@@ -20,6 +20,7 @@ from ..ops.importer_common import game_version
 from collections import namedtuple
 import struct
 import re
+from io import StringIO
 
 Vector = namedtuple("Vector", "x y z")
 
@@ -136,13 +137,19 @@ specialSections = {
 #######################################################
 class MapDataUtility:
 
-    # Check if a filename indicates a binary IPL file
+    # Check if file stream contains binary IPL data by reading its header
     #######################################################
     @staticmethod
-    def isBinaryIPL(filename):
-        # Binary IPL files end with _stream.ipl or _stream[number].ipl
-        basename = os.path.basename(filename).lower()
-        return bool(re.match(r'.*_stream\d*\.ipl$', basename))
+    def isBinaryIPLStream(fileStream):
+        # Binary IPL files always start with the ASCII string "bnry"
+        current_pos = fileStream.tell()
+        try:
+            header = fileStream.read(4)
+            fileStream.seek(current_pos)
+            return header == b'bnry'
+        except (IOError, OSError):
+            fileStream.seek(current_pos)
+            return False
 
     # Read binary IPL data from a file stream (credit to Allerek)
     #######################################################
@@ -237,6 +244,42 @@ class MapDataUtility:
         
         return sections
 
+    # Read text-based IPL/IDE file from stream
+    #######################################################
+    @staticmethod
+    def readTextFileFromStream(fileStream, dataStructures):
+        sections = {}
+        
+        line = fileStream.readline().strip()
+        
+        while line:
+            # Presume we have a section start
+            sectionName = line
+            sectionUtility = None
+            
+            if line in specialSections:
+                # Section requires some special reading / writing procedures
+                sectionUtility = specialSections[sectionName](
+                    sectionName, dataStructures
+                )
+            elif line in dataStructures:
+                # Section is generic,
+                # can be read / written to with the default utility
+                sectionUtility = GenericSectionUtility(
+                    sectionName, dataStructures
+                )
+            
+            if sectionUtility is not None:
+                sections[sectionName] = sectionUtility.read(fileStream)
+                print("%s: %d entries" % (
+                    sectionName, len(sections[sectionName])
+                ))
+            
+            # Get next section
+            line = fileStream.readline().strip()
+        
+        return sections
+
     # Read text-based IPL/IDE file
     #######################################################
     @staticmethod
@@ -244,33 +287,8 @@ class MapDataUtility:
         sections = {}
         
         with open(fullpath, 'r', encoding='latin-1') as fileStream:
-            line = fileStream.readline().strip()
-            
-            while line:
-                # Presume we have a section start
-                sectionName = line
-                sectionUtility = None
-                
-                if line in specialSections:
-                    # Section requires some special reading / writing procedures
-                    sectionUtility = specialSections[sectionName](
-                        sectionName, dataStructures
-                    )
-                elif line in dataStructures:
-                    # Section is generic,
-                    # can be read / written to with the default utility
-                    sectionUtility = GenericSectionUtility(
-                        sectionName, dataStructures
-                    )
-                
-                if sectionUtility is not None:
-                    sections[sectionName] = sectionUtility.read(fileStream)
-                    print("%s: %d entries" % (
-                        sectionName, len(sections[sectionName])
-                    ))
-                
-                # Get next section
-                line = fileStream.readline().strip()
+            fileStream.name = fullpath  # Ensure name attribute is set
+            sections = MapDataUtility.readTextFileFromStream(fileStream, dataStructures)
         
         return sections
 
@@ -287,15 +305,20 @@ class MapDataUtility:
 
         sections = {}
 
-        # Check if this is a binary IPL file based on filename
-        if MapDataUtility.isBinaryIPL(filename):
-            sections = MapDataUtility.readBinaryIPL(filepath, filename, dataStructures)
-        else:
-            # Read as text file (IPL or IDE)
-            try:
-                sections = MapDataUtility.readTextFile(fullpath, dataStructures)
-            except FileNotFoundError:
-                print(f"File not found: {fullpath}")
+        try:
+            with open(fullpath, 'rb') as fileStream:
+                if MapDataUtility.isBinaryIPLStream(fileStream):
+                    sections = MapDataUtility.readBinaryIPLFromStream(fileStream, dataStructures)
+                    print(f"Read binary IPL from file: {fullpath}")
+                else:
+                    binary_data = fileStream.read()
+                    text_data = binary_data.decode('latin-1')
+                    text_stream = StringIO(text_data)
+                    text_stream.name = fullpath  # Set name attribute for IDE filename detection
+                    sections = MapDataUtility.readTextFileFromStream(text_stream, dataStructures)
+                
+        except FileNotFoundError:
+            print(f"File not found: {fullpath}")
 
         return sections
 
