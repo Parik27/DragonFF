@@ -4,7 +4,10 @@ from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
     OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
-from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col, COLLECTION_OT_dff_generate_bounds
+from .col_ot import EXPORT_OT_col, \
+    OBJECT_OT_facegoups_col, \
+    COLLECTION_OT_dff_generate_bounds, \
+    OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 
 texture_filters_items = (
@@ -218,7 +221,7 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op.use_active_collection = False
 
 
-    #######################################################
+#######################################################
 def import_dff_func(self, context):
     self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff, col)")
 
@@ -844,3 +847,24 @@ class SCENE_PT_dffAtomics(bpy.types.Panel):
         if not scene_dff.real_time_update:
             col = row.column()
             col.operator(SCENE_OT_dff_update.bl_idname, icon='FILE_REFRESH', text="")
+
+#######################################################@
+class DFF_MT_AddCollisionObject(bpy.types.Menu):
+    bl_label = "Collision"
+
+    def draw(self, context):
+        self.layout.operator(OBJECT_OT_dff_add_collision_box.bl_idname, text="Box", icon="CUBE")
+        self.layout.operator(OBJECT_OT_dff_add_collision_sphere.bl_idname, text="Sphere", icon="SPHERE")
+
+#######################################################@
+class DFF_MT_AddObject(bpy.types.Menu):
+    bl_label = "DragonFF"
+
+    def draw(self, context):
+        self.layout.menu("DFF_MT_AddCollisionObject", text="Collision")
+        self.layout.menu("DFF_MT_Add2DFXObject", text="2DFX")
+
+#######################################################
+def add_object_dff_func(self, context):
+    self.layout.separator()
+    self.layout.menu("DFF_MT_AddObject", text="DragonFF")

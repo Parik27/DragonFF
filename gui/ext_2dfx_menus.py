@@ -2,6 +2,7 @@ import bpy
 
 from bpy_extras.io_utils import ImportHelper
 
+from .ext_2dfx_ot import *
 from ..gtaLib import txd
 
 particle_txd_names = [
@@ -397,3 +398,16 @@ class EXT2DFXMenus:
         }
 
         functions[effect](layout, context)
+
+#######################################################@
+class DFF_MT_Add2DFXObject(bpy.types.Menu):
+    bl_label = "2DFX"
+
+    def draw(self, context):
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_light.bl_idname, text="Light", icon="LIGHT")
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_particle.bl_idname, text="Particle", icon="PARTICLES")
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_sun_glare.bl_idname, text="Sun Glare", icon="LIGHT_SUN")
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_road_sign.bl_idname, text="Road Sign", icon="TEXT")
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_trigger_point.bl_idname, text="Trigger Point", icon="KEYFRAME")
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_cover_point.bl_idname, text="Cover Point", icon="MOD_PHYSICS")
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_escalator.bl_idname, text="Escalator", icon="MOD_ARRAY")

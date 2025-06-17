@@ -220,3 +220,76 @@ class COLLECTION_OT_dff_generate_bounds(bpy.types.Operator):
                     area.tag_redraw()
 
         return {'FINISHED'}
+
+#######################################################
+class AddCollisionHelper:
+    bl_options = {'REGISTER', 'UNDO'}
+
+    location: bpy.props.FloatVectorProperty(
+        name="Location",
+        description="Location for the newly added object",
+        subtype='XYZ',
+        default=(0, 0, 0)
+    )
+
+    radius: bpy.props.FloatProperty(
+        name="Radius",
+        description="Radius",
+        default=1,
+        min=0.001
+    )
+
+    #######################################################
+    def invoke(self, context, event):
+        self.location = context.scene.cursor.location
+        return self.execute(context)
+
+#######################################################
+class OBJECT_OT_dff_add_collision_box(bpy.types.Operator, AddCollisionHelper):
+
+    bl_idname = "object.dff_add_collision_box"
+    bl_label = "Add Collision Box"
+    bl_description = "Add collision box to the scene"
+
+    #######################################################
+    def execute(self, context):
+        ret = bpy.ops.object.empty_add(type='CUBE', radius=self.radius, location=self.location)
+        if ret != {'FINISHED'}:
+            return ret
+
+        obj = context.object
+
+        obj.name = "ColBox"
+        obj.dff.type = 'COL'
+
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+        obj.lock_rotation[2] = True
+        obj.lock_rotation_w = True
+
+        return {'FINISHED'}
+
+#######################################################
+class OBJECT_OT_dff_add_collision_sphere(bpy.types.Operator, AddCollisionHelper):
+
+    bl_idname = "object.dff_add_collision_sphere"
+    bl_label = "Add Collision Sphere"
+    bl_description = "Add collision sphere to the scene"
+
+    #######################################################
+    def execute(self, context):
+        ret = bpy.ops.object.empty_add(type='SPHERE', radius=self.radius, location=self.location)
+        if ret != {'FINISHED'}:
+            return ret
+
+        obj = context.object
+
+        obj.name = "ColSphere"
+        obj.dff.type = 'COL'
+
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+        obj.lock_rotation[2] = True
+        obj.lock_rotation_w = True
+
+        return {'FINISHED'}

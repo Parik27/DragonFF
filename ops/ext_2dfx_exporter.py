@@ -16,7 +16,7 @@
 
 import math
 
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from ..gtaLib import dff
 
@@ -215,10 +215,18 @@ class ext_2dfx_exporter:
         settings = obj.dff.ext_2dfx
         loc = obj.location if use_local_position else obj.matrix_world.translation
 
+        matrix = obj.matrix_world.to_quaternion().to_matrix().to_4x4()
+        for axis in range(3):
+            matrix[axis][3] = loc[axis]
+
+        bottom = (matrix @ Matrix.Translation(settings.val_vector_1)).to_translation()
+        top = (matrix @ Matrix.Translation(settings.val_vector_2)).to_translation()
+        end = (matrix @ Matrix.Translation(settings.val_vector_3)).to_translation()
+
         entry = dff.Escalator2dfx(loc)
-        entry.bottom = tuple(loc[i] + settings.val_vector_1[i] for i in range(3))
-        entry.top = tuple(loc[i] + settings.val_vector_2[i] for i in range(3))
-        entry.end = tuple(loc[i] + settings.val_vector_3[i] for i in range(3))
+        entry.bottom = tuple(bottom)
+        entry.top = tuple(top)
+        entry.end = tuple(end)
         entry.direction = int(settings.escalator_direction)
 
         return entry

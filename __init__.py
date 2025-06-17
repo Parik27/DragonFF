@@ -45,6 +45,15 @@ _classes = [
     gui.OBJECT_OT_dff_set_parent_bone,
     gui.OBJECT_OT_dff_clear_parent_bone,
     gui.OBJECT_OT_facegoups_col,
+    gui.OBJECT_OT_dff_add_collision_box,
+    gui.OBJECT_OT_dff_add_collision_sphere,
+    gui.OBJECT_OT_dff_add_2dfx_light,
+    gui.OBJECT_OT_dff_add_2dfx_particle,
+    gui.OBJECT_OT_dff_add_2dfx_sun_glare,
+    gui.OBJECT_OT_dff_add_2dfx_road_sign,
+    gui.OBJECT_OT_dff_add_2dfx_trigger_point,
+    gui.OBJECT_OT_dff_add_2dfx_cover_point,
+    gui.OBJECT_OT_dff_add_2dfx_escalator,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
@@ -64,6 +73,9 @@ _classes = [
     gui.DFF_MT_ExportChoice,
     gui.DFF_MT_EditArmature,
     gui.DFF_MT_Pose,
+    gui.DFF_MT_AddCollisionObject,
+    gui.DFF_MT_Add2DFXObject,
+    gui.DFF_MT_AddObject,
     gui.DFF_UL_FrameItems,
     gui.DFF_UL_AtomicItems,
     gui.SCENE_PT_dffFrames,
@@ -104,6 +116,7 @@ def register():
     bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
     bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
     bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
+    bpy.types.VIEW3D_MT_add.append(gui.add_object_dff_func)
 
     global _draw_3d_handler
     _draw_3d_handler = bpy.types.SpaceView3D.draw_handler_add(draw_3d_callback, (), 'WINDOW', 'POST_VIEW')
@@ -126,6 +139,7 @@ def unregister():
     bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
     bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
     bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
+    bpy.types.VIEW3D_MT_add.remove(gui.add_object_dff_func)
 
     bpy.types.SpaceView3D.draw_handler_remove(_draw_3d_handler, 'WINDOW')
 

@@ -365,17 +365,19 @@ class Escalator2DFXGizmoGroup(GizmoGroup):
     def setup(self, context):
 
         def get_bottom_vector():
-            return context.object.dff.ext_2dfx.val_vector_1
+            v1 = context.object.matrix_world.to_translation()
+            v2 = self.bottom_gizmo.matrix_world.to_translation()
+            return v2 - v1
 
         def get_top_vector():
-            v1 = context.object.dff.ext_2dfx.val_vector_1
-            v2 = context.object.dff.ext_2dfx.val_vector_2
-            return (v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2])
+            v1 = self.bottom_gizmo.matrix_world.to_translation()
+            v2 = self.top_gizmo.matrix_world.to_translation()
+            return v2 - v1
 
         def get_end_vector():
-            v1 = context.object.dff.ext_2dfx.val_vector_2
-            v2 = context.object.dff.ext_2dfx.val_vector_3
-            return (v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2])
+            v1 = self.top_gizmo.matrix_world.to_translation()
+            v2 = self.end_gizmo.matrix_world.to_translation()
+            return v2 - v1
 
         def get_bottom_z():
             return context.object.dff.ext_2dfx.val_vector_1[2]
@@ -437,7 +439,7 @@ class Escalator2DFXGizmoGroup(GizmoGroup):
     #######################################################
     def refresh(self, context):
         obj = context.object
-        matrix = Matrix.Translation(obj.matrix_world.to_translation())
+        matrix = obj.matrix_world.normalized()
 
         bottom = obj.dff.ext_2dfx.val_vector_1
         top = obj.dff.ext_2dfx.val_vector_2
