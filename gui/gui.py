@@ -20,3 +20,5 @@ from .ext_2dfx_menus import *
 from .dff_ot import *
 from .map import *
 from .gizmos import *
+from .ipl_ot import *
+from .ide_ot import *

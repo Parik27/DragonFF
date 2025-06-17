@@ -8,6 +8,96 @@ from ..data import map_data
 from ..ops.importer_common import game_version
 
 #######################################################
+class IDEObjectProps(bpy.types.PropertyGroup):
+    """IDE properties for objects"""
+    
+    obj_id: bpy.props.StringProperty(
+        name="Object ID",
+        description="Unique object ID in IDE files",
+        default=""
+    )
+    
+    model_name: bpy.props.StringProperty(
+        name="Model Name",
+        description="Model name (should match DFF filename)",
+        default=""
+    )
+    
+    txd_name: bpy.props.StringProperty(
+        name="TXD Name",
+        description="Texture dictionary name",
+        default=""
+    )
+    
+    flags: bpy.props.StringProperty(
+        name="Flags",
+        description="Object flags",
+        default="0"
+    )
+    
+    draw_distance: bpy.props.StringProperty(
+        name="Draw Distance",
+        description="Single draw distance",
+        default="100"
+    )
+    
+    draw_distance1: bpy.props.StringProperty(
+        name="Draw Distance 1",
+        description="First draw distance (for multi-LOD objects)",
+        default=""
+    )
+    
+    draw_distance2: bpy.props.StringProperty(
+        name="Draw Distance 2",
+        description="Second draw distance (for multi-LOD objects)",
+        default=""
+    )
+    
+    draw_distance3: bpy.props.StringProperty(
+        name="Draw Distance 3",
+        description="Third draw distance (for multi-LOD objects)",
+        default=""
+    )
+    
+    obj_type: bpy.props.EnumProperty(
+        name="Object Type",
+        description="IDE object type",
+        items=[
+            ('objs', 'Regular Object', 'Standard object'),
+            ('tobj', 'Time Object', 'Time-based object')
+        ],
+        default='objs'
+    )
+    
+    time_on: bpy.props.StringProperty(
+        name="Time On",
+        description="Hour when object appears (0-23)",
+        default="0"
+    )
+    
+    time_off: bpy.props.StringProperty(
+        name="Time Off",
+        description="Hour when object disappears (0-23)",
+        default="24"
+    )
+
+#######################################################
+class IPLObjectProps(bpy.types.PropertyGroup):
+    """IPL properties for objects"""
+    
+    interior: bpy.props.StringProperty(
+        name="Interior",
+        description="Interior ID (0 for exterior)",
+        default="0"
+    )
+    
+    lod: bpy.props.StringProperty(
+        name="LOD",
+        description="LOD object ID (-1 for no LOD)",
+        default="-1"
+    )
+
+#######################################################
 class DFFFrameProps(bpy.types.PropertyGroup):
     obj  : bpy.props.PointerProperty(type=bpy.types.Object)
     icon : bpy.props.StringProperty()
@@ -283,7 +373,7 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
 #######################################################
 class MapImportPanel(bpy.types.Panel):
     """Creates a Panel in the scene context of the properties editor"""
-    bl_label = "DragonFF - Map Import"
+    bl_label = "DragonFF - Map I/O"
     bl_idname = "SCENE_PT_layout"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -322,3 +412,110 @@ class MapImportPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("scene.dragonff_map_import")
+        
+        layout.separator()
+        
+        row = layout.row()
+        row.operator("export_ipl.scene", text="Export IPL")
+        
+        row = layout.row()
+        row.operator("export_ide.scene", text="Export IDE")
+
+
+#######################################################
+class MapObjectPanel(bpy.types.Panel):
+    """Panel for IPL/IDE object properties"""
+    bl_label = "DragonFF - Map Properties"
+    bl_idname = "OBJECT_PT_map_props"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "object"
+    
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None
+    
+    def draw(self, context):
+        layout = self.layout
+        obj = context.object
+        
+        # IPL Data
+        box = layout.box()
+        box.label(text="IPL Data (Instance Placement):", icon='OUTLINER_OB_EMPTY')
+        
+        col = box.column()
+        
+        row = col.row()
+        row.label(text="Object ID:")
+        row.label(text=obj.ide.obj_id if obj.ide.obj_id else "Not Set")
+        
+        row = col.row()
+        row.label(text="Model Name:")
+        row.label(text=obj.ide.model_name if obj.ide.model_name else "Not Set")
+        
+        row = col.row()
+        row.prop(obj.ipl, "interior")
+        
+        if context.scene.dff.game_version_dropdown == game_version.SA:
+            row = col.row()
+            row.prop(obj.ipl, "lod")
+        
+        # Show current transform
+        col.separator()
+        col.label(text="Transform:")
+        col.label(text=f"Position: {obj.location.x:.3f}, {obj.location.y:.3f}, {obj.location.z:.3f}")
+        rot = obj.rotation_quaternion
+        col.label(text=f"Rotation: {rot.x:.3f}, {rot.y:.3f}, {rot.z:.3f}, {rot.w:.3f}")
+        
+        # IDE Data
+        box = layout.box()
+        box.label(text="IDE Data (Object Definition):", icon='OUTLINER_DATA_MESH')
+        
+        col = box.column()
+        
+        # Object ID
+        row = col.row(align=True)
+        row.prop(obj.ide, "obj_id")
+        
+        # Model Name
+        row = col.row()
+        row.prop(obj.ide, "model_name")
+        
+        # Object Type
+        row = col.row()
+        row.prop(obj.ide, "obj_type")
+        
+        # TXD Name
+        row = col.row()
+        row.prop(obj.ide, "txd_name")
+        
+        # Flags
+        row = col.row()
+        row.prop(obj.ide, "flags")
+        
+        # Draw Distances
+        col.separator()
+        col.label(text="Draw Distances:")
+        
+        # Check which draw distance format to use
+        if obj.ide.draw_distance1 or obj.ide.draw_distance2 or obj.ide.draw_distance3:
+            # Multiple draw distances
+            row = col.row()
+            row.prop(obj.ide, "draw_distance1")
+            row = col.row()
+            row.prop(obj.ide, "draw_distance2")
+            row = col.row()
+            row.prop(obj.ide, "draw_distance3")
+        else:
+            # Single draw distance
+            row = col.row()
+            row.prop(obj.ide, "draw_distance")
+        
+        # Time Object Properties
+        if obj.ide.obj_type == 'tobj':
+            col.separator()
+            col.label(text="Time Object Properties:")
+            
+            row = col.row()
+            row.prop(obj.ide, "time_on")
+            row.prop(obj.ide, "time_off")
