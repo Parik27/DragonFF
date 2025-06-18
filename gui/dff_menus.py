@@ -9,6 +9,8 @@ from .col_ot import EXPORT_OT_col, \
     COLLECTION_OT_dff_generate_bounds, \
     OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
+from .ide_ot import EXPORT_OT_ide
+from .ipl_ot import EXPORT_OT_ipl
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -219,6 +221,10 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
         op.use_active_collection = False
+        self.layout.operator(EXPORT_OT_ide.bl_idname,
+                             text="DragonFF IDE (.ide)")
+        self.layout.operator(EXPORT_OT_ipl.bl_idname,
+                             text="DragonFF IPL (.ipl)")
 
 
 #######################################################
