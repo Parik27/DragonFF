@@ -685,16 +685,16 @@ class Frame:
 
         data = b''
 
-        if self.name is not None and self.name != "unknown":
-            data += Sections.write_chunk(Sections.pad_string(self.name),
-                                         types["Frame"])
-
         if self.bone_data is not None:
             data += self.bone_data.to_mem()
 
         if self.user_data is not None:
             data += self.user_data.to_mem()
-        
+
+        if self.name is not None and self.name != "unknown":
+            data += Sections.write_chunk(Sections.pad_string(self.name),
+                                         types["Frame"])
+
         return Sections.write_chunk(data, types["Extension"])
 
     ##################################################################
