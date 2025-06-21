@@ -45,12 +45,28 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
         items = (
             ('0', 'Light', 'Light'),
             ('1', 'Particle', 'Particle'),
+            ('3', 'Ped Attractor', 'Ped Attractor'),
             ('4', 'Sun Glare', 'Sun Glare'),
             ('6', 'Enter Exit', 'Enter Exit'),
             ('7', 'Road Sign', 'Road Sign'),
             ('8', 'Trigger Point', 'Trigger Point'),
             ('9', 'Cover Point', 'Cover Point'),
             ('10', 'Escalator', 'Escalator'),
+        )
+    )
+
+    ped_attractor_type : bpy.props.EnumProperty(
+        items = (
+            ('0', 'ATM', 'Ped uses ATM (at day time only)'),
+            ('1', 'Seat', 'Ped sits (at day time only)'),
+            ('2', 'Stop', 'Ped stands (at day time only)'),
+            ('3', 'Pizza', 'Ped stands for few seconds'),
+            ('4', 'Shelter', 'Ped goes away after spawning, but stands if weather is rainy'),
+            ('5', 'Trigger Script', 'Launches an external script'),
+            ('6', 'Look At', 'Ped looks at object, then goes away'),
+            ('7', 'Scripted', ''),
+            ('8', 'Park', 'Ped lays (at day time only, ped goes away after 6 PM)'),
+            ('9', 'Step', 'Ped sits on steps'),
         )
     )
 
@@ -74,6 +90,22 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
     val_vector_2 : bpy.props.FloatVectorProperty(default = [0, 0, 0])
     val_vector_3 : bpy.props.FloatVectorProperty(default = [0, 0, 0])
 
+    val_euler_1 : bpy.props.FloatVectorProperty(
+        default = [0, 0, 0],
+        subtype='EULER',
+        min=-math.pi * 2,
+        max=math.pi * 2,
+        step=100
+    )
+
+    val_euler_2 : bpy.props.FloatVectorProperty(
+        default = [0, 0, 0],
+        subtype='EULER',
+        min=-math.pi * 2,
+        max=math.pi * 2,
+        step=100
+    )
+
     val_degree_1 : bpy.props.FloatProperty(
         min = -180,
         max = 180
@@ -86,6 +118,8 @@ class EXT2DFXObjectProps(bpy.types.PropertyGroup):
 
     val_hour_1 : bpy.props.IntProperty(min = 0, max = 24)
     val_hour_2 : bpy.props.IntProperty(min = 0, max = 24)
+
+    val_chance_1 : bpy.props.IntProperty(min = 0, max = 100)
 
     escalator_direction : bpy.props.EnumProperty(
         items = (
@@ -313,6 +347,20 @@ class EXT2DFXMenus:
         box.prop(settings, "val_str24_1", text="Effect Name")
 
     #######################################################
+    def draw_ped_attractor(layout, context):
+        obj = context.object
+        settings = obj.dff.ext_2dfx
+
+        box = layout.box()
+        box.prop(settings, "ped_attractor_type", text="Type")
+        box.prop(settings, "val_euler_1", text="Queue Direction")
+        box.prop(obj, "rotation_euler", text="Use Direction")
+        box.prop(settings, "val_euler_2", text="Forward Direction")
+        box.prop(settings, "val_str8_1", text="External Script")
+        box.prop(settings, "val_chance_1", text="Ped Existing Probability")
+        box.prop(settings, "val_int_1", text="Unknown")
+
+    #######################################################
     def draw_sun_glare_menu(layout, context):
         pass
 
@@ -389,6 +437,7 @@ class EXT2DFXMenus:
         functions = {
             0: self.draw_light_menu,
             1: self.draw_particle_menu,
+            3: self.draw_ped_attractor,
             4: self.draw_sun_glare_menu,
             6: self.draw_enter_exit_menu,
             7: self.draw_road_sign_menu,
@@ -407,6 +456,7 @@ class DFF_MT_Add2DFXObject(bpy.types.Menu):
         self.layout.operator(OBJECT_OT_dff_add_2dfx_light.bl_idname, text="Light", icon="LIGHT")
         self.layout.operator(OBJECT_OT_dff_add_2dfx_particle.bl_idname, text="Particle", icon="PARTICLES")
         self.layout.operator(OBJECT_OT_dff_add_2dfx_sun_glare.bl_idname, text="Sun Glare", icon="LIGHT_SUN")
+        self.layout.operator(OBJECT_OT_dff_add_2dfx_ped_attractor.bl_idname, text="Ped Attractor", icon="ARMATURE_DATA")
         self.layout.operator(OBJECT_OT_dff_add_2dfx_road_sign.bl_idname, text="Road Sign", icon="TEXT")
         self.layout.operator(OBJECT_OT_dff_add_2dfx_trigger_point.bl_idname, text="Trigger Point", icon="KEYFRAME")
         self.layout.operator(OBJECT_OT_dff_add_2dfx_cover_point.bl_idname, text="Cover Point", icon="MOD_PHYSICS")

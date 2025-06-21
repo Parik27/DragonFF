@@ -301,6 +301,56 @@ class CollisionCollectionGizmoGroup(GizmoGroup):
         gz.use_draw_scale = False
 
 #######################################################
+class PedAttractor2DFXGizmoGroup(GizmoGroup):
+
+    bl_idname = "OBJECT_GGT_2dfx_ped_attractor"
+    bl_label = "2DFX Ped Attractor Widget"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'WINDOW'
+    bl_options = {'3D', 'PERSISTENT'}
+
+    #######################################################
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return (obj and obj.type == 'EMPTY' and obj.dff.type == '2DFX' and obj.dff.ext_2dfx.effect == '3')
+
+    #######################################################
+    def setup(self, context):
+
+        gz = self.gizmos.new("GIZMO_GT_arrow_3d")
+        gz.color = gz.color_highlight = 1, 0, 0
+        self.queue_dir_gizmo = gz
+
+        gz = self.gizmos.new("GIZMO_GT_arrow_3d")
+        gz.color = gz.color_highlight = 0, 1, 0
+        self.use_dir_gizmo = gz
+
+        gz = self.gizmos.new("GIZMO_GT_arrow_3d")
+        gz.color = gz.color_highlight = 0, 0, 1
+        self.forward_dir_gizmo = gz
+
+        for gz in (self.queue_dir_gizmo, self.use_dir_gizmo, self.forward_dir_gizmo):
+            gz.alpha = gz.alpha_highlight = 0.5
+            gz.length = 1
+            gz.target_set_handler("offset", get=lambda: 0, set=lambda v: None)
+            gz.use_draw_scale = False
+
+    #######################################################
+    def refresh(self, context):
+        obj = context.object
+        location = obj.matrix_world.to_translation()
+        matrix = Matrix.Translation(location)
+
+        queue_dir = obj.dff.ext_2dfx.val_euler_1
+        use_dir = obj.matrix_world.to_euler()
+        forward_dir = obj.dff.ext_2dfx.val_euler_2
+
+        self.queue_dir_gizmo.matrix_basis = matrix @ queue_dir.to_matrix().to_4x4()
+        self.use_dir_gizmo.matrix_basis = matrix @ use_dir.to_matrix().to_4x4()
+        self.forward_dir_gizmo.matrix_basis = matrix @ forward_dir.to_matrix().to_4x4()
+
+#######################################################
 class RoadSign2DFXGizmoGroup(GizmoGroup):
 
     bl_idname = "OBJECT_GGT_2dfx_road_sign"
@@ -397,9 +447,6 @@ class Escalator2DFXGizmoGroup(GizmoGroup):
         def set_end_z(value):
             context.object.dff.ext_2dfx.val_vector_3[2] = value
 
-        def dummy(value):
-            pass
-
         gz = self.gizmos.new("GIZMO_GT_arrow_3d")
         gz.target_set_handler("offset", get=get_bottom_z, set=set_bottom_z)
         self.bottom_gizmo = gz
@@ -421,16 +468,16 @@ class Escalator2DFXGizmoGroup(GizmoGroup):
             gz.use_draw_scale = False
 
         gz = self.gizmos.new(VectorPlaneGizmo.bl_idname)
-        gz.target_set_handler("vector", get=get_bottom_vector, set=dummy)
+        gz.target_set_handler("vector", get=get_bottom_vector, set=lambda v: None)
         self.bottom_plane_gizmo = gz
 
         gz = self.gizmos.new(VectorPlaneGizmo.bl_idname)
-        gz.target_set_handler("vector", get=get_top_vector, set=dummy)
+        gz.target_set_handler("vector", get=get_top_vector, set=lambda v: None)
         gz.color = 1.0, 0.5, 0.0
         self.top_plane_gizmo = gz
 
         gz = self.gizmos.new(VectorPlaneGizmo.bl_idname)
-        gz.target_set_handler("vector", get=get_end_vector, set=dummy)
+        gz.target_set_handler("vector", get=get_end_vector, set=lambda v: None)
         self.end_plane_gizmo = gz
 
         for gz in self.gizmos:

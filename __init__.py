@@ -49,6 +49,7 @@ _classes = [
     gui.OBJECT_OT_dff_add_collision_sphere,
     gui.OBJECT_OT_dff_add_2dfx_light,
     gui.OBJECT_OT_dff_add_2dfx_particle,
+    gui.OBJECT_OT_dff_add_2dfx_ped_attractor,
     gui.OBJECT_OT_dff_add_2dfx_sun_glare,
     gui.OBJECT_OT_dff_add_2dfx_road_sign,
     gui.OBJECT_OT_dff_add_2dfx_trigger_point,
@@ -85,6 +86,7 @@ _classes = [
     gui.Bound2DHeightGizmo,
     gui.VectorPlaneGizmo,
     gui.CollisionCollectionGizmoGroup,
+    gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
     gui.Escalator2DFXGizmoGroup,
     map_importer.Map_Import_Operator

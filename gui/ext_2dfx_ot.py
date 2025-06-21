@@ -96,6 +96,52 @@ class OBJECT_OT_dff_add_2dfx_particle(bpy.types.Operator, Add2DFXHelper):
         return {'FINISHED'}
 
 #######################################################
+class OBJECT_OT_dff_add_2dfx_ped_attractor(bpy.types.Operator, Add2DFXHelper):
+
+    bl_idname = "object.dff_add_2dfx_ped_attractor"
+    bl_label = "Add 2DFX Ped Attractor"
+    bl_description = "Add 2DFX Ped Attractor effect object to the scene"
+
+    ped_attractor_type : bpy.props.EnumProperty(
+        name="Type",
+        items=(
+            ('0', 'ATM', 'Ped uses ATM (at day time only)'),
+            ('1', 'Seat', 'Ped sits (at day time only)'),
+            ('2', 'Stop', 'Ped stands (at day time only)'),
+            ('3', 'Pizza', 'Ped stands for few seconds'),
+            ('4', 'Shelter', 'Ped goes away after spawning, but stands if weather is rainy'),
+            ('5', 'Trigger Script', 'Launches an external script'),
+            ('6', 'Look At', 'Ped looks at object, then goes away'),
+            ('7', 'Scripted', ''),
+            ('8', 'Park', 'Ped lays (at day time only, ped goes away after 6 PM)'),
+            ('9', 'Step', 'Ped sits on steps'),
+        ),
+        default='6'
+    )
+
+    ped_existing_probability : bpy.props.IntProperty(
+        name="Ped Existing Probability",
+        min=0,
+        max=100,
+        default=75
+    )
+
+    #######################################################
+    def execute(self, context):
+        obj = ext_2dfx_importer.create_ped_attractor_object(
+            attractor_type=self.ped_attractor_type,
+            queue_euler=(math.pi / 2, 0, math.pi),
+            use_euler=(math.pi / 2, 0, math.pi),
+            forward_euler=(math.pi / 2, 0, 0),
+            external_script='none',
+            ped_existing_probability=self.ped_existing_probability,
+            unk=0
+        )
+        self.apply_2dfx_object(context, obj, '3')
+
+        return {'FINISHED'}
+
+#######################################################
 class OBJECT_OT_dff_add_2dfx_sun_glare(bpy.types.Operator, Add2DFXHelper):
 
     bl_idname = "object.dff_add_2dfx_sun_glare"

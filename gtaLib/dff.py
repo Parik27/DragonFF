@@ -1212,7 +1212,7 @@ class PedAttractor2dfx:
     #######################################################
     # See: https://gtamods.com/wiki/2d_Effect_(RW_Section)
     #######################################################
-    class Types(Enum):
+    class Types(IntEnum):
 
         PED_ATM_ATTRACTOR = 0
         PED_SEAT_ATTRACTOR = 1
@@ -1229,12 +1229,15 @@ class PedAttractor2dfx:
     def __init__(self, loc):
 
         self.effect_id = 3
-        
+
         self.loc = loc
         self.type = 0
-        self.rotation_matrix = None
-        self.external_script = ""
+        self.queue_direction = [0, 0, 0]
+        self.use_direction = [0, 0, 0]
+        self.forward_direction = [0, 0, 0]
+        self.external_script = "none"
         self.ped_existing_probability = 0
+        self.unk = 0
 
     #######################################################
     @staticmethod
@@ -1242,19 +1245,23 @@ class PedAttractor2dfx:
         self = PedAttractor2dfx(loc)
 
         self.type = unpack_from("<I", data, offset)[0]
-        self.rotation_matrix = Sections.read(Matrix, data, offset + 4)
-        self.external_script = data[offset + 40: strlen(data, offset + 40)]
-        self.ped_existing_probabiliy = unpack_from("<I", data, offset + 48)[0]
+        self.queue_direction = Sections.read(Vector, data, offset + 4)
+        self.use_direction = Sections.read(Vector, data, offset + 16)
+        self.forward_direction = Sections.read(Vector, data, offset + 28)
+        external_script = data[offset + 40:offset + 48]
+        self.ped_existing_probability, self.unk = unpack_from("<II", data, offset + 48)
 
-        self.external_script = self.external_script.decode('ascii')
-        
+        self.external_script = external_script[:strlen(external_script)].decode('ascii')
+
         return self
 
     #######################################################
     def to_mem(self):
         data = pack("<I", self.type)
-        data += Sections.write(Matrix, self.rotation_matrix)
-        data += pack("<8sI", self.external_script, self.ped_existing_probability)
+        data += Sections.write(Vector, self.queue_direction)
+        data += Sections.write(Vector, self.use_direction)
+        data += Sections.write(Vector, self.forward_direction)
+        data += pack("<8sII", self.external_script.encode(), self.ped_existing_probability, self.unk)
 
         return data
 

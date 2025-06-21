@@ -92,6 +92,23 @@ class ext_2dfx_importer:
 
     #######################################################
     @staticmethod
+    def create_ped_attractor_object(attractor_type, queue_euler, use_euler, forward_euler,
+                                    external_script, ped_existing_probability, unk):
+        obj = bpy.data.objects.new("2dfx_ped_attractor", None)
+
+        settings = obj.dff.ext_2dfx
+        settings.ped_attractor_type = attractor_type
+        settings.val_euler_1 = queue_euler
+        obj.rotation_euler = use_euler
+        settings.val_euler_2 = forward_euler
+        settings.val_str8_1 = external_script
+        settings.val_chance_1 = ped_existing_probability
+        settings.val_int_1 = unk
+
+        return obj
+
+    #######################################################
+    @staticmethod
     def create_sun_glare_object():
         obj = bpy.data.objects.new("2dfx_sun_glare", None)
 
@@ -216,6 +233,19 @@ class ext_2dfx_importer:
         return ext_2dfx_importer.create_particle_object(effect)
 
     #######################################################
+    def import_ped_attractor(self, entry):
+        attractor_type = str(entry.type)
+        queue_euler = Vector(entry.queue_direction).to_track_quat('Z', 'Y').to_euler()
+        use_euler = Vector(entry.use_direction).to_track_quat('Z', 'Y').to_euler()
+        forward_euler = Vector(entry.forward_direction).to_track_quat('Z', 'Y').to_euler()
+        external_script = entry.external_script
+        ped_existing_probability = entry.ped_existing_probability
+        unk = entry.unk
+        return ext_2dfx_importer.create_ped_attractor_object(attractor_type,
+                                                             queue_euler, use_euler, forward_euler,
+                                                             external_script, ped_existing_probability, unk)
+
+    #######################################################
     def import_sun_glare(self, entry):
         return ext_2dfx_importer.create_sun_glare_object()
 
@@ -287,6 +317,7 @@ class ext_2dfx_importer:
         functions = {
             0: self.import_light,
             1: self.import_particle,
+            3: self.import_ped_attractor,
             4: self.import_sun_glare,
             6: self.import_enter_exit,
             7: self.import_road_sign,
