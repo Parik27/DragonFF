@@ -92,12 +92,6 @@ _classes = [
     map_importer.Map_Import_Operator
 ]
 
-_draw_3d_handler = None
-
-#######################################################
-def draw_3d_callback():
-    gui.DFFSceneProps.draw_fg()
-
 #######################################################
 def register():
 
@@ -120,9 +114,6 @@ def register():
     bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
     bpy.types.VIEW3D_MT_add.append(gui.add_object_dff_func)
 
-    global _draw_3d_handler
-    _draw_3d_handler = bpy.types.SpaceView3D.draw_handler_add(draw_3d_callback, (), 'WINDOW', 'POST_VIEW')
-
     gui.State.hook_events()
 
 #######################################################
@@ -143,7 +134,7 @@ def unregister():
     bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
     bpy.types.VIEW3D_MT_add.remove(gui.add_object_dff_func)
 
-    bpy.types.SpaceView3D.draw_handler_remove(_draw_3d_handler, 'WINDOW')
+    gui.FaceGroupsDrawer.disable_draw()
 
     gui.State.unhook_events()
 

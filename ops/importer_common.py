@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
+import bmesh
 from collections import namedtuple
 
 game_version = namedtuple("game_version", "III VC SA LCS VCS")
@@ -47,6 +48,20 @@ def create_collection(name, link=True):
 def hide_object(object, hide=True):
     object.hide_set(hide)
 
+#######################################################
+def create_bmesh_for_mesh(mesh, obj_mode):
+    if obj_mode == "EDIT":
+        bm = bmesh.from_edit_mesh(mesh)
+    else:
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+    return bm
+
+#######################################################
+def redraw_viewport():
+    for area in bpy.context.window.screen.areas:
+        if area.type == 'VIEW_3D':
+            area.tag_redraw()
 
 #######################################################
 class material_helper:
