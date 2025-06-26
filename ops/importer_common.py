@@ -189,16 +189,14 @@ class material_helper:
             fps = bpy.context.scene.render.fps
 
             action = bpy.data.actions.new(uv_anim.name)
-            anim_data = self.material.node_tree.animation_data_create()
-            anim_data.action = action
 
             fcurves = [
                 None,
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[3].default_value', index=0),
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[3].default_value', index=1),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=0),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=1),
                 None,
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[1].default_value', index=0),
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[1].default_value', index=1),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=0),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=1),
             ]
 
             for frame_idx, frame in enumerate(uv_anim.frames):
@@ -241,6 +239,9 @@ class material_helper:
                     # Could also use round here perhaps. I don't know what's better
                     kp.co = frame.time * fps, val
                     kp.interpolation = 'LINEAR'
+
+        anim_data = self.material.node_tree.animation_data_create()
+        anim_data.action = action
 
         self.material.dff.animation_name   = uv_anim.name
         self.material.dff.export_animation = True

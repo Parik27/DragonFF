@@ -210,11 +210,6 @@ class material_helper:
         # so time_inc is added for the key
         keyframes_dict = {} # (time, time_inc): [(val, is_constant_interpolation)] * 4
 
-        data_path_offset = {
-            'nodes["Mapping"].inputs[1].default_value': 2,
-            'nodes["Mapping"].inputs[3].default_value': 0,
-        }
-
         mapping = self.principled.base_color_texture.node_mapping_get()
         default_values = (
             mapping.inputs['Scale'].default_value[0],
@@ -222,6 +217,11 @@ class material_helper:
             mapping.inputs['Location'].default_value[0],
             mapping.inputs['Location'].default_value[1],
         )
+
+        data_path_offset = {
+            f'nodes["{mapping.name}"].inputs[1].default_value': 2,
+            f'nodes["{mapping.name}"].inputs[3].default_value': 0,
+        }
 
         # Set keyframes_dict
         for curve in anim_data.action.fcurves:
