@@ -264,10 +264,10 @@ class ext_2dfx_exporter:
             10: self.export_escalator,
         }
 
-        for obj in objects:
-            if obj.dff.type != '2DFX':
-                continue
+        ext_2dfx_objects = [obj for obj in objects if obj.dff.type == '2DFX']
+        ext_2dfx_objects.sort(key=lambda obj: obj.name)
 
+        for obj in ext_2dfx_objects:
             entry = functions[int(obj.dff.ext_2dfx.effect)](obj, use_local_position)
             if entry:
                 self.effects.append_entry(entry)
