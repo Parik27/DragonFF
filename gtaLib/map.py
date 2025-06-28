@@ -266,7 +266,7 @@ class MapDataUtility:
             except FileNotFoundError:
                 print("Warning: gta3.img not found at:", imgpath)
 
-        sections = self.read_file(fullpath, data_structures, ipl_section)
+        sections = self.read_file(fullpath, data_structures, aliases)
         return self.merge_dols(ipl, sections)
 
     ########################################################################

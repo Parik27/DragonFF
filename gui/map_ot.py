@@ -56,8 +56,8 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
             # Import CULL if there are any left to load
             if not self._cull_loaded:
 
-                # for cull in importer.cull_instances:
-                #     importer.import_cull(context, cull)
+                for cull in importer.cull_instances:
+                    importer.import_cull(context, cull)
 
                 self._progress_current += 1
                 self._cull_loaded = True
@@ -134,11 +134,11 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
         self._inst_loaded = False
         self._progress_total += len(self._importer.object_instances)
 
-        # if self._importer.cull_instances:
-        #     self._cull_loaded = False
-        #     self._progress_total += 1
-        # else:
-        #     self._cull_loaded = True
+        if self._importer.cull_instances:
+            self._cull_loaded = False
+            self._progress_total += 1
+        else:
+            self._cull_loaded = True
 
         if self._importer.col_files:
             self._col_index = 0

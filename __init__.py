@@ -62,6 +62,7 @@ _classes = [
     gui.EXT2DFXObjectProps,
     gui.Light2DFXObjectProps,
     gui.RoadSign2DFXObjectProps,
+    gui.CULLObjectProps,
     gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,

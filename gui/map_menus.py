@@ -122,6 +122,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    load_cull: bpy.props.BoolProperty(
+        name        = "Load Map CULL",
+        default     = False
+    )
+
     game_root : bpy.props.StringProperty(
         name = 'Game root',
         default = 'C:/Program Files (x86)/Steam/steamapps/common/',
@@ -242,6 +247,7 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "load_txd", text="Load TXD files")
         col.prop(settings, "read_mat_split", text="Read Material Split")
         col.prop(settings, "load_collisions", text="Load Map Collisions")
+        col.prop(settings, "load_cull", text="Load Map CULL")
 
         layout.separator()
 

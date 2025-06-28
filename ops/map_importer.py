@@ -18,7 +18,7 @@ import bpy
 import os
 from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer
-# from .cull_importer import cull_importer
+from .cull_importer import cull_importer
 from .importer_common import hide_object
 
 #######################################################
@@ -27,12 +27,12 @@ class map_importer:
     model_cache = {}
     object_data = []
     object_instances = []
-    # cull_instances = []
+    cull_instances = []
     col_files = []
     collision_collection = None
     object_instances_collection = None
     mesh_collection = None
-    # cull_collection = None
+    cull_collection = None
     map_section = ""
     settings = None
 
@@ -201,16 +201,16 @@ class map_importer:
             collection.children.link(c)
 
     #######################################################
-    # @staticmethod
-    # def import_cull(context, cull):
-    #     self = map_importer
+    @staticmethod
+    def import_cull(context, cull):
+        self = map_importer
 
-    #     if not self.cull_collection:
-    #         self.create_cull_collection(context)
+        if not self.cull_collection:
+            self.create_cull_collection(context)
 
-    #     obj = cull_importer.import_cull(cull)
+        obj = cull_importer.import_cull(cull)
 
-    #     self.cull_collection.objects.link(obj)
+        self.cull_collection.objects.link(obj)
 
     #######################################################
     @staticmethod
@@ -245,20 +245,20 @@ class map_importer:
             context.view_layer.active_layer_collection.hide_viewport = True
 
     #######################################################
-    # @staticmethod
-    # def create_cull_collection(context):
-    #     self = map_importer
+    @staticmethod
+    def create_cull_collection(context):
+        self = map_importer
 
-    #     coll_name = '%s CULL' % self.settings.game_version_dropdown
-    #     self.cull_collection = bpy.data.collections.get(coll_name)
+        coll_name = '%s CULL' % self.settings.game_version_dropdown
+        self.cull_collection = bpy.data.collections.get(coll_name)
 
-    #     if not self.cull_collection:
-    #         self.cull_collection = bpy.data.collections.new(coll_name)
-    #         context.scene.collection.children.link(self.cull_collection)
+        if not self.cull_collection:
+            self.cull_collection = bpy.data.collections.new(coll_name)
+            context.scene.collection.children.link(self.cull_collection)
 
-    #         # Hide collection
-    #         context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
-    #         context.view_layer.active_layer_collection.hide_viewport = True
+            # Hide collection
+            context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
+            context.view_layer.active_layer_collection.hide_viewport = True
 
     #######################################################
     @staticmethod
@@ -270,7 +270,7 @@ class map_importer:
         self.object_instances_collection = None
         self.mesh_collection = None
         self.collision_collection = None
-        # self.cull_collection = None
+        self.cull_collection = None
         self.settings = settings
 
         if self.settings.use_custom_map_section:
@@ -288,10 +288,10 @@ class map_importer:
         self.object_instances = map_data.object_instances
         self.object_data = map_data.object_data
 
-        # if self.settings.load_cull:
-        #     self.cull_instances = map_data.cull_instances
-        # else:
-        #     self.cull_instances = []
+        if self.settings.load_cull:
+            self.cull_instances = map_data.cull_instances
+        else:
+            self.cull_instances = []
 
         if self.settings.load_collisions:
 

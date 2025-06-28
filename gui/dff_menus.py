@@ -9,6 +9,7 @@ from .col_ot import EXPORT_OT_col, \
     COLLECTION_OT_dff_generate_bounds, \
     OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
+from .cull_menus import CULLObjectProps, CULLMenus
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -371,6 +372,10 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         EXT2DFXMenus.draw_menu(int(settings.effect), layout, context)
 
     #######################################################
+    def draw_cull_menu(self, context):
+        CULLMenus.draw_menu(self.layout, context)
+
+    #######################################################
     def draw_obj_menu(self, context):
 
         layout = self.layout
@@ -397,6 +402,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         elif settings.type == '2DFX':
             self.draw_2dfx_menu(context)
+
+        elif settings.type == 'CULL':
+            self.draw_cull_menu(context)
 
     #######################################################
     def draw(self, context):
@@ -540,6 +548,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('COL', 'Collision Object', 'Object is a collision object'),
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('2DFX', '2DFX', 'Object is a 2D effect'),
+            ('CULL', 'CULL', 'Object is a CULL zone'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
@@ -674,6 +683,9 @@ compatibiility with DFF Viewers"
 
     # 2DFX properties
     ext_2dfx : bpy.props.PointerProperty(type=EXT2DFXObjectProps)
+
+    # CULL properties
+    cull: bpy.props.PointerProperty(type=CULLObjectProps)
 
     # Miscellaneous properties
     is_frame_locked : bpy.props.BoolProperty()
