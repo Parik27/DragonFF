@@ -16,7 +16,6 @@
 
 import bpy
 from .gui import gui
-from .ops import map_importer
 
 from bpy.utils import register_class, unregister_class
 
@@ -40,6 +39,7 @@ _classes = [
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
+    gui.SCENE_OT_dff_import_map,
     gui.SCENE_OT_ipl_select,
     gui.OBJECT_OT_dff_generate_bone_props,
     gui.OBJECT_OT_dff_set_parent_bone,
@@ -88,8 +88,7 @@ _classes = [
     gui.CollisionCollectionGizmoGroup,
     gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
-    gui.Escalator2DFXGizmoGroup,
-    map_importer.Map_Import_Operator
+    gui.Escalator2DFXGizmoGroup
 ]
 
 #######################################################

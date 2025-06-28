@@ -18,60 +18,45 @@ import bpy
 import os
 from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer
-from .importer_common import (hide_object)
+# from .cull_importer import cull_importer
+from .importer_common import hide_object
 
 #######################################################
-class Map_Import_Operator(bpy.types.Operator):
-    """Tooltip"""
-    bl_idname = "scene.dragonff_map_import"
-    bl_label = "Import map section"
+class map_importer:
 
-    _timer = None
-    _updating = False
-    _calcs_done = False
-    _inst_index = 0
-
-    _object_instances = []
-    _object_data = []
-    _model_cache = {}
-    _col_files_all = set()
-    _col_files = []
-    _col_index = 0
-    _check_collisions = True
-    _mesh_collection = None
-    _collision_collection = None
-    _ipl_collection = None
-
+    model_cache = {}
+    object_data = []
+    object_instances = []
+    # cull_instances = []
+    col_files = []
+    collision_collection = None
+    object_instances_collection = None
+    mesh_collection = None
+    # cull_collection = None
+    map_section = ""
     settings = None
 
     #######################################################
-    def import_object(self, context):
-
-        # Are there any IPL entries left to import?
-        if self._inst_index > len(self._object_instances) - 1:
-            self._calcs_done = True
-            return
-
-        # Fetch next inst
-        inst = self._object_instances[self._inst_index]
-        self._inst_index += 1
+    @staticmethod
+    def import_object_instance(context, inst):
+        self = map_importer
 
         # Skip LODs if user selects this
         if hasattr(inst, 'lod') and int(inst.lod) == -1 and self.settings.skip_lod:
             return
 
         # Deleted objects that Rockstar forgot to remove?
-        if inst.id not in self._object_data:
+        if inst.id not in self.object_data:
             return
 
-        model = self._object_data[inst.id].modelName
-        txd = self._object_data[inst.id].txdName
+        model = self.object_data[inst.id].modelName
+        txd = self.object_data[inst.id].txdName
 
-        if inst.id in self._model_cache:
+        if inst.id in self.model_cache:
 
             # Get model from memory
             new_objects = {}
-            model_cache = self._model_cache[inst.id]
+            model_cache = self.model_cache[inst.id]
 
             cached_objects = [obj for obj in model_cache if obj.dff.type == "OBJ"]
             for obj in cached_objects:
@@ -101,7 +86,7 @@ class Map_Import_Operator(bpy.types.Operator):
             # Position root object
             for obj in new_objects.values():
                 if not obj.parent:
-                    Map_Import_Operator.apply_transformation_to_object(
+                    self.apply_transformation_to_object(
                         obj, inst
                     )
 
@@ -129,7 +114,7 @@ class Map_Import_Operator(bpy.types.Operator):
                     context.collection.objects.link(new_obj)
                 new_objects[obj] = new_obj
 
-            print(str(inst.id) + ' loaded from cache')
+            print(str(inst.id), 'loaded from cache')
         else:
 
             # Import dff from a file if file exists
@@ -158,7 +143,7 @@ class Map_Import_Operator(bpy.types.Operator):
             root_objects = [obj for obj in collection_objects if obj.dff.type == "OBJ" and not obj.parent]
 
             for obj in root_objects:
-                Map_Import_Operator.apply_transformation_to_object(
+                map_importer.apply_transformation_to_object(
                     obj, inst
                 )
 
@@ -170,15 +155,18 @@ class Map_Import_Operator(bpy.types.Operator):
                         obj.parent = root_objects[0]
 
             # Move dff collection to a top collection named for the file it came from
+            if not self.object_instances_collection:
+                self.create_object_instances_collection(context)
+
             context.scene.collection.children.unlink(importer.current_collection)
-            self._ipl_collection.children.link(importer.current_collection)
+            self.object_instances_collection.children.link(importer.current_collection)
 
             # Save into buffer
-            self._model_cache[inst.id] = collection_objects
-            print(str(inst.id) + ' loaded new')
-    
+            self.model_cache[inst.id] = collection_objects
+            print(str(inst.id), 'loaded new')
+
         # Look for collision mesh
-        name = self._model_cache[inst.id][0].name
+        name = self.model_cache[inst.id][0].name
         for obj in bpy.data.objects:
             if obj.dff.type == 'COL' and obj.name.endswith("%s.ColMesh" % name):
                 new_obj = bpy.data.objects.new(obj.name, obj.data)
@@ -186,7 +174,7 @@ class Map_Import_Operator(bpy.types.Operator):
                 new_obj.location = obj.location
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.scale = obj.scale
-                Map_Import_Operator.apply_transformation_to_object(
+                map_importer.apply_transformation_to_object(
                     new_obj, inst
                 )
                 if '{}.dff'.format(name) in bpy.data.collections:
@@ -196,152 +184,142 @@ class Map_Import_Operator(bpy.types.Operator):
                 hide_object(new_obj)
 
     #######################################################
-    def modal(self, context, event):
+    @staticmethod
+    def import_collision(context, filename):
+        self = map_importer
 
-        if event.type in {'ESC'}:
-            self.cancel(context)
-            return {'CANCELLED'}
+        if not self.collision_collection:
+            self.create_collisions_collection(context)
 
-        if event.type == 'TIMER' and not self._updating:
-            self._updating = True
-            num = 0
+        collection = bpy.data.collections.new(filename)
+        self.collision_collection.children.link(collection)
+        col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
 
-            # First run through all instances and determine which .col files to load
-            if self.settings.load_collisions and self._check_collisions:
-                for i in range(len(self._object_instances)):
-                    id = self._object_instances[i].id
-                    # Deleted objects that Rockstar forgot to remove?
-                    if id not in self._object_data:
-                        continue
-                    objdata = self._object_data[id]
-                    if not hasattr(objdata, 'filename'):
-                        continue
-                    prefix = objdata.filename.split('/')[-1][:-4].lower()
-                    for filename in self._col_files_all:
-                        if filename.startswith(prefix):
-                            if not bpy.data.collections.get(filename) and filename not in self._col_files:
-                                self._col_files.append(filename)
-                self._check_collisions = False
-
-            # Load collision files first if there are any left to load
-            elif len(self._col_files) > 0:
-                filename = self._col_files[self._col_index]
-                self._col_index += 1
-                if self._col_index >= len(self._col_files):
-                    self._col_files.clear()
-                collection = bpy.data.collections.new(filename)
-                self._collision_collection.children.link(collection)
-                col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
-                # Move all collisions to a top collection named for the file they came from
-                for c in col_list:
-                    context.scene.collection.children.unlink(c)
-                    collection.children.link(c)
-
-                # Hide this collection in the viewport (individual collision meshes will be linked and transformed
-                # as needed to their respective map sections, this collection is just for export)
-                context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
-                context.view_layer.active_layer_collection.hide_viewport = True
-
-                # Update cursor progress indicator if something needs to be loaded
-                num = (
-                        float(self._col_index) / float(len(self._col_files))
-                ) if self._col_files else 0
-
-            else:
-                # As the number of objects increases, loading performance starts to get crushed by scene updates, so
-                # we try to keep loading at least 5% of the total scene object count on each timer pulse.
-                num_objects_at_once = max(10, int(0.05 * len(bpy.data.objects)))
-
-                # Now load the actual objects
-                for x in range(num_objects_at_once):
-                    try:
-                        self.import_object(context)
-                    except:
-                        print("Can`t import model... skipping")
-
-                # Update cursor progress indicator if something needs to be loaded
-                num = (
-                    float(self._inst_index) / float(len(self._object_instances))
-                ) if self._object_instances else 0
-
-            bpy.context.window_manager.progress_update(num)
-
-            # Update dependency graph
-            # in 2.7x it's context.scene.update()
-            dg = context.evaluated_depsgraph_get()
-            dg.update() 
-
-            self._updating = False
-
-        if self._calcs_done:
-            self.cancel(context)
-            return {'FINISHED'}
-
-        return {'PASS_THROUGH'}
+        # Move all collisions to a top collection named for the file they came from
+        for c in col_list:
+            context.scene.collection.children.unlink(c)
+            collection.children.link(c)
 
     #######################################################
-    def execute(self, context):
+    # @staticmethod
+    # def import_cull(context, cull):
+    #     self = map_importer
 
-        self.settings = context.scene.dff
-        self._model_cache = {}
+    #     if not self.cull_collection:
+    #         self.create_cull_collection(context)
 
-        if self.settings.use_custom_map_section:
-            map_section = self.settings.custom_ipl_path
-        else:
-            map_section = self.settings.map_sections
+    #     obj = cull_importer.import_cull(cull)
 
-        # Get all the necessary IDE and IPL data
-        map_data = map_utilites.MapDataUtility.getMapData(
-            self.settings.game_version_dropdown,
-            self.settings.game_root,
-            map_section,
-            self.settings.use_custom_map_section)
-        
-        self._object_instances = map_data['object_instances']
-        self._object_data = map_data['object_data']
+    #     self.cull_collection.objects.link(obj)
 
-        # Create collections to organize the scene between geometry and collision
-        meshcollname = '%s Meshes' % self.settings.game_version_dropdown
-        collcollname = '%s Collisions' % self.settings.game_version_dropdown
-        self._mesh_collection = bpy.data.collections.get(meshcollname)
-        if not self._mesh_collection:
-            self._mesh_collection = bpy.data.collections.new(meshcollname)
-            context.scene.collection.children.link(self._mesh_collection)
-        self._collision_collection = bpy.data.collections.get(collcollname)
-        if not self._collision_collection:
-            self._collision_collection = bpy.data.collections.new(collcollname)
-            context.scene.collection.children.link(self._collision_collection)
+    #######################################################
+    @staticmethod
+    def create_object_instances_collection(context):
+        self = map_importer
 
-        # Hide Collision collection
-        context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[-1]
-        context.view_layer.active_layer_collection.hide_viewport = True
+        coll_name = '%s Meshes' % self.settings.game_version_dropdown
+        self.mesh_collection = bpy.data.collections.get(coll_name)
+
+        if not self.mesh_collection:
+            self.mesh_collection = bpy.data.collections.new(coll_name)
+            context.scene.collection.children.link(self.mesh_collection)
 
         # Create a new collection in Mesh to hold all the subsequent dffs loaded from this map section
-        self._ipl_collection = bpy.data.collections.new(map_section)
-        self._mesh_collection.children.link(self._ipl_collection)
-
-        # Get a list of the .col files available
-        for filename in os.listdir(self.settings.dff_folder):
-            if filename.endswith(".col"):
-                self._col_files_all.add(filename)
-
-        wm = context.window_manager
-        wm.progress_begin(0, 100.0)
-        
-         # Call the "modal" function every 0.1s
-        self._timer = wm.event_timer_add(0.1, window=context.window)
-        
-        wm.modal_handler_add(self)
-
-        return {'RUNNING_MODAL'}
+        self.object_instances_collection = bpy.data.collections.new(self.map_section)
+        self.mesh_collection.children.link(self.object_instances_collection)
 
     #######################################################
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.progress_end()
-        wm.event_timer_remove(self._timer)
+    @staticmethod
+    def create_collisions_collection(context):
+        self = map_importer
+
+        coll_name = '%s Collisions' % self.settings.game_version_dropdown
+        self.collision_collection = bpy.data.collections.get(coll_name)
+
+        if not self.collision_collection:
+            self.collision_collection = bpy.data.collections.new(coll_name)
+            context.scene.collection.children.link(self.collision_collection)
+
+            # Hide collection
+            context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
+            context.view_layer.active_layer_collection.hide_viewport = True
 
     #######################################################
+    # @staticmethod
+    # def create_cull_collection(context):
+    #     self = map_importer
+
+    #     coll_name = '%s CULL' % self.settings.game_version_dropdown
+    #     self.cull_collection = bpy.data.collections.get(coll_name)
+
+    #     if not self.cull_collection:
+    #         self.cull_collection = bpy.data.collections.new(coll_name)
+    #         context.scene.collection.children.link(self.cull_collection)
+
+    #         # Hide collection
+    #         context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
+    #         context.view_layer.active_layer_collection.hide_viewport = True
+
+    #######################################################
+    @staticmethod
+    def load_map(settings):
+        self = map_importer
+
+        self.model_cache = {}
+        self.col_files = []
+        self.object_instances_collection = None
+        self.mesh_collection = None
+        self.collision_collection = None
+        # self.cull_collection = None
+        self.settings = settings
+
+        if self.settings.use_custom_map_section:
+            self.map_section = self.settings.custom_ipl_path
+        else:
+            self.map_section = self.settings.map_sections
+
+        # Get all the necessary IDE and IPL data
+        map_data = map_utilites.MapDataUtility.load_map_data(
+            self.settings.game_version_dropdown,
+            self.settings.game_root,
+            self.map_section,
+            self.settings.use_custom_map_section)
+
+        self.object_instances = map_data.object_instances
+        self.object_data = map_data.object_data
+
+        # if self.settings.load_cull:
+        #     self.cull_instances = map_data.cull_instances
+        # else:
+        #     self.cull_instances = []
+
+        if self.settings.load_collisions:
+
+            # Get a list of the .col files available
+            col_files_all = set()
+            for filename in os.listdir(self.settings.dff_folder):
+                if filename.endswith(".col"):
+                    col_files_all.add(filename)
+
+            # Run through all instances and determine which .col files to load
+            for i in range(len(self.object_instances)):
+                id = self.object_instances[i].id
+                # Deleted objects that Rockstar forgot to remove?
+                if id not in self.object_data:
+                    continue
+
+                objdata = self.object_data[id]
+                if not hasattr(objdata, 'filename'):
+                    continue
+
+                prefix = objdata.filename.split('/')[-1][:-4].lower()
+                for filename in col_files_all:
+                    if filename.startswith(prefix):
+                        if not bpy.data.collections.get(filename) and filename not in self.col_files:
+                            self.col_files.append(filename)
+
+    #######################################################
+    @staticmethod
     def apply_transformation_to_object(obj, inst):
         obj.location.x = float(inst.posX)
         obj.location.y = float(inst.posY)
@@ -359,3 +337,9 @@ class Map_Import_Operator(bpy.types.Operator):
             obj.scale.y = float(inst.scaleY)
         if hasattr(inst, 'scaleZ'):
             obj.scale.z = float(inst.scaleZ)
+
+#######################################################
+def load_map(settings):
+    map_importer.load_map(settings)
+
+    return map_importer

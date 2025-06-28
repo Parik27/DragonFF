@@ -23,9 +23,9 @@
 from collections import namedtuple
 from ..ops.importer_common import game_version
 
-III_structures = {}
-VC_structures = {}
-SA_structures = {}
+III_structures, III_IPL_aliases, III_IDE_aliases = {}, {}, {}
+VC_structures, VC_IPL_aliases, VC_IDE_aliases = {}, {}, {}
+SA_structures, SA_IPL_aliases, SA_IDE_aliases = {}, {}, {}
 
 #############
 #    IPL    #
@@ -50,8 +50,9 @@ SA_structures['inst'] =  namedtuple("IPL_INST_SA", "id modelName interior posX p
 # Creates zones with special attributes
 III_structures['cull'] = namedtuple("IPL_CULL_3",      "centerX centerY centerZ lowerLeftX lowerLeftY lowerLeftZ upperRightX upperRightY upperRightZ flags wantedLevelDrop")
 VC_structures['cull'] =  namedtuple("IPL_CULL_VC",     "centerX centerY centerZ lowerLeftX lowerLeftY lowerLeftZ upperRightX upperRightY upperRightZ flags wantedLevelDrop")
-SA_structures['cull_1'] =  namedtuple("IPL_CULL_SA_1", "centerX centerY centerZ unknown1 widthY bottomZ widthX unknown2 topZ flag unknown3")
-SA_structures['cull_2'] =  namedtuple("IPL_CULL_SA_2", "centerX centerY centerZ unknown1 widthY bottomZ widthX unknown2 topZ flag Vx Vy Vz cm")
+SA_structures['cull_1'] =  namedtuple("IPL_CULL_SA_1", "centerX centerY centerZ skewX widthY bottomZ widthX skewY topZ flags unknown")
+SA_structures['cull_2'] =  namedtuple("IPL_CULL_SA_2", "centerX centerY centerZ skewX widthY bottomZ widthX skewY topZ flags Vx Vy Vz cm")
+SA_IPL_aliases['cull'] = ('cull_1', 'cull_2')
 
 # ZONE
 # Creates map, navigation, and info zones
@@ -79,6 +80,7 @@ SA_structures['jump'] = namedtuple("IPL_JUMP_SA", "startLowerX startLowerY start
 # This creates an audio if you enter the zone
 SA_structures['auzo_1'] = namedtuple("IPL_AUZO_SA_1", "name id switch x y z radius")
 SA_structures['auzo_2'] = namedtuple("IPL_AUZO_SA_2", "name id switch x1 y1 z1 x2 y2 z2")
+SA_IPL_aliases['auzo'] = ('auzo_1', 'auzo_2')
 
 # CARS
 # Creates a parked car generator
@@ -110,16 +112,19 @@ III_structures['objs_1'] = namedtuple("IDE_OBJS_3_1",  "id modelName txdName dra
 III_structures['objs_2'] = namedtuple("IDE_OBJS_3_2",  "id modelName txdName meshCount drawDistance flags filename")
 III_structures['objs_3'] = namedtuple("IDE_OBJS_3_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags filename")
 III_structures['objs_4'] = namedtuple("IDE_OBJS_3_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags filename")
+III_IDE_aliases['objs'] = ('objs_1', 'objs_2', 'objs_3', 'objs_4')
 
 VC_structures['objs_1'] =  namedtuple("IDE_OBJS_VC_1",  "id modelName txdName drawDistance flags filename")
 VC_structures['objs_2'] =  namedtuple("IDE_OBJS_VC_2",  "id modelName txdName meshCount drawDistance flags filename")
 VC_structures['objs_3'] =  namedtuple("IDE_OBJS_VC_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags filename")
 VC_structures['objs_4'] =  namedtuple("IDE_OBJS_VC_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags filename")
+VC_IDE_aliases['objs'] = ('objs_1', 'objs_2', 'objs_3', 'objs_4')
 
 SA_structures['objs_1'] =  namedtuple("IDE_OBJS_SA_1",  "id modelName txdName drawDistance flags filename")
 SA_structures['objs_2'] =  namedtuple("IDE_OBJS_SA_2",  "id modelName txdName meshCount drawDistance flags filename")
 SA_structures['objs_3'] =  namedtuple("IDE_OBJS_SA_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags filename")
 SA_structures['objs_4'] =  namedtuple("IDE_OBJS_SA_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags filename")
+SA_IDE_aliases['objs'] = ('objs_1', 'objs_2', 'objs_3', 'objs_4')
 
 # TOBJ
 # Defines time objects. The section functions similarly to objs but has two additional
@@ -129,16 +134,19 @@ III_structures['tobj_1'] = namedtuple("IDE_TOBJ_3_1",  "id modelName txdName dra
 III_structures['tobj_2'] = namedtuple("IDE_TOBJ_3_2",  "id modelName txdName meshCount drawDistance flags timeOn timeOff filename")
 III_structures['tobj_3'] = namedtuple("IDE_TOBJ_3_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags timeOn timeOff filename")
 III_structures['tobj_4'] = namedtuple("IDE_TOBJ_3_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags timeOn timeOff filename")
+III_IDE_aliases['tobj'] = ('tobj_1', 'tobj_2', 'tobj_3', 'tobj_4')
 
 VC_structures['tobj_1'] =  namedtuple("IDE_TOBJ_VC_1",  "id modelName txdName drawDistance flags timeOn timeOff filename")
 VC_structures['tobj_2'] =  namedtuple("IDE_TOBJ_VC_2",  "id modelName txdName meshCount drawDistance flags timeOn timeOff filename")
 VC_structures['tobj_3'] =  namedtuple("IDE_TOBJ_VC_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags timeOn timeOff filename")
 VC_structures['tobj_4'] =  namedtuple("IDE_TOBJ_VC_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags timeOn timeOff filename")
+VC_IDE_aliases['tobj'] = ('tobj_1', 'tobj_2', 'tobj_3', 'tobj_4')
 
 SA_structures['tobj_1'] =  namedtuple("IDE_TOBJ_SA_1",  "id modelName txdName drawDistance flags timeOn timeOff filename")
 SA_structures['tobj_2'] =  namedtuple("IDE_TOBJ_SA_2",  "id modelName txdName meshCount drawDistance flags timeOn timeOff filename")
 SA_structures['tobj_3'] =  namedtuple("IDE_TOBJ_SA_3",  "id modelName txdName meshCount drawDistance1 drawDistance2 flags timeOn timeOff filename")
 SA_structures['tobj_4'] =  namedtuple("IDE_TOBJ_SA_4",  "id modelName txdName meshCount drawDistance1 drawDistance2 drawDistance3 flags timeOn timeOff filename")
+SA_IDE_aliases['tobj'] = ('tobj_1', 'tobj_2', 'tobj_3', 'tobj_4')
 
 # ANIM
 # Defines animated objects. The section functions similarly to objs but has one
@@ -155,19 +163,18 @@ SA_structures['peds'] =  namedtuple("IDE_PEDS_SA", "id modelName txdName pedType
 # CARS
 # Defines vehicle objects
 # See: https://www.grandtheftwiki.com/CARS_(IDE_Section)
-III_structures['cars_boat'] =  namedtuple("IDE_CARS_3_BOAT",  "id modelName txdName type handlingId gameName vehicleClass frequency level compRules")
-III_structures['cars_train'] = namedtuple("IDE_CARS_3_TRAIN", "id modelName txdName type handlingId gameName vehicleClass frequency level compRules")
-III_structures['cars_heli'] =  namedtuple("IDE_CARS_3_HELI",  "id modelName txdName type handlingId gameName vehicleClass frequency level compRules")
-III_structures['cars_plane'] = namedtuple("IDE_CARS_3_PLANE", "id modelName txdName type handlingId gameName vehicleClass frequency level compRules lodModel")
-III_structures['cars_car'] =   namedtuple("IDE_CARS_3_CAR",   "id modelName txdName type handlingId gameName vehicleClass frequency level compRules wheelId wheelScale")
+III_structures['cars_special'] = namedtuple("IDE_CARS_3_SPECIAL", "id modelName txdName type handlingId gameName vehicleClass frequency level compRules") # boat, train, heli
+III_structures['cars_plane'] =   namedtuple("IDE_CARS_3_PLANE",   "id modelName txdName type handlingId gameName vehicleClass frequency level compRules lodModel")
+III_structures['cars_car'] =     namedtuple("IDE_CARS_3_CAR",     "id modelName txdName type handlingId gameName vehicleClass frequency level compRules wheelId wheelScale")
+III_IDE_aliases['cars'] = ('cars_special', 'cars_plane', 'cars_car')
 
-VC_structures['cars_boat'] =   namedtuple("IDE_CARS_VC_BOAT",  "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules")
-VC_structures['cars_heli'] =   namedtuple("IDE_CARS_VC_HELI",  "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules")
-VC_structures['cars_plane'] =  namedtuple("IDE_CARS_VC_PLANE", "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules lodModel")
-VC_structures['cars_car'] =    namedtuple("IDE_CARS_VC_CAR",   "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules wheelId wheelScale")
-VC_structures['cars_bike'] =   namedtuple("IDE_CARS_VC_BIKE",  "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules steeringAngle wheelScale")
+VC_structures['cars_special'] = namedtuple("IDE_CARS_VC_SPECIAL", "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules") # boat, heli
+VC_structures['cars_plane'] =   namedtuple("IDE_CARS_VC_PLANE",   "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules lodModel")
+VC_structures['cars_car'] =     namedtuple("IDE_CARS_VC_CAR",     "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules wheelId wheelScale")
+VC_structures['cars_bike'] =    namedtuple("IDE_CARS_VC_BIKE",    "id modelName txdName type handlingId gameName anims vehicleClass frequency level compRules steeringAngle wheelScale")
+VC_IDE_aliases['cars'] = ('cars_special', 'cars_plane', 'cars_car', 'cars_bike')
 
-SA_structures['cars'] =        namedtuple("IDE_CARS_SA", "id modelName txdName type handlingId gameName anims vehicleClass frequency flags comprules wheelId wheelScaleFront wheelScaleRear unknownValue")
+SA_structures['cars'] =         namedtuple("IDE_CARS_SA",         "id modelName txdName type handlingId gameName anims vehicleClass frequency flags comprules wheelId wheelScaleFront wheelScaleRear unknownValue")
 
 # HIER
 # Defines clump objects for use in cutscenes
@@ -710,26 +717,36 @@ VCS_IPL = (
 data = {
     game_version.III : {
         'structures': III_structures,
+        'IDE_aliases': III_IDE_aliases,
+        'IPL_aliases': III_IPL_aliases,
         'IDE_paths': III_IDE,
         'IPL_paths': III_IPL,
     },
     game_version.VC : {
         'structures': VC_structures,
+        'IDE_aliases': VC_IDE_aliases,
+        'IPL_aliases': VC_IPL_aliases,
         'IDE_paths': VC_IDE,
         'IPL_paths': VC_IPL,
     },
     game_version.SA : {
         'structures': SA_structures,
+        'IDE_aliases': SA_IDE_aliases,
+        'IPL_aliases': SA_IPL_aliases,
         'IDE_paths': SA_IDE,
         'IPL_paths': SA_IPL,
     },
     game_version.LCS : {
         'structures': SA_structures,
+        'IDE_aliases': SA_IDE_aliases,
+        'IPL_aliases': SA_IPL_aliases,
         'IDE_paths': LCS_IDE,
         'IPL_paths': LCS_IPL,
     },
     game_version.VCS : {
         'structures': SA_structures,
+        'IDE_aliases': SA_IDE_aliases,
+        'IPL_aliases': SA_IPL_aliases,
         'IDE_paths': VCS_IDE,
         'IPL_paths': VCS_IPL,
     },
