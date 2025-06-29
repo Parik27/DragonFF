@@ -39,21 +39,7 @@ class cull_importer:
         obj.lock_rotation_w = True
 
         settings = obj.dff.cull
-
-        settings.flag_cam_close_in_for_player   = bool(flags & (1<<0))
-        settings.flag_cam_stairs_for_player     = bool(flags & (1<<1))
-        settings.flag_cam_1st_person_for_player = bool(flags & (1<<2))
-        settings.flag_no_rain                   = bool(flags & (1<<3))
-        settings.flag_no_police                 = bool(flags & (1<<4))
-        settings.flag_5                         = bool(flags & (1<<5))
-        settings.flag_do_need_to_load_collision = bool(flags & (1<<6))
-        settings.flag_7                         = bool(flags & (1<<7))
-        settings.flag_police_abandon_cars       = bool(flags & (1<<8))
-        settings.flag_in_room_for_audio         = bool(flags & (1<<9))
-        settings.flag_water_fudge               = bool(flags & (1<<10))
-        settings.flag_military_zone             = bool(flags & (1<<12))
-        settings.flag_extra_air_resistance      = bool(flags & (1<<14))
-        settings.flag_fewer_cars                = bool(flags & (1<<15))
+        settings.flags = {str(1 << i) for i in range(16) if flags & (1 << i)}
 
         return obj
 
@@ -68,6 +54,9 @@ class cull_importer:
         flags = int(cull.flags)
 
         wanted_level_drop = 0
+        mirror_enabled = False
+        mirror_axis = 'AXIS_X'
+        mirror_coordinate = 0.0
 
         if hasattr(cull, 'widthX'):
             scale.x = float(cull.widthX)
@@ -82,8 +71,21 @@ class cull_importer:
             angle = -atan2(2 * float(cull.skewX), 2 * scale.y)
 
             if hasattr(cull, 'Vx'):
-                # TODO: mirror
-                pass
+                mirror_enabled = True
+                vx, vy, vz = float(cull.Vx), float(cull.Vy), float(cull.Vz)
+                if vx > 0.5:
+                    mirror_axis = 'AXIS_X'
+                elif vx < -0.5:
+                    mirror_axis = 'AXIS_NEGATIVE_X'
+                elif vy > 0.5:
+                    mirror_axis = 'AXIS_Y'
+                elif vy < -0.5:
+                    mirror_axis = 'AXIS_NEGATIVE_Y'
+                elif vz > 0.5:
+                    mirror_axis = 'AXIS_Z'
+                elif vz < -0.5:
+                    mirror_axis = 'AXIS_NEGATIVE_Z'
+                mirror_coordinate = float(cull.cm)
 
         elif hasattr(cull, "lowerLeftX"):
             lower_left = Vector((float(cull.lowerLeftX), float(cull.lowerLeftY), float(cull.lowerLeftZ)))
@@ -96,6 +98,10 @@ class cull_importer:
             wanted_level_drop = int(cull.wantedLevelDrop)
 
         obj = self.create_cull_object(location, scale, flags, angle)
-        obj.dff.cull.wanted_level_drop = wanted_level_drop
+        settings = obj.dff.cull
+        settings.wanted_level_drop = wanted_level_drop
+        settings.mirror_enabled = mirror_enabled
+        settings.mirror_axis = mirror_axis
+        settings.mirror_coordinate = mirror_coordinate
 
         return obj

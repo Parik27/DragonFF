@@ -16,34 +16,24 @@
 
 import bpy
 import bmesh
-from collections import namedtuple
 
-game_version = namedtuple("game_version", "III VC SA LCS VCS")
-game_version.III = 'III'
-game_version.VC = 'VC'
-game_version.SA = 'SA'
-game_version.LCS = 'LCS'
-game_version.VCS = 'VCS'
-
-#######################################################            
+#######################################################
 def set_object_mode(obj, mode):
-        
     bpy.context.view_layer.objects.active = obj
-        
     bpy.ops.object.mode_set(mode=mode, toggle=False)
 
 #######################################################
 def link_object(obj, collection):
     collection.objects.link(obj)
 
-#######################################################        
+#######################################################
 def create_collection(name, link=True):
     collection = bpy.data.collections.new(name)
     if link:
         bpy.context.scene.collection.children.link(collection)
 
     return collection
-        
+
 #######################################################
 def hide_object(object, hide=True):
     object.hide_set(hide)

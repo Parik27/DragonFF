@@ -36,6 +36,7 @@ _classes = [
     gui.IMPORT_OT_txd,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
+    gui.EXPORT_OT_ipl_cull,
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,

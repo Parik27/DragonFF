@@ -21,7 +21,13 @@
 # documented.
 
 from collections import namedtuple
-from ..ops.importer_common import game_version
+
+game_version = namedtuple("game_version", "III VC SA LCS VCS")
+game_version.III = 'III'
+game_version.VC = 'VC'
+game_version.SA = 'SA'
+game_version.LCS = 'LCS'
+game_version.VCS = 'VCS'
 
 III_structures, III_IPL_aliases, III_IDE_aliases = {}, {}, {}
 VC_structures, VC_IPL_aliases, VC_IDE_aliases = {}, {}, {}

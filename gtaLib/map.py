@@ -20,9 +20,8 @@ import struct
 from dataclasses import dataclass
 from io import BytesIO, BufferedReader, StringIO
 
+from .data import map_data
 from .img import img
-from ..data import map_data
-from ..ops.importer_common import game_version
 
 #######################################################
 @dataclass
@@ -31,11 +30,17 @@ class MapData:
     object_data: dict
     cull_instances: list
 
+#######################################################
+@dataclass
+class TextIPLData:
+    object_instances: list
+    cull_instances: list
+
 # Base for all IPL / IDE section reader / writer classes
 #######################################################
 class SectionUtility:
 
-    def __init__(self, section_name, data_structures):
+    def __init__(self, section_name, data_structures = []):
         self.section_name = section_name
         self.data_structures_dict = {len(ds._fields): ds for ds in data_structures}
 
@@ -88,8 +93,11 @@ class SectionUtility:
         return self.data_structures_dict.get(len(line_params))
 
     #######################################################
-    def write(self):
-        pass
+    def write(self, file_stream, lines):
+        file_stream.write(f"{self.section_name}\n")
+        for line in lines:
+            file_stream.write(f"{line}\n")
+        file_stream.write("end\n")
 
 # Utility for reading / writing to map data files (.IPL, .IDE)
 #######################################################
@@ -290,7 +298,7 @@ class MapDataUtility:
             # Prune IDEs unrelated to current IPL section (SA only). First, make IDE_paths a mutable list, then iterate
             # over a copy so we can remove elements during iteration. This is a naive pruning which keeps all ides with a
             # few generic keywords in their name and culls anything else with a prefix different from the given ipl_section
-            if game_id == game_version.SA:
+            if game_id == map_data.game_version.SA:
                 data['IDE_paths'] = list(data['IDE_paths'])
                 for p in data['IDE_paths'].copy():
                     if p.startswith('DATA/MAPS/generic/') or p.startswith('DATA/MAPS/leveldes/') or 'xref' in p:
@@ -352,3 +360,60 @@ class MapDataUtility:
             object_data = object_data,
             cull_instances = cull_instances
         )
+
+    ########################################################################
+    @staticmethod
+    def write_text_ipl_to_stream(file_stream, game_id, ipl_data:TextIPLData):
+        file_stream.write("# IPL generated with DragonFF\n")
+
+        section_utility = SectionUtility("inst")
+        section_utility.write(file_stream, ipl_data.object_instances)
+
+        section_utility = SectionUtility("cull")
+        section_utility.write(file_stream, ipl_data.cull_instances)
+
+        if game_id == map_data.game_version.III:
+            pass
+
+        elif game_id == map_data.game_version.VC:
+            section_utility = SectionUtility("pick")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("path")
+            section_utility.write(file_stream, [])
+
+        elif game_id == map_data.game_version.SA:
+            section_utility = SectionUtility("path")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("grge")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("enex")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("pick")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("cars")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("jump")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("tcyc")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("auzo")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("mult")
+            section_utility.write(file_stream, [])
+
+    ########################################################################
+    @staticmethod
+    def write_ipl_data(filename, game_id, ipl_data:TextIPLData):
+        self = MapDataUtility
+
+        with open(filename, 'w') as file_stream:
+            self.write_text_ipl_to_stream(file_stream, game_id, ipl_data)

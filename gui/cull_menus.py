@@ -16,83 +16,109 @@
 
 import bpy
 
-from ..ops.importer_common import game_version
+from ..gtaLib.data.map_data import game_version
 
 #######################################################
 class CULLObjectProps(bpy.types.PropertyGroup):
 
-    flag_cam_close_in_for_player : bpy.props.BoolProperty(
-        name = "Cam Close In For Player",
-        description = "Camera close in into player using closest third-person view camera mode,"
-            "does not close in if in first person or cinematic mode, camera mode cannot be changed while in the zone"
-    )
+    flags : bpy.props.EnumProperty(
+        name = "Flags",
+        items = (
+            ('1', 'Cam Close In For Player',
+             'Camera close in into player using closest third-person view camera mode,'
+                'does not close in if in first person or cinematic mode, camera mode cannot be changed while in the zone',
+             0, (1<<0)),
 
-    flag_cam_stairs_for_player : bpy.props.BoolProperty(
-        name = "Cam Stairs For Player",
-        description = "Camera remotely placed outside the zone, no control of camera, camera mode cannot be changed while in the zone"
-    )
+            ('2', 'Cam Stairs For Player',
+             'Camera remotely placed outside the zone, no control of camera, camera mode cannot be changed while in the zone',
+             0, (1<<1)),
 
-    flag_cam_1st_person_for_player : bpy.props.BoolProperty(
-        name = "Cam 1st Person For Player",
-        description = "Lowers the camera angle on boats"
-    )
+            ('4', 'Cam 1st Person For Player',
+             'Lowers the camera angle on boats',
+             0, (1<<2)),
 
-    flag_no_rain : bpy.props.BoolProperty(
-        name = "No Rain",
-        description = "Rain-free, police helicopter-free zone"
-    )
+            ('8', 'No Rain',
+             'Rain-free, police helicopter-free zone',
+             0, (1<<3)),
 
-    flag_no_police : bpy.props.BoolProperty(
-        name = "No Police",
-        description = "Police will not exit their vehicles voluntarily."
-            "They will only exit if you do something to them (like shoot it)."
-            "Cops both on foot and in vehicles will not chase you but can shoot at you"
-    )
+            ('16', 'No Police',
+             'They will only exit if you do something to them (like shoot it).'
+                'Cops both on foot and in vehicles will not chase you but can shoot at you',
+             0, (1<<4)),
 
-    flag_5 : bpy.props.BoolProperty(
-        name = "Flag 32"
-    )
+            ('32', 'Flag 32',
+             '',
+             0, (1<<5)),
 
-    flag_do_need_to_load_collision : bpy.props.BoolProperty(
-        name = "Do Need To Load Collision"
-    )
+            ('64', 'Do Need To Load Collision',
+             '',
+             0, (1<<6)),
 
-    flag_7 : bpy.props.BoolProperty(
-        name = "Flag 128"
-    )
+            ('128', 'Flag 128',
+             '',
+             0, (1<<7)),
 
-    flag_police_abandon_cars : bpy.props.BoolProperty(
-        name = "Police Abandon Cars",
-        description = "Police will always exit their vehicles once they are spawned ONLY IF you have a wanted level"
-            "If you don't, they'll drive normally"
-    )
+            ('256', 'Police Abandon Cars',
+             'Police will always exit their vehicles once they are spawned ONLY IF you have a wanted level'
+                "If you don't, they'll drive normally",
+             0, (1<<8)),
 
-    flag_in_room_for_audio : bpy.props.BoolProperty(
-        name = "In Room For Audio"
-    )
+            ('512', 'In Room For Audio',
+             '',
+             0, (1<<9)),
 
-    flag_water_fudge : bpy.props.BoolProperty(
-        name = "Water Fudge",
-        description = "Some visual ocean water effects are removed like the transparent waves and sparkles on the water"
-    )
+            ('1024', 'Water Fudge',
+             'Some visual ocean water effects are removed like the transparent waves and sparkles on the water',
+             0, (1<<10)),
 
-    flag_military_zone : bpy.props.BoolProperty(
-        name = "Military_Zone",
-        description = "5-Star Military zone"
-    )
+            ('2048', 'Flag 2048',
+             '',
+             0, (1<<11)),
 
-    flag_extra_air_resistance : bpy.props.BoolProperty(
-        name = "Extra Air Resistance",
-        description = "Doesn't allow cars to reach top speed"
-    )
+            ('4096', 'Military Zone',
+             '5-Star Military zone',
+             0, (1<<12)),
 
-    flag_fewer_cars : bpy.props.BoolProperty(
-        name = "Fewer Cars",
-        description = "Spawn fewer cars in this area"
+            ('8192', 'Flag 8192',
+             '',
+             0, (1<<13)),
+
+            ('16384', 'Extra Air Resistance',
+             "Doesn't allow cars to reach top speed",
+             0, (1<<14)),
+
+            ('32768', 'Fewer Cars',
+             "Spawn fewer cars in this area",
+             0, (1<<15)),
+        ),
+        options = {'ENUM_FLAG'}
     )
 
     wanted_level_drop : bpy.props.IntProperty(
         name = "Wanted Level Drop"
+    )
+
+    mirror_enabled : bpy.props.BoolProperty(
+        name = "Enable Mirror"
+    )
+
+    mirror_axis : bpy.props.EnumProperty(
+        name = "Mirror Axis",
+        description = "Mirror direction",
+        items = (
+            ('AXIS_X', 'X', ''),
+            ('AXIS_Y', 'Y', ''),
+            ('AXIS_Z', 'Z', ''),
+            ('AXIS_NEGATIVE_X', '-X', ''),
+            ('AXIS_NEGATIVE_Y', '-Y', ''),
+            ('AXIS_NEGATIVE_Z', '-Z', ''),
+        ),
+        default = 'AXIS_Z'
+    )
+
+    mirror_coordinate : bpy.props.FloatProperty(
+        name = "Mirror Coordinate",
+        description = "Mirror plane coordinate in direction axis"
     )
 
 #######################################################
@@ -103,41 +129,20 @@ class CULLMenus:
         obj = context.object
 
         settings = obj.dff.cull
-        game = context.scene.dff.game_version_dropdown
+        game_id = context.scene.dff.game_version_dropdown
 
         layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
 
         box = layout.box()
 
-        if game in (game_version.III, game_version.VC):
+        if game_id in (game_version.III, game_version.VC):
             box.prop(settings, "wanted_level_drop")
         else:
-            pass
+            box.prop(settings, "mirror_enabled")
+            if settings.mirror_enabled:
+                box.prop(settings, "mirror_axis")
+                box.prop(settings, "mirror_coordinate")
 
         box = layout.box()
         box.label(text="Flags")
-        box.prop(settings, "flag_cam_close_in_for_player")
-        box.prop(settings, "flag_cam_stairs_for_player")
-        box.prop(settings, "flag_cam_1st_person_for_player")
-        box.prop(settings, "flag_no_rain")
-
-        if game == game_version.III:
-            box.prop(settings, "flag_no_police")
-            box.prop(settings, "flag_5")
-            box.prop(settings, "flag_do_need_to_load_collision")
-            box.prop(settings, "flag_7")
-            box.prop(settings, "flag_police_abandon_cars")
-        elif game == game_version.VC:
-            box.prop(settings, "flag_no_police")
-            box.prop(settings, "flag_5")
-            box.prop(settings, "flag_7")
-            box.prop(settings, "flag_police_abandon_cars")
-            box.prop(settings, "flag_in_room_for_audio")
-            box.prop(settings, "flag_water_fudge")
-        else:
-            box.prop(settings, "flag_police_abandon_cars")
-            box.prop(settings, "flag_in_room_for_audio")
-            box.prop(settings, "flag_water_fudge")
-            box.prop(settings, "flag_military_zone")
-            box.prop(settings, "flag_extra_air_resistance")
-            box.prop(settings, "flag_fewer_cars")
+        box.prop(settings, "flags")

@@ -18,8 +18,7 @@ import bpy
 
 from .col_ot import FaceGroupsDrawer
 from .map_ot import SCENE_OT_ipl_select
-from ..data import map_data
-from ..ops.importer_common import game_version
+from ..gtaLib.data import map_data
 
 #######################################################
 class DFFFrameProps(bpy.types.PropertyGroup):
@@ -77,11 +76,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     game_version_dropdown : bpy.props.EnumProperty(
         name = 'Game',
         items = (
-            (game_version.III, 'GTA III', 'GTA III map segments'),
-            (game_version.VC, 'GTA VC', 'GTA VC map segments'),
-            (game_version.SA, 'GTA SA', 'GTA SA map segments'),
-            (game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
-            (game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
+            (map_data.game_version.III, 'GTA III', 'GTA III map segments'),
+            (map_data.game_version.VC, 'GTA VC', 'GTA VC map segments'),
+            (map_data.game_version.SA, 'GTA SA', 'GTA SA map segments'),
+            (map_data.game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
+            (map_data.game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
         )
     )
 

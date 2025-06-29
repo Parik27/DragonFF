@@ -16,10 +16,11 @@
 
 import bpy
 import os
+import time
 
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper, ExportHelper
 
-from ..ops import map_importer
+from ..ops import map_importer, ipl_exporter
 
 #######################################################
 class SCENE_OT_dff_import_map(bpy.types.Operator):
@@ -194,4 +195,59 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
                 # File is outside game directory, use absolute path
                 # Don't change game_root, keep the existing one
                 context.scene.dff.custom_ipl_path = filepath
+        return {'FINISHED'}
+
+#######################################################
+class EXPORT_OT_ipl_cull(bpy.types.Operator, ExportHelper):
+
+    bl_idname           = "export_scene.dff_ipl_cull"
+    bl_description      = "Export a GTA CULL IPL File"
+    bl_label            = "DragonFF CULL (.ipl)"
+    filename_ext        = ".ipl"
+
+    filepath            : bpy.props.StringProperty(name="File path",
+                                              maxlen=1024,
+                                              default="",
+                                              subtype='FILE_PATH')
+
+    filter_glob         : bpy.props.StringProperty(default="*.ipl",
+                                              options={'HIDDEN'})
+
+    only_selected       : bpy.props.BoolProperty(
+        name            = "Only Selected",
+        default         = False
+    )
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "only_selected")
+        layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
+
+    #######################################################
+    def execute(self, context):
+
+        start = time.time()
+        try:
+            ipl_exporter.export_ipl(
+                {
+                    "file_name"     : self.filepath,
+                    "only_selected" : self.only_selected,
+                    "game_id"       : context.scene.dff.game_version_dropdown,
+                    "export_inst"   : False,
+                    "export_cull"   : True,
+                }
+            )
+
+            if not ipl_exporter.ipl_exporter.total_objects_num:
+                report = "No objects with IPL data found"
+                self.report({"ERROR"}, report)
+                return {'CANCELLED'}, report
+
+            self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
+
+        except Exception as e:
+            self.report({"ERROR"}, str(e))
+
         return {'FINISHED'}
