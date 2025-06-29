@@ -15,12 +15,15 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
+import math
 import os
 import time
 
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
 from ..ops import map_importer, ipl_exporter
+from ..ops.cull_importer import cull_importer
+from ..ops.importer_common import link_object
 
 #######################################################
 class SCENE_OT_dff_import_map(bpy.types.Operator):
@@ -249,5 +252,59 @@ class EXPORT_OT_ipl_cull(bpy.types.Operator, ExportHelper):
 
         except Exception as e:
             self.report({"ERROR"}, str(e))
+
+        return {'FINISHED'}
+
+#######################################################
+class OBJECT_OT_dff_add_cull(bpy.types.Operator):
+
+    bl_idname = "object.dff_add_cull"
+    bl_label = "Add CULL Zone"
+    bl_description = "Add CULL zone to the scene"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    location: bpy.props.FloatVectorProperty(
+        name="Location",
+        description="Location for the newly added object",
+        subtype='XYZ',
+        default=(0, 0, 0)
+    )
+
+    scale: bpy.props.FloatVectorProperty(
+        name="Scale",
+        description="Scale for the newly added object",
+        subtype='XYZ',
+        default=(1, 1, 1)
+    )
+
+    angle: bpy.props.FloatProperty(
+        name="Angle",
+        description="Angle along the Z axis",
+        subtype='ANGLE',
+        min=-math.pi * 2,
+        max=math.pi * 2,
+        step=100,
+        default=0
+    )
+
+    #######################################################
+    def invoke(self, context, event):
+        self.location = context.scene.cursor.location
+        return self.execute(context)
+
+    #######################################################
+    def execute(self, context):
+        obj = cull_importer.create_cull_object(
+            location=self.location,
+            scale=self.scale,
+            flags=0,
+            angle=self.angle
+        )
+        link_object(obj, context.collection)
+
+        context.view_layer.objects.active = obj
+        for o in context.selected_objects:
+            o.select_set(False)
+        obj.select_set(True)
 
         return {'FINISHED'}

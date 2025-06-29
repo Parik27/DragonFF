@@ -17,7 +17,7 @@
 import bpy
 
 from .col_ot import FaceGroupsDrawer
-from .map_ot import SCENE_OT_ipl_select
+from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull
 from ..gtaLib.data import map_data
 
 #######################################################
@@ -255,3 +255,10 @@ class MapImportPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("scene.dragonff_map_import")
+
+#######################################################@
+class DFF_MT_AddMapObject(bpy.types.Menu):
+    bl_label = "Map"
+
+    def draw(self, context):
+        self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")

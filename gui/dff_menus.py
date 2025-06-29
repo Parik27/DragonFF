@@ -878,6 +878,7 @@ class DFF_MT_AddObject(bpy.types.Menu):
     def draw(self, context):
         self.layout.menu("DFF_MT_AddCollisionObject", text="Collision")
         self.layout.menu("DFF_MT_Add2DFXObject", text="2DFX")
+        self.layout.menu("DFF_MT_AddMapObject", text="Map")
 
 #######################################################
 def add_object_dff_func(self, context):
