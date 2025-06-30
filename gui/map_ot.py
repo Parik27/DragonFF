@@ -111,7 +111,7 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
                 float(self._progress_current) / float(self._progress_total)
             ) if self._progress_total else 100
 
-            bpy.context.window_manager.progress_update(progress)
+            context.window_manager.progress_update(progress)
 
             # Update dependency graph
             dg = context.evaluated_depsgraph_get()

@@ -225,7 +225,10 @@ class map_importer:
             context.scene.collection.children.link(self.mesh_collection)
 
         # Create a new collection in Mesh to hold all the subsequent dffs loaded from this map section
-        self.object_instances_collection = bpy.data.collections.new(self.map_section)
+        coll_name = self.map_section
+        if os.path.isabs(coll_name):
+            coll_name = os.path.basename(coll_name)
+        self.object_instances_collection = bpy.data.collections.new(coll_name)
         self.mesh_collection.children.link(self.object_instances_collection)
 
     #######################################################
