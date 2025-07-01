@@ -62,6 +62,13 @@ class dff_importer:
     #######################################################
     def multiply_matrix(a, b):
         return a @ b
+
+    #######################################################
+    @staticmethod
+    def clean_object_name(name):
+        if "." in name:
+            return name + '.001'
+        return name
     
     #######################################################
     def _init():
@@ -91,7 +98,7 @@ class dff_importer:
             frame = self.dff.frame_list[atomic.frame]
             geom = self.dff.geometry_list[atomic.geometry]
 
-            mesh = bpy.data.meshes.new(frame.name)
+            mesh = bpy.data.meshes.new(self.clean_object_name(frame.name))
             bm   = bmesh.new()
 
             # Create a material order sorted by geometry splits
@@ -348,7 +355,7 @@ class dff_importer:
                 continue
             
             # Generate a nice name with index and frame
-            name = "%s.%d" % (frame.name, index)
+            name = "%s.%d" % (self.clean_object_name(frame.name), index)
             name = self.generate_material_name(material, name)
             
             mat = bpy.data.materials.new(name)
@@ -524,8 +531,8 @@ class dff_importer:
 
         self = dff_importer
         
-        armature = bpy.data.armatures.new(frame.name)
-        obj = bpy.data.objects.new(frame.name, armature)
+        armature = bpy.data.armatures.new(self.clean_object_name(frame.name))
+        obj = bpy.data.objects.new(self.clean_object_name(frame.name), armature)
         link_object(obj, dff_importer.current_collection)
 
         skinned_obj_data = None
@@ -741,7 +748,7 @@ class dff_importer:
             # Create and link the object to the scene
             if obj is None:
                 if len(meshes) != 1:
-                    obj = bpy.data.objects.new(frame.name, None)
+                    obj = bpy.data.objects.new(self.clean_object_name(frame.name), None)
                     link_object(obj, dff_importer.current_collection)
 
                     # Set empty display properties to something decent
@@ -750,7 +757,7 @@ class dff_importer:
                 else:
                     # Use a mesh as a frame object
                     obj = meshes[0]
-                    obj.name = frame.name
+                    obj.name = self.clean_object_name(frame.name)
 
                 obj.rotation_mode = 'QUATERNION'
                 obj.matrix_local  = matrix.copy()
