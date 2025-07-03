@@ -626,7 +626,6 @@ class dff_exporter:
         # maximum will be 2. If obj.dff.uv_map1 is NOT set, the maximum cannot
         # be greater than 0.
         max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
-        max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
 
         extra_vert = None
         if has_night_colors:
@@ -695,16 +694,18 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def populate_geometry_from_faces_data(faces_list, geometry):
-        for face in faces_list:
-            verts = face['verts']
-            geometry.triangles.append(
-                dff.Triangle._make((
-                    verts[1], #b
-                    verts[0], #a
-                    face['mat_idx'], #material
-                    verts[2] #c
-                ))
-            )
+        triangles = [
+            dff.Triangle._make((
+                verts[1], #b
+                verts[0], #a
+                face['mat_idx'], #material
+                verts[2] #c
+            ))
+            for face in faces_list
+            for verts in [face['verts']]
+        ]
+        geometry.triangles.extend(triangles)
+        geometry.triangles.sort(key=lambda triangle: triangle.material)
 
     #######################################################
     @staticmethod

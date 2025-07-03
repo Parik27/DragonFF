@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from struct import unpack_from, calcsize, pack
 from enum import Enum, IntEnum
 
@@ -1929,15 +1929,11 @@ class Geometry:
 
         data = bytearray()
 
-        meshes = {}
+        meshes = defaultdict(list)
         is_tri_strip = self.export_flags["triangle_strip"]
 
         if is_tri_strip:
             for triangle in self.triangles:
-
-                if triangle.material not in meshes:
-                    meshes[triangle.material] = []
-
                 meshes[triangle.material].append([triangle.a, triangle.b, triangle.c])
 
             for mesh in meshes:
@@ -1945,16 +1941,12 @@ class Geometry:
 
         else:
             for triangle in self.triangles:
-
-                if triangle.material not in meshes:
-                    meshes[triangle.material] = []
-
-                meshes[triangle.material] += [triangle.a, triangle.b, triangle.c]
+                meshes[triangle.material].extend([triangle.a, triangle.b, triangle.c])
 
         total_indices = sum(len(triangles) for triangles in meshes.values())
         data += pack("<III", int(is_tri_strip), len(meshes), total_indices)
 
-        for mesh in sorted(meshes):
+        for mesh in meshes:
             data += pack("<II", len(meshes[mesh]), mesh)
             data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
 
