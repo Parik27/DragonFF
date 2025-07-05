@@ -26,7 +26,7 @@ from ..gtaLib import dff
 from .importer_common import (
     link_object, create_collection,
     material_helper, set_object_mode,
-    hide_object)
+    hide_object, invert_matrix_safe)
 from .col_importer import import_col_mem
 from ..ops import txd_importer
 from ..ops.ext_2dfx_importer import ext_2dfx_importer
@@ -572,7 +572,7 @@ class dff_importer:
             if skinned_obj_data is not None:
                 matrix = skinned_obj_data.bone_matrices[bone.index]
                 matrix = mathutils.Matrix(matrix).transposed()
-                matrix = matrix.inverted()
+                invert_matrix_safe(matrix)
 
                 e_bone.transform(matrix, scale=True, roll=False)
                 e_bone.roll = self.align_roll(e_bone.vector,

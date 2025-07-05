@@ -48,6 +48,13 @@ def create_bmesh_for_mesh(mesh, obj_mode):
     return bm
 
 #######################################################
+def invert_matrix_safe(matrix):
+    if abs(matrix.determinant()) > 1e-8:
+        matrix.invert()
+    else:
+        matrix.identity()
+
+#######################################################
 def redraw_viewport():
     for area in bpy.context.window.screen.areas:
         if area.type == 'VIEW_3D':
