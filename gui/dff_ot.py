@@ -64,7 +64,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     dm_to_clumps    :  bpy.props.BoolProperty(
         name        = "Delta Morph Multiple Clumps",
         description = "Split Delta Morph into multiple clumps",
-        default     = False
+        default     = True
     )
 
     only_selected       : bpy.props.BoolProperty(
@@ -338,7 +338,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     clumps_to_dm    :  bpy.props.BoolProperty(
         name        = "Delta Morph Multiple Clumps",
         description = "Merge multiple clumps into one using Delta Morph",
-        default     = False
+        default     = True
     )
 
     image_ext : bpy.props.EnumProperty(
