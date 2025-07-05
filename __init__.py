@@ -33,7 +33,6 @@ bl_info = {
 # Class list to register
 _classes = [
     gui.IMPORT_OT_dff,
-    gui.IMPORT_OT_txd,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
     gui.EXPORT_OT_ipl_cull,
@@ -70,7 +69,6 @@ _classes = [
     gui.DFFObjectProps,
     gui.DFFCollectionProps,
     gui.MapImportPanel,
-    gui.TXDImportPanel,
     gui.DFFFrameProps,
     gui.DFFAtomicProps,
     gui.DFFSceneProps,

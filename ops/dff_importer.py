@@ -28,17 +28,13 @@ from .importer_common import (
     material_helper, set_object_mode,
     hide_object, invert_matrix_safe)
 from .col_importer import import_col_mem
-from ..ops import txd_importer
 from ..ops.ext_2dfx_importer import ext_2dfx_importer
 from ..ops.state import State
 
 #######################################################
 class dff_importer:
 
-    load_txd           = False
-    txd_filename       = ""
-    skip_mipmaps       = True
-    txd_pack           = True
+    txd_images         = {}
     image_ext          = "png"
     materials_naming   = "DEF"
     use_bone_connect   = False
@@ -84,7 +80,6 @@ class dff_importer:
         self.bones = {}
         self.frame_bones = {}
         self.materials = {}
-        self.txd_images = {}
         self.warning = ""
 
     #######################################################
@@ -807,22 +802,6 @@ class dff_importer:
         self.dff.load_file(file_name)
         self.file_name = file_name
 
-        # Load the TXD
-        if self.load_txd:
-            # Import txd from a file if file exists
-            base_path = os.path.dirname(file_name)
-            txd_filename = self.txd_filename if self.txd_filename \
-                else os.path.basename(file_name)[:-4] + ".txd"
-            txd_path = os.path.join(base_path, txd_filename)
-            if os.path.isfile(txd_path):
-                self.txd_images = txd_importer.import_txd(
-                    {
-                        'file_name'    : txd_path,
-                        'skip_mipmaps' : self.skip_mipmaps,
-                        'pack'         : self.txd_pack,
-                    }
-                ).images
-
         # Create a new group/collection
         self.current_collection = create_collection(
             os.path.basename(file_name)
@@ -891,10 +870,7 @@ def set_parent_bone(obj, armature, bone_name):
 def import_dff(options):
 
     # Shadow function
-    dff_importer.load_txd         = options['load_txd']
-    dff_importer.txd_filename     = options['txd_filename']
-    dff_importer.skip_mipmaps     = options['skip_mipmaps']
-    dff_importer.txd_pack         = options['txd_pack']
+    dff_importer.txd_images       = options['txd_images']
     dff_importer.image_ext        = options['image_ext']
     dff_importer.use_bone_connect = options['connect_bones']
     dff_importer.use_mat_split    = options['use_mat_split']

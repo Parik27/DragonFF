@@ -110,6 +110,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    txd_pack : bpy.props.BoolProperty(
+        name        = "Pack Images",
+        description = "Pack images as embedded data into the .blend file",
+        default     = False
+    )
+
     read_mat_split  :  bpy.props.BoolProperty(
         name        = "Read Material Split",
         description = "Whether to read material split for loading triangles",
@@ -233,20 +239,25 @@ class MapImportPanel(bpy.types.Panel):
                                 align=True)
 
         col = flow.column()
-        col.prop(settings, "game_version_dropdown", text="Game")
+        col.prop(settings, "game_version_dropdown")
         if settings.use_custom_map_section:
             row = col.row(align=True)
             row.prop(settings, "custom_ipl_path")
             row.operator(SCENE_OT_ipl_select.bl_idname, text="", icon='FILEBROWSER')
         else:
-            col.prop(settings, "map_sections", text="Map segment")
-        col.prop(settings, "use_custom_map_section", text="Use custom map segment")
+            col.prop(settings, "map_sections")
+        col.prop(settings, "use_custom_map_section")
         col.separator()
-        col.prop(settings, "skip_lod", text="Skip LOD objects")
-        col.prop(settings, "load_txd", text="Load TXD files")
-        col.prop(settings, "read_mat_split", text="Read Material Split")
-        col.prop(settings, "load_collisions", text="Load Map Collisions")
-        col.prop(settings, "load_cull", text="Load Map CULL")
+
+        box = col.box()
+        box.prop(settings, "load_txd")
+        if settings.load_txd:
+            box.prop(settings, "txd_pack")
+
+        col.prop(settings, "skip_lod")
+        col.prop(settings, "read_mat_split")
+        col.prop(settings, "load_collisions")
+        col.prop(settings, "load_cull")
 
         layout.separator()
 

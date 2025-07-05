@@ -17,7 +17,7 @@
 import bpy
 import os
 from ..gtaLib import map as map_utilites
-from ..ops import dff_importer, col_importer
+from ..ops import dff_importer, col_importer, txd_importer
 from .cull_importer import cull_importer
 from .importer_common import hide_object
 
@@ -117,18 +117,29 @@ class map_importer:
             print(str(inst.id), 'loaded from cache')
         else:
 
+            dff_filepath = "%s/%s.dff" % (self.settings.dff_folder, model)
+            txd_filepath = "%s/%s.txd" % (self.settings.dff_folder, txd)
+
             # Import dff from a file if file exists
-            if not os.path.isfile("%s/%s.dff" % (self.settings.dff_folder, model)):
+            if not os.path.isfile(dff_filepath):
                 return
+
+            txd_images = {}
+            if self.settings.load_txd and os.path.isfile(txd_filepath):
+                txd_images = txd_importer.import_txd(
+                    {
+                        'file_name'      : txd_filepath,
+                        'skip_mipmaps'   : True,
+                        'pack'           : self.settings.txd_pack,
+                    }
+                ).images
+
             importer = dff_importer.import_dff(
                 {
                     'file_name'      : "%s/%s.dff" % (
                         self.settings.dff_folder, model
                     ),
-                    'load_txd'         : self.settings.load_txd,
-                    'txd_filename'     : "%s.txd" % txd,
-                    'skip_mipmaps'     : True,
-                    'txd_pack'         : False,
+                    'txd_images'       : txd_images,
                     'image_ext'        : 'PNG',
                     'connect_bones'    : False,
                     'use_mat_split'    : self.settings.read_mat_split,
