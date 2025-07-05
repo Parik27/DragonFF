@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from struct import unpack_from, calcsize, pack
 from enum import Enum, IntEnum
 
@@ -132,6 +132,7 @@ types = {
     "Collision Model"         : 39056122,
     "Reflection Material"     : 39056124,
     "Frame"                   : 39056126,
+    "SAMP Collision Model"    : 39056127,
 }
 
 #######################################################
@@ -215,7 +216,7 @@ class Sections:
         
     #######################################################
     def write(type, data, chunk_type=None):
-        _data = b''
+        _data = bytearray()
         
         if type in Sections.formats:
             packer = Sections.formats[type]
@@ -298,7 +299,7 @@ class Texture:
     #######################################################
     def to_mem(self):
 
-        data = b''
+        data = bytearray()
         data += pack("<2B2x", self.filters, self.uv_addressing)
 
         data  = Sections.write_chunk(data, types["Struct"])
@@ -306,7 +307,7 @@ class Texture:
                                      types["String"])
         data += Sections.write_chunk(Sections.pad_string(self.mask),
                                      types["String"])
-        data += Sections.write_chunk(b'', types["Extension"])
+        data += Sections.write_chunk(bytearray(), types["Extension"])
 
         return Sections.write_chunk(data, types["Texture"])
 
@@ -375,7 +376,7 @@ class Material:
     #######################################################
     def bumpfx_to_mem(self):
 
-        data = b''
+        data = bytearray()
         bump_map = self.plugins['bump_map'][0]
         
         data += pack("<IfI", 1, bump_map.intensity, bump_map.bump_map is not None)
@@ -439,7 +440,7 @@ class Material:
     
     #######################################################
     def matfx_to_mem(self):
-        data = b''
+        data = bytearray()
 
         effectType = 0
         if 'bump_map' in self.plugins:
@@ -467,7 +468,7 @@ class Material:
 
         if effectType == 0:
             self._hasMatFX = False
-            return b''
+            return bytearray()
             
         if effectType != 3 or effectType != 6: #Both effects are set
             data += pack("<I", 0)
@@ -543,7 +544,7 @@ class Atomic:
     #######################################################
     def to_mem(self):
 
-        data = b''
+        data = bytearray()
         data += pack("<4I", self.frame, self.geometry, self.flags, self.unk)
         return data
 
@@ -600,7 +601,7 @@ class UserData:
 
     #######################################################
     def to_mem (self):
-        data = b''
+        data = bytearray()
 
         data += pack("<I", len(self.sections))
         for section in self.sections:
@@ -673,7 +674,7 @@ class Frame:
     #######################################################
     def header_to_mem(self):
 
-        data = b''
+        data = bytearray()
         data += Sections.write(Matrix, self.rotation_matrix)
         data += Sections.write(Vector, self.position)
         data += pack("<iI", self.parent, self.creation_flags)
@@ -682,18 +683,18 @@ class Frame:
     #######################################################
     def extensions_to_mem(self):
 
-        data = b''
-
-        if self.name is not None and self.name != "unknown":
-            data += Sections.write_chunk(Sections.pad_string(self.name),
-                                         types["Frame"])
+        data = bytearray()
 
         if self.bone_data is not None:
             data += self.bone_data.to_mem()
 
         if self.user_data is not None:
             data += self.user_data.to_mem()
-        
+
+        if self.name is not None and self.name != "unknown":
+            data += Sections.write_chunk(Sections.pad_string(self.name),
+                                         types["Frame"])
+
         return Sections.write_chunk(data, types["Extension"])
 
     ##################################################################
@@ -731,7 +732,7 @@ class HAnimPLG:
     #######################################################
     def to_mem(self):
 
-        data = b''
+        data = bytearray()
 
         data += Sections.write(HAnimHeader, self.header)
         if len(self.bones) > 0:
@@ -878,7 +879,7 @@ class SkinPLG:
             self.max_weights_per_vertex = 0
             self.bones_used = []
 
-        data = b''
+        data = bytearray()
         data += pack("<3Bx", self.num_bones, len(self.bones_used),
                      self.max_weights_per_vertex)
 
@@ -1211,7 +1212,7 @@ class PedAttractor2dfx:
     #######################################################
     # See: https://gtamods.com/wiki/2d_Effect_(RW_Section)
     #######################################################
-    class Types(Enum):
+    class Types(IntEnum):
 
         PED_ATM_ATTRACTOR = 0
         PED_SEAT_ATTRACTOR = 1
@@ -1228,12 +1229,15 @@ class PedAttractor2dfx:
     def __init__(self, loc):
 
         self.effect_id = 3
-        
+
         self.loc = loc
         self.type = 0
-        self.rotation_matrix = None
-        self.external_script = ""
+        self.queue_direction = [0, 0, 0]
+        self.use_direction = [0, 0, 0]
+        self.forward_direction = [0, 0, 0]
+        self.external_script = "none"
         self.ped_existing_probability = 0
+        self.unk = 0
 
     #######################################################
     @staticmethod
@@ -1241,19 +1245,23 @@ class PedAttractor2dfx:
         self = PedAttractor2dfx(loc)
 
         self.type = unpack_from("<I", data, offset)[0]
-        self.rotation_matrix = Sections.read(Matrix, data, offset + 4)
-        self.external_script = data[offset + 40: strlen(data, offset + 40)]
-        self.ped_existing_probabiliy = unpack_from("<I", data, offset + 48)[0]
+        self.queue_direction = Sections.read(Vector, data, offset + 4)
+        self.use_direction = Sections.read(Vector, data, offset + 16)
+        self.forward_direction = Sections.read(Vector, data, offset + 28)
+        external_script = data[offset + 40:offset + 48]
+        self.ped_existing_probability, self.unk = unpack_from("<II", data, offset + 48)
 
-        self.external_script = self.external_script.decode('ascii')
-        
+        self.external_script = external_script[:strlen(external_script)].decode('ascii')
+
         return self
 
     #######################################################
     def to_mem(self):
         data = pack("<I", self.type)
-        data += Sections.write(Matrix, self.rotation_matrix)
-        data += pack("<8sI", self.external_script, self.ped_existing_probability)
+        data += Sections.write(Vector, self.queue_direction)
+        data += Sections.write(Vector, self.use_direction)
+        data += Sections.write(Vector, self.forward_direction)
+        data += pack("<8sII", self.external_script.encode(), self.ped_existing_probability, self.unk)
 
         return data
 
@@ -1272,7 +1280,7 @@ class SunGlare2dfx:
 
     #######################################################
     def to_mem(self):
-        return b''
+        return bytearray()
 
 #######################################################
 class EnterExit2dfx:
@@ -1458,6 +1466,37 @@ class CoverPoint2dfx:
         return data
 
 #######################################################
+class Escalator2dfx:
+
+    #######################################################
+    def __init__(self, loc):
+        self.loc = loc
+        self.effect_id = 10
+        self.bottom = [0, 0, 0]
+        self.top = [0, 0, 0]
+        self.end = [0, 0, 0]
+        self.direction = 0
+
+    #######################################################
+    @staticmethod
+    def from_mem(loc, data, offset, size):
+
+        self = Escalator2dfx(loc)
+        self.bottom = Sections.read(Vector, data, offset)
+        self.top = Sections.read(Vector, data, offset + 12)
+        self.end = Sections.read(Vector, data, offset + 24)
+        self.direction = unpack_from("<I", data, offset + 36)[0]
+        return self
+
+    #######################################################
+    def to_mem(self):
+        data = Sections.write(Vector, self.bottom)
+        data += Sections.write(Vector, self.top)
+        data += Sections.write(Vector, self.end)
+        data += pack("<I", self.direction)
+        return data
+
+#######################################################
 class Extension2dfx:
 
     #######################################################
@@ -1492,6 +1531,7 @@ class Extension2dfx:
                 7: RoadSign2dfx,
                 8: TriggerPoint2dfx,
                 9: CoverPoint2dfx,
+                10: Escalator2dfx,
             }
 
             loc = Sections.read(Vector, data, pos)
@@ -1514,7 +1554,7 @@ class Extension2dfx:
 
         # Write only if there are entries
         if self.is_empty():
-            return b''
+            return bytearray()
 
         # Entries length
         data = pack("<I", len(self.entries))
@@ -1534,6 +1574,14 @@ class Extension2dfx:
     def __add__(self, other):
         self.entries += other.entries # concatinate entries
         return self
+
+#######################################################
+class ExtensionColl:
+
+    #######################################################
+    def __init__(self, ext_type, data):
+        self.ext_type = ext_type
+        self.data = data
 
 #######################################################
 class DeltaMorph:
@@ -1578,7 +1626,7 @@ class DeltaMorph:
             if s > 0:
                 data += pack("<B", s)
 
-        data = b''
+        data = bytearray()
         n, li = 0, -1
         for i in self.indices:
             if i != li + 1:
@@ -1704,7 +1752,7 @@ class DeltaMorphPLG:
     def to_mem(self):
 
         if not self.entries:
-            return b''
+            return bytearray()
 
         data = pack("<I", len(self.entries))
         for entry in self.entries:
@@ -1864,7 +1912,7 @@ class Geometry:
     def material_list_to_mem(self):
         # TODO: Support instance materials
 
-        data = b''
+        data = bytearray()
         
         data += pack("<I", len(self.materials))
         for i in range(len(self.materials)):
@@ -1881,17 +1929,13 @@ class Geometry:
     #######################################################
     def write_bin_split(self):
 
-        data = b''
+        data = bytearray()
 
-        meshes = {}
+        meshes = defaultdict(list)
         is_tri_strip = self.export_flags["triangle_strip"]
 
         if is_tri_strip:
             for triangle in self.triangles:
-
-                if triangle.material not in meshes:
-                    meshes[triangle.material] = []
-
                 meshes[triangle.material].append([triangle.a, triangle.b, triangle.c])
 
             for mesh in meshes:
@@ -1899,16 +1943,12 @@ class Geometry:
 
         else:
             for triangle in self.triangles:
-
-                if triangle.material not in meshes:
-                    meshes[triangle.material] = []
-
-                meshes[triangle.material] += [triangle.a, triangle.b, triangle.c]
+                meshes[triangle.material].extend([triangle.a, triangle.b, triangle.c])
 
         total_indices = sum(len(triangles) for triangles in meshes.values())
         data += pack("<III", int(is_tri_strip), len(meshes), total_indices)
 
-        for mesh in sorted(meshes):
+        for mesh in meshes:
             data += pack("<II", len(meshes[mesh]), mesh)
             data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
 
@@ -1917,7 +1957,7 @@ class Geometry:
     #######################################################
     def extensions_to_mem(self, extra_extensions = []):
 
-        data = b''
+        data = bytearray()
 
         # Write Bin Mesh PLG
         if self.export_flags['write_mesh_plg'] or self.export_flags['exclude_geo_faces']:
@@ -1954,7 +1994,7 @@ class Geometry:
 
         flags |= (len(self.uv_layers) & 0xff) << 16
 
-        data = b''
+        data = bytearray()
         data += pack("<IIII",
                      flags,
                      len(self.triangles) if not self.export_flags["exclude_geo_faces"] else 0,
@@ -2653,9 +2693,9 @@ class Clump:
                 elif chunk.type == types["Atomic"]:  
                     self.read_atomic(chunk)
 
-                elif chunk.type == types["Collision Model"]:
+                elif chunk.type in (types["Collision Model"], types["SAMP Collision Model"]):
                     self.collisions.append(
-                        self.data[self.pos:self.pos + chunk.size]
+                        ExtensionColl(chunk.type, self.data[self.pos:self.pos + chunk.size])
                     )
                     self.pos += chunk.size
                     
@@ -2670,7 +2710,7 @@ class Clump:
     #######################################################
     def write_frame_list(self):
 
-        data = b''
+        data = bytearray()
 
         data += pack("<I", len(self.frame_list)) # length
 
@@ -2686,7 +2726,7 @@ class Clump:
 
     #######################################################
     def write_geometry_list(self):
-        data = b''
+        data = bytearray()
         data += pack("<I", len(self.geometry_list))
 
         data = Sections.write_chunk(data, types["Struct"])
@@ -2709,7 +2749,7 @@ class Clump:
         data = Sections.write_chunk(data, types["Struct"])
         geometry = self.geometry_list[atomic.geometry]
 
-        ext_data = b''
+        ext_data = bytearray()
         if "skin" in geometry.extensions:
             right_to_render = atomic.extensions.get("right_to_render")
             if not right_to_render:
@@ -2752,11 +2792,11 @@ class Clump:
         for atomic in self.atomic_list:
             data += self.write_atomic(atomic)
 
-        for coll_data in self.collisions:
-            _data = Sections.write_chunk(coll_data, types["Collision Model"])
+        for coll in self.collisions:
+            _data = Sections.write_chunk(coll.data, coll.ext_type)
             data += Sections.write_chunk(_data, types["Extension"])
 
-        data += Sections.write_chunk(b'', types["Extension"])
+        data += Sections.write_chunk(bytearray(), types["Extension"])
 
         return Sections.write_chunk(data, types["ClumpStruct"])
 
@@ -2847,7 +2887,7 @@ class dff:
     def write_uv_dict(self):
 
         if len(self.uvanim_dict) < 1:
-            return b''
+            return bytearray()
 
         data = pack("<I", len(self.uvanim_dict))
         data = Sections.write_chunk(data, types["Struct"])
@@ -2882,7 +2922,7 @@ class dff:
     #######################################################
     def write_memory(self, version):
 
-        data = b''
+        data = bytearray()
         Sections.set_library_id(version, 0xFFFF)
 
         data += self.write_uv_dict()

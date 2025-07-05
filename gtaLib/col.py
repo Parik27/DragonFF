@@ -306,8 +306,13 @@ class coll:
                                        "model_id"
                                    ]
         )
+
         try:
-            header = header_format._make(self.__read_struct("4sI22sH"))
+            if self._data[:3] == b"COL":
+                header = header_format._make(self.__read_struct("4sI22sH"))
+            else:
+                # Headless COL (DFF embedded PS2 version)
+                header = header_format._make((b"COLL", len(self._data) - 8, b"col", 0))
         except StructError:
             raise RuntimeError("Unexpected EOF")
 

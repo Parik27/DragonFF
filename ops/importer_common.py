@@ -15,50 +15,43 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import bpy
-from collections import namedtuple
+import bmesh
 
-game_version = namedtuple("game_version", "III VC SA LCS VCS")
-game_version.III = 'III'
-game_version.VC = 'VC'
-game_version.SA = 'SA'
-game_version.LCS = 'LCS'
-game_version.VCS = 'VCS'
-
-#######################################################            
+#######################################################
 def set_object_mode(obj, mode):
-        
-    # Blender 2.79 compatibility
-    if (2, 80, 0) > bpy.app.version:
-        bpy.context.scene.objects.active = obj
-    else:
-        bpy.context.view_layer.objects.active = obj
-        
+    bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode=mode, toggle=False)
 
 #######################################################
 def link_object(obj, collection):
     collection.objects.link(obj)
-    if (2, 80, 0) > bpy.app.version:
-        bpy.context.scene.objects.link(obj)
-        
-#######################################################        
+
+#######################################################
 def create_collection(name, link=True):
-    if (2, 80, 0) > bpy.app.version:
-        return bpy.data.groups.new(name)
-    else:
-        collection = bpy.data.collections.new(name)
-        if link:
-            bpy.context.scene.collection.children.link(collection)
-            
-        return collection        
-        
+    collection = bpy.data.collections.new(name)
+    if link:
+        bpy.context.scene.collection.children.link(collection)
+
+    return collection
+
 #######################################################
 def hide_object(object, hide=True):
-    if (2, 80, 0) > bpy.app.version:
-        object.hide = hide
-    else:
-        object.hide_set(hide)
+    object.hide_set(hide)
 
+#######################################################
+def create_bmesh_for_mesh(mesh, obj_mode):
+    if obj_mode == "EDIT":
+        bm = bmesh.from_edit_mesh(mesh)
+    else:
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+    return bm
+
+#######################################################
+def redraw_viewport():
+    for area in bpy.context.window.screen.areas:
+        if area.type == 'VIEW_3D':
+            area.tag_redraw()
 
 #######################################################
 class material_helper:
@@ -74,6 +67,8 @@ class material_helper:
             # Set Alpha
             node = self.principled.node_principled_bsdf.inputs["Base Color"]
             node.default_value[3] = color[3] / 255
+
+            self.material.diffuse_color = [i / 255 for i in color]
             
         else:
             self.material.diffuse_color = [i / 255 for i in color[:3]]
@@ -184,16 +179,14 @@ class material_helper:
             fps = bpy.context.scene.render.fps
 
             action = bpy.data.actions.new(uv_anim.name)
-            anim_data = self.material.node_tree.animation_data_create()
-            anim_data.action = action
 
             fcurves = [
                 None,
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[3].default_value', index=0),
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[3].default_value', index=1),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=0),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=1),
                 None,
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[1].default_value', index=0),
-                action.fcurves.new(data_path='nodes["Mapping"].inputs[1].default_value', index=1),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=0),
+                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=1),
             ]
 
             for frame_idx, frame in enumerate(uv_anim.frames):
@@ -237,6 +230,9 @@ class material_helper:
                     kp.co = frame.time * fps, val
                     kp.interpolation = 'LINEAR'
 
+        anim_data = self.material.node_tree.animation_data_create()
+        anim_data.action = action
+
         self.material.dff.animation_name   = uv_anim.name
         self.material.dff.export_animation = True
 
@@ -250,11 +246,10 @@ class material_helper:
         self.principled = None
 
         # Init Principled Wrapper for Blender 2.8
-        if bpy.app.version >= (2, 80, 0):
-            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-            
-            self.principled = PrincipledBSDFWrapper(self.material,
-                                                    is_readonly=False)
+        from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+
+        self.principled = PrincipledBSDFWrapper(self.material,
+                                                is_readonly=False)
 
 #######################################################
 class object_helper:

@@ -16,7 +16,6 @@
 
 import bpy
 from .gui import gui
-from .ops import map_importer
 
 from bpy.utils import register_class, unregister_class
 
@@ -37,14 +36,27 @@ _classes = [
     gui.IMPORT_OT_txd,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
+    gui.EXPORT_OT_ipl_cull,
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
+    gui.SCENE_OT_dff_import_map,
     gui.SCENE_OT_ipl_select,
     gui.OBJECT_OT_dff_generate_bone_props,
     gui.OBJECT_OT_dff_set_parent_bone,
     gui.OBJECT_OT_dff_clear_parent_bone,
     gui.OBJECT_OT_facegoups_col,
+    gui.OBJECT_OT_dff_add_collision_box,
+    gui.OBJECT_OT_dff_add_collision_sphere,
+    gui.OBJECT_OT_dff_add_2dfx_light,
+    gui.OBJECT_OT_dff_add_2dfx_particle,
+    gui.OBJECT_OT_dff_add_2dfx_ped_attractor,
+    gui.OBJECT_OT_dff_add_2dfx_sun_glare,
+    gui.OBJECT_OT_dff_add_2dfx_road_sign,
+    gui.OBJECT_OT_dff_add_2dfx_trigger_point,
+    gui.OBJECT_OT_dff_add_2dfx_cover_point,
+    gui.OBJECT_OT_dff_add_2dfx_escalator,
+    gui.OBJECT_OT_dff_add_cull,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
@@ -52,6 +64,7 @@ _classes = [
     gui.EXT2DFXObjectProps,
     gui.Light2DFXObjectProps,
     gui.RoadSign2DFXObjectProps,
+    gui.CULLObjectProps,
     gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
@@ -64,20 +77,23 @@ _classes = [
     gui.DFF_MT_ExportChoice,
     gui.DFF_MT_EditArmature,
     gui.DFF_MT_Pose,
+    gui.DFF_MT_AddCollisionObject,
+    gui.DFF_MT_Add2DFXObject,
+    gui.DFF_MT_AddMapObject,
+    gui.DFF_MT_AddObject,
     gui.DFF_UL_FrameItems,
     gui.DFF_UL_AtomicItems,
     gui.SCENE_PT_dffFrames,
     gui.SCENE_PT_dffAtomics,
-    map_importer.Map_Import_Operator
+    gui.Bounds3DGizmo,
+    gui.Bound2DWidthGizmo,
+    gui.Bound2DHeightGizmo,
+    gui.VectorPlaneGizmo,
+    gui.CollisionCollectionGizmoGroup,
+    gui.PedAttractor2DFXGizmoGroup,
+    gui.RoadSign2DFXGizmoGroup,
+    gui.Escalator2DFXGizmoGroup
 ]
-
-_draw_3d_handler = None
-
-#######################################################
-def draw_3d_callback():
-    gui.DFFSceneProps.draw_fg()
-    gui.RoadSign2DFXObjectProps.draw_size()
-    gui.DFFCollectionProps.draw_bounds()
 
 #######################################################
 def register():
@@ -86,39 +102,42 @@ def register():
     for cls in _classes:
         register_class(cls)
 
-    if (2, 80, 0) > bpy.app.version:
-        bpy.types.INFO_MT_file_import.append(gui.import_dff_func)
-        bpy.types.INFO_MT_file_export.append(gui.export_dff_func)
+    bpy.types.Scene.dff = bpy.props.PointerProperty(type=gui.DFFSceneProps)
+    bpy.types.Light.ext_2dfx = bpy.props.PointerProperty(type=gui.Light2DFXObjectProps)
+    bpy.types.TextCurve.ext_2dfx = bpy.props.PointerProperty(type=gui.RoadSign2DFXObjectProps)
+    bpy.types.Material.dff = bpy.props.PointerProperty(type=gui.DFFMaterialProps)
+    bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
+    bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
 
-    else:
-        bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
-        bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
-        bpy.types.OUTLINER_MT_collection.append(gui.export_col_outliner)
-        bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
-        bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
-        bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
-
-        global _draw_3d_handler
-        _draw_3d_handler = bpy.types.SpaceView3D.draw_handler_add(draw_3d_callback, (), 'WINDOW', 'POST_VIEW')
+    bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
+    bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
+    bpy.types.OUTLINER_MT_collection.append(gui.export_col_outliner)
+    bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
+    bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
+    bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
+    bpy.types.VIEW3D_MT_add.append(gui.add_object_dff_func)
 
     gui.State.hook_events()
 
 #######################################################
 def unregister():
 
-    if (2, 80, 0) > bpy.app.version:
-        bpy.types.INFO_MT_file_import.remove(gui.import_dff_func)
-        bpy.types.INFO_MT_file_export.remove(gui.export_dff_func)
+    del bpy.types.Scene.dff
+    del bpy.types.Light.ext_2dfx
+    del bpy.types.TextCurve.ext_2dfx
+    del bpy.types.Material.dff
+    del bpy.types.Object.dff
+    del bpy.types.Collection.dff
 
-    else:
-        bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
-        bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
-        bpy.types.OUTLINER_MT_collection.remove(gui.export_col_outliner)
-        bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
-        bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
-        bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
+    bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
+    bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)
+    bpy.types.OUTLINER_MT_collection.remove(gui.export_col_outliner)
+    bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
+    bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
+    bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
+    bpy.types.VIEW3D_MT_add.remove(gui.add_object_dff_func)
 
-        bpy.types.SpaceView3D.draw_handler_remove(_draw_3d_handler, 'WINDOW')
+    gui.FaceGroupsDrawer.disable_draw()
 
     gui.State.unhook_events()
 

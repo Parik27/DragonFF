@@ -15,268 +15,318 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
-from ..data import map_data
-from ..ops.importer_common import game_version
-from collections import namedtuple
 import struct
 
-Vector = namedtuple("Vector", "x y z")
+from dataclasses import dataclass
+from io import BytesIO, BufferedReader, StringIO
+
+from .data import map_data
+from .img import img
+
+#######################################################
+@dataclass
+class MapData:
+    object_instances: list
+    object_data: dict
+    cull_instances: list
+
+#######################################################
+@dataclass
+class TextIPLData:
+    object_instances: list
+    cull_instances: list
 
 # Base for all IPL / IDE section reader / writer classes
 #######################################################
-class GenericSectionUtility: 
+class SectionUtility:
 
-    def __init__(self, sectionName, dataStructures):
-        self.sectionName = sectionName
-        self.dataStructures = dataStructures
+    def __init__(self, section_name, data_structures = []):
+        self.section_name = section_name
+        self.data_structures_dict = {len(ds._fields): ds for ds in data_structures}
 
     #######################################################
-    def read(self, fileStream):
+    def read(self, file_stream):
 
         entries = []
 
-        line = fileStream.readline().strip()
+        line = file_stream.readline().strip()
         while line != "end":
 
             # Split line and trim individual elements
-            lineParams = [e.strip() for e in line.split(",")]
+            line_params = [e.strip() for e in line.split(",")]
 
-            # Append filename for IDEs (needed for collision lookups)
-            fname = os.path.basename(fileStream.name)
-            if fname.lower().endswith('.ide'):
-                lineParams.append(fname)
+            # Append file name for IDEs (needed for collision lookups)
+            filename = os.path.basename(file_stream.name)
+            if filename.lower().endswith('.ide'):
+                line_params.append(filename)
 
             # Get the correct data structure for this section entry
-            dataStructure = self.getDataStructure(lineParams)
+            data_structure = self.get_data_structure(line_params)
 
             # Validate data structure
-            if(dataStructure is None):
-                print(type(self).__name__+
-                      " error: No appropriate data structure found")
-                print("    Section name: " + self.sectionName)
-                print("    Line parameters: " + str(lineParams))
-            elif(len(dataStructure._fields) != len(lineParams)):
+            if data_structure is None:
+                print(type(self).__name__, "Error: No appropriate data structure found")
+                print("    Section name:", self.section_name)
+                print("    Line parameters:", str(line_params))
+
+            elif len(data_structure._fields) != len(line_params):
                 print(
-                    type(self).__name__+" error: Number of line parameters "
+                    type(self).__name__, "Error: Number of line parameters "
                     "doesn't match the number of structure fields."
                 )
-                print("    Section name: " + self.sectionName)
-                print("    Data structure name: " + dataStructure.__name__)
-                print("    Data structure: " + str(dataStructure._fields))
-                print("    Line parameters: " + str(lineParams))
+                print("    Section name:", self.section_name)
+                print("    Data structure name:", data_structure.__name__)
+                print("    Data structure:", str(data_structure._fields))
+                print("    Line parameters:", str(line_params))
+
             else:
                 # Add entry
-                entries.append(dataStructure(*lineParams))
+                entries.append(data_structure(*line_params))
 
             # Read next line
-            line = fileStream.readline().strip()
+            line = file_stream.readline().strip()
 
         return entries
 
     #######################################################
-    def getDataStructure(self, lineParams):
-        return self.dataStructures[self.sectionName]
+    def get_data_structure(self, line_params):
+        return self.data_structures_dict.get(len(line_params))
 
     #######################################################
-    def write(self):
-        pass
-
-#######################################################
-class OBJSSectionUtility(GenericSectionUtility):
-    def getDataStructure(self, lineParams):
-
-        if(len(lineParams) == 6):
-            dataStructure = self.dataStructures["objs_1"]
-        elif(len(lineParams) == 7):
-            dataStructure = self.dataStructures["objs_2"]
-        elif(len(lineParams) == 8):
-            dataStructure = self.dataStructures["objs_3"]
-        elif(len(lineParams) == 9):
-            dataStructure = self.dataStructures["objs_4"]
-        else:
-            print(type(self).__name__ + " error: Unknown number of line parameters")
-            dataStructure = None
-        
-        return dataStructure
-
-#######################################################
-class TOBJSectionUtility(GenericSectionUtility):
-    def getDataStructure(self, lineParams):
-
-        if(len(lineParams) == 8):
-            dataStructure = self.dataStructures["tobj_1"]
-        elif(len(lineParams) == 9):
-            dataStructure = self.dataStructures["tobj_2"]
-        elif(len(lineParams) == 10):
-            dataStructure = self.dataStructures["tobj_3"]
-        elif(len(lineParams) == 11):
-            dataStructure = self.dataStructures["tobj_4"]
-        else:
-            print(type(self).__name__ + " error: Unknown number of line parameters")
-            dataStructure = None
-        
-        return dataStructure
-
-#######################################################
-class CARSSectionUtility(GenericSectionUtility):
-    def getDataStructure(self, lineParams):
-        # TODO:
-        print("'cars' not yet implemented")
-
-# List of IPL/IDE sections which require a section utility that's different
-# from the default one.
-specialSections = {
-    'objs': OBJSSectionUtility,
-    'tobj': TOBJSectionUtility,
-    'cars': CARSSectionUtility
-}
+    def write(self, file_stream, lines):
+        file_stream.write(f"{self.section_name}\n")
+        for line in lines:
+            file_stream.write(f"{line}\n")
+        file_stream.write("end\n")
 
 # Utility for reading / writing to map data files (.IPL, .IDE)
 #######################################################
 class MapDataUtility:
 
-    # Returns a dictionary of sections found in the given file
+    # Check if file stream contains binary IPL data by reading its header
     #######################################################
-    def readFile(filepath, filename, dataStructures):
+    @staticmethod
+    def is_binary_ipl_stream(file_stream):
+        # Binary IPL files always start with the ASCII string "bnry"
+        current_pos = file_stream.tell()
+        try:
+            header = file_stream.read(4)
+            file_stream.seek(current_pos)
+            return header == b'bnry'
+        except (IOError, OSError):
+            file_stream.seek(current_pos)
+            return False
 
-        fullpath = "%s%s" % (filepath, filename)
-        print('\nMapDataUtility reading: ' + fullpath)
+    # Get full path of file
+    #######################################################
+    @staticmethod
+    def get_full_path(game_root, filename):
+        # Check if file name is already an absolute path
+        if os.path.isabs(filename):
+            return filename
 
+        return os.path.join(game_root, filename)
+
+    # Merge Dictionaries of Lists
+    #######################################################
+    @staticmethod
+    def merge_dols(dol1, dol2):
+        result = dict(dol1, **dol2)
+        result.update((k, dol1[k] + dol2[k])
+                        for k in set(dol1).intersection(dol2))
+        return result
+
+    # Read binary IPL data from a file stream (credit to Allerek)
+    #######################################################
+    @staticmethod
+    def read_binary_ipl_from_stream(file_stream, data_structures):
         sections = {}
 
+        # Save the starting position (where the IPL file begins)
+        start_pos = file_stream.tell()
+
+        # Read and unpack the header
+        header = file_stream.read(32)
+        if len(header) < 32:
+            print("Error: Invalid binary IPL file - header too short")
+            return sections
+
+        _, num_of_instances, _, _, _, _, _, instances_offset = struct.unpack('4siiiiiii', header)
+
+        # Read and process instance definitions
+        item_size = 40
+        insts = []
+
+        # Seek relative to the start of the IPL file
+        file_stream.seek(start_pos + instances_offset)
+
+        for i in range(num_of_instances):
+            instances = file_stream.read(item_size)
+            if len(instances) < item_size:
+                print(f"Warning: Could not read instance {i}, reached end of file")
+                break
+
+            # Read binary instance
+            x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, obj_id, interior, lod = struct.unpack('fffffffiii', instances)
+
+            # Create value list (with values as strings) and map to the data struct
+            vals = [obj_id, "", interior, x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, lod]
+            insts.append(data_structures['inst'](*[str(v) for v in vals]))
+
+        sections["inst"] = insts
+        print("inst: %d entries" % len(insts))
+        return sections
+
+    # Read text-based IPL/IDE file from stream
+    #######################################################
+    @staticmethod
+    def read_text_file_from_stream(file_stream, data_structures, aliases):
+        sections = {}
+
+        line = file_stream.readline().strip()
+
+        while line:
+            # Presume we have a section start
+            section_name = line
+            section_utility = None
+
+            if section_name in aliases:
+                available_data_structures = [data_structures[s] for s in aliases[line]]
+                section_utility = SectionUtility(section_name, available_data_structures)
+
+            elif section_name in data_structures:
+                section_utility = SectionUtility(section_name, [data_structures[section_name]])
+
+            if section_utility is not None:
+                sections[section_name] = section_utility.read(file_stream)
+                print("%s: %d entries" % (
+                    section_name, len(sections[section_name])
+                ))
+
+            # Get next section
+            line = file_stream.readline().strip()
+
+        return sections
+
+    # Returns a dictionary of sections found in the given file
+    #######################################################
+    @staticmethod
+    def read_file(filepath, data_structures, aliases):
+        self = MapDataUtility
+
+        sections = {}
         try:
-            fileStream = open(fullpath, 'r', encoding='latin-1')
+            with open(filepath, 'rb') as file_stream:
+                if self.is_binary_ipl_stream(file_stream):
+                    sections = self.read_binary_ipl_from_stream(file_stream, data_structures)
+                else:
+                    binary_data = file_stream.read()
+                    text_data = binary_data.decode('latin-1')
+                    text_stream = StringIO(text_data)
+                    text_stream.name = filepath  # Set name attribute for IDE filename detection
+                    sections = self.read_text_file_from_stream(text_stream, data_structures, aliases)
 
         except FileNotFoundError:
-
-            # If file doesn't exist, look for binary file inside gta3.img file (credit to Allerek)
-            fullpath = "%s%s" % (filepath, 'models/gta3.img')
-            with open(fullpath, 'rb') as img_file:
-                # Read the first 8 bytes for the header and unpack
-                header = img_file.read(8)
-                magic, num_entries = struct.unpack('4sI', header)
-
-                # Read and process directory entries
-                entry_size = 32
-                entries = []
-                for i in range(num_entries):
-                    entry_data = img_file.read(entry_size)
-                    offset, streaming_size, _, name = struct.unpack('IHH24s', entry_data)
-                    name = name.split(b'\x00', 1)[0].decode('utf-8')
-                    entries.append((offset, streaming_size, name))
-
-                # Look for ipl file in gta3.img
-                for offset, streaming_size, name in entries:
-                    if name == filename:
-
-                        # Read and unpack the header
-                        img_file.seek(offset * 2048)
-                        header = img_file.read(32)
-                        _, num_of_instances, _, _, _, _, _, instances_offset = struct.unpack('4siiiiiii', header)
-
-                        # Read and process instance definitions
-                        item_size = 40
-                        read_base = offset * 2048 + instances_offset
-                        insts = []
-                        current_offset = read_base
-                        for i in range(num_of_instances):
-                            img_file.seek(current_offset)
-                            instances = img_file.read(40)
-
-                            # Read binary instance
-                            x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, obj_id, interior, lod = struct.unpack('fffffffiii', instances)
-
-                            # Create value list (with values as strings) and map to the data struct
-                            vals = [obj_id, "", interior, x_pos, y_pos, z_pos, x_rot, y_rot, z_rot, w_rot, lod]
-                            insts.append(dataStructures['inst'](*[str(v) for v in vals]))
-
-                            # Prepare for reading of next instance inside of .ipl
-                            current_offset = read_base + i * item_size
-
-                        sections["inst"] = insts
-
-        else:
-            with fileStream:
-                line = fileStream.readline().strip()
-
-                while line:
-
-                    # Presume we have a section start
-                    sectionName = line
-                    sectionUtility = None
-
-                    if line in specialSections:
-                        # Section requires some special reading / writing procedures
-                        sectionUtility = specialSections[sectionName](
-                            sectionName, dataStructures
-                        )
-                    elif line in dataStructures:
-                        # Section is generic,
-                        # can be read / written to with the default utility
-                        sectionUtility = GenericSectionUtility(
-                            sectionName, dataStructures
-                        )
-
-                    if sectionUtility is not None:
-                        sections[sectionName] = sectionUtility.read(fileStream)
-                        print("%s: %d entries" % (
-                            sectionName, len(sections[sectionName]
-                            )
-                        ))
-
-                    # Get next section
-                    line = fileStream.readline().strip()
+            print("File not found:", filepath)
 
         return sections
 
     ########################################################################
-    def getMapData(gameID, gameRoot, iplSection, isCustomIPL):
+    @staticmethod
+    def load_ide_data(game_root, ide_paths, data_structures, aliases):
+        self = MapDataUtility
 
-        data = map_data.data[gameID].copy()
+        ide = {}
+        for file in ide_paths:
+            fullpath = self.get_full_path(game_root, file)
+            print('\nMapDataUtility reading:', fullpath)
+            sections = self.read_file(fullpath, data_structures, aliases)
+            ide = self.merge_dols(ide, sections)
 
-        if isCustomIPL:
+        return ide
+
+    ########################################################################
+    @staticmethod
+    def load_ipl_data(game_root, ipl_section, data_structures, aliases):
+        self = MapDataUtility
+
+        ipl = {}
+        fullpath = self.get_full_path(game_root, ipl_section)
+        print('\nMapDataUtility reading:', fullpath)
+
+        if not os.path.isfile(fullpath):
+             # If not found, look for it inside gta3.img
+            imgpath = os.path.join(game_root, 'models/gta3.img')
+
+            try:
+                with img.open(imgpath) as img_file:
+                    basename = os.path.basename(ipl_section)
+                    entry_idx = img_file.find_entry_idx(basename)
+
+                    if entry_idx > -1:
+                        print("Read binary IPL from gta3.img:", basename)
+                        _, data = img_file.read_entry(entry_idx)
+                        file_stream = BufferedReader(BytesIO(data))
+                        sections = MapDataUtility.read_binary_ipl_from_stream(file_stream, data_structures)
+                        ipl = self.merge_dols(ipl, sections)
+                        return ipl
+
+            except FileNotFoundError:
+                print("Warning: gta3.img not found at:", imgpath)
+
+        sections = self.read_file(fullpath, data_structures, aliases)
+        return self.merge_dols(ipl, sections)
+
+    ########################################################################
+    @staticmethod
+    def load_map_data(game_id, game_root, ipl_section, is_custom_ipl):
+        self = MapDataUtility
+
+        data = map_data.data[game_id].copy()
+
+        if is_custom_ipl:
             # Find paths to all IDEs
             ide_paths = []
-            for root_path, _, files in os.walk(os.path.join(gameRoot, "DATA/MAPS")):
+            for root_path, _, files in os.walk(os.path.join(game_root, "DATA/MAPS")):
                 for file in files:
                     if file.lower().endswith(".ide"):
-                        full_path = os.path.join(root_path, file)
-                        ide_paths.append(os.path.relpath(full_path, gameRoot))
+                        fullpath = os.path.join(root_path, file)
+                        ide_paths.append(os.path.relpath(fullpath, game_root))
             data['IDE_paths'] = ide_paths
 
         else:
             # Prune IDEs unrelated to current IPL section (SA only). First, make IDE_paths a mutable list, then iterate
             # over a copy so we can remove elements during iteration. This is a naive pruning which keeps all ides with a
-            # few generic keywords in their name and culls anything else with a prefix different from the given iplSection
-            if gameID == game_version.SA:
+            # few generic keywords in their name and culls anything else with a prefix different from the given ipl_section
+            if game_id == map_data.game_version.SA:
                 data['IDE_paths'] = list(data['IDE_paths'])
                 for p in data['IDE_paths'].copy():
                     if p.startswith('DATA/MAPS/generic/') or p.startswith('DATA/MAPS/leveldes/') or 'xref' in p:
                         continue
                     ide_prefix = p.split('/')[-1].lower()
-                    ipl_prefix = iplSection.split('/')[-1].lower()[:3]
+                    ipl_prefix = ipl_section.split('/')[-1].lower()[:3]
                     if not ide_prefix.startswith(ipl_prefix):
                         data['IDE_paths'].remove(p)
 
-        ide = {}
-
-        for file in data['IDE_paths']:
-            sections = MapDataUtility.readFile(
-                gameRoot, file,
-                data['structures']
-            )
-            ide = MapDataUtility.merge_dols(ide, sections)
-
-        ipl = {}
-
-        sections = MapDataUtility.readFile(
-            gameRoot, iplSection,
-            data['structures']
+        # Load IDEs
+        ide = self.load_ide_data(
+            game_root,
+            data['IDE_paths'],
+            data['structures'],
+            data['IDE_aliases']
         )
-        ipl = MapDataUtility.merge_dols(ipl, sections)
+
+        # Load IPL
+        ipl = self.load_ipl_data(
+            game_root,
+            ipl_section,
+            data['structures'],
+            data['IPL_aliases']
+        )
 
         # Extract relevant sections
         object_instances = []
+        cull_instances = []
         object_data = {}
 
         # Get all insts into a flat list (array)
@@ -286,7 +336,12 @@ class MapDataUtility:
         if 'inst' in ipl:
             for entry in ipl['inst']:
                 object_instances.append(entry)
-                
+
+        # Get all culls into a flat list (array)
+        if 'cull' in ipl:
+            for entry in ipl['cull']:
+                cull_instances.append(entry)
+
         # Get all objs and tobjs into flat ID keyed dictionaries
         if 'objs' in ide:
             for entry in ide['objs']:
@@ -300,15 +355,65 @@ class MapDataUtility:
                     print('TOBJ ERROR!! a duplicate ID!!')
                 object_data[entry.id] = entry
 
-        return {
-            'object_instances': object_instances,
-            'object_data': object_data
-            }
+        return MapData(
+            object_instances = object_instances,
+            object_data = object_data,
+            cull_instances = cull_instances
+        )
 
-    # Merge Dictionaries of Lists
-    #######################################################
-    def merge_dols(dol1, dol2):
-        result = dict(dol1, **dol2)
-        result.update((k, dol1[k] + dol2[k])
-                        for k in set(dol1).intersection(dol2))
-        return result
+    ########################################################################
+    @staticmethod
+    def write_text_ipl_to_stream(file_stream, game_id, ipl_data:TextIPLData):
+        file_stream.write("# IPL generated with DragonFF\n")
+
+        section_utility = SectionUtility("inst")
+        section_utility.write(file_stream, ipl_data.object_instances)
+
+        section_utility = SectionUtility("cull")
+        section_utility.write(file_stream, ipl_data.cull_instances)
+
+        if game_id == map_data.game_version.III:
+            pass
+
+        elif game_id == map_data.game_version.VC:
+            section_utility = SectionUtility("pick")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("path")
+            section_utility.write(file_stream, [])
+
+        elif game_id == map_data.game_version.SA:
+            section_utility = SectionUtility("path")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("grge")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("enex")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("pick")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("cars")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("jump")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("tcyc")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("auzo")
+            section_utility.write(file_stream, [])
+
+            section_utility = SectionUtility("mult")
+            section_utility.write(file_stream, [])
+
+    ########################################################################
+    @staticmethod
+    def write_ipl_data(filename, game_id, ipl_data:TextIPLData):
+        self = MapDataUtility
+
+        with open(filename, 'w') as file_stream:
+            self.write_text_ipl_to_stream(file_stream, game_id, ipl_data)

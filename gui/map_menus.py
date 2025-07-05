@@ -1,12 +1,24 @@
+# GTA DragonFF - Blender scripts to edit basic GTA formats
+# Copyright (C) 2019  Parik
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import bpy
-import gpu
-import numpy as np
-import os
-import random
-from bpy_extras.io_utils import ImportHelper
-from gpu_extras.batch import batch_for_shader
-from ..data import map_data
-from ..ops.importer_common import game_version
+
+from .col_ot import FaceGroupsDrawer
+from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull
+from ..gtaLib.data import map_data
 
 #######################################################
 class DFFFrameProps(bpy.types.PropertyGroup):
@@ -64,11 +76,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     game_version_dropdown : bpy.props.EnumProperty(
         name = 'Game',
         items = (
-            (game_version.III, 'GTA III', 'GTA III map segments'),
-            (game_version.VC, 'GTA VC', 'GTA VC map segments'),
-            (game_version.SA, 'GTA SA', 'GTA SA map segments'),
-            (game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
-            (game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
+            (map_data.game_version.III, 'GTA III', 'GTA III map segments'),
+            (map_data.game_version.VC, 'GTA VC', 'GTA VC map segments'),
+            (map_data.game_version.SA, 'GTA SA', 'GTA SA map segments'),
+            (map_data.game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
+            (map_data.game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
         )
     )
 
@@ -80,7 +92,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     custom_ipl_path : bpy.props.StringProperty(
         name        = "IPL path",
         default     = '',
-        description = "Custom IPL path"
+        description = "Custom IPL path (supports both relative paths from game root and absolute paths)"
     )
 
     use_custom_map_section : bpy.props.BoolProperty(
@@ -109,6 +121,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    load_cull: bpy.props.BoolProperty(
+        name        = "Load Map CULL",
+        default     = False
+    )
+
     game_root : bpy.props.StringProperty(
         name = 'Game root',
         default = 'C:/Program Files (x86)/Steam/steamapps/common/',
@@ -123,18 +140,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         subtype = 'DIR_PATH'
     )
 
-    # txd_folder = bpy.props.StringProperty \
-    #     (
-    #     name = 'Txd folder',
-    #     default = 'C:/Users/blaha/Documents/GitHub/DragonFF/tests/txd',
-    #     description = "Define a folder where all of the txd models are stored.",
-    #     subtype = 'DIR_PATH'
-    #     )
-
     draw_facegroups : bpy.props.BoolProperty(
         name="Draw Face Groups",
         description="Display the Face Groups of the active object (if they exist) in the viewport",
-        default=False
+        default=False,
+        get=FaceGroupsDrawer.get_draw_enabled,
+        set=FaceGroupsDrawer.set_draw_enabled
     )
 
     draw_bounds: bpy.props.BoolProperty(
@@ -201,90 +212,6 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = True
     )
 
-    def draw_fg():
-        if not bpy.context.scene.dff.draw_facegroups:
-            return
-        o = bpy.context.active_object
-        if o and o.select_get() and o.type == 'MESH' and o.data.attributes.get('face group'):
-            mesh = bpy.context.active_object.data
-            attr = mesh.attributes['face group'].data
-            if len(attr) == 0:
-                return
-            mesh.calc_loop_triangles()
-
-            # As the face groups are stored as face attributes, we'll generate unique vertices across the whole overlay
-            # because the colors of different faces can't be shared across vertices
-            size = 3 * len(mesh.loop_triangles)
-            vertices = np.empty((size, 3), 'f')
-            vertex_colors = np.empty((size, 4), 'f')
-            indices = np.arange(0, size, dtype='i')
-
-            # Each face group gets a random color, but set an explicit seed so the resulting color array remains
-            # deterministic across redraws
-            random.seed(10)
-            color = []
-            grp = -1
-            idx = 0
-            for i, face in enumerate(mesh.loop_triangles):
-                vertices[idx  ] = mesh.vertices[face.vertices[0]].co
-                vertices[idx+1] = mesh.vertices[face.vertices[1]].co
-                vertices[idx+2] = mesh.vertices[face.vertices[2]].co
-                if grp != attr[i].value:
-                    color = random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), 1.0
-                    grp = attr[i].value
-                vertex_colors[idx  ] = color
-                vertex_colors[idx+1] = color
-                vertex_colors[idx+2] = color
-                idx += 3
-
-            shader = gpu.shader.from_builtin('FLAT_COLOR')
-            batch = batch_for_shader(
-                shader, 'TRIS',
-                {"pos": vertices, "color": vertex_colors},
-                indices=indices,
-            )
-
-            # Draw the overlay over the existing collision object faces. There will be z-fighting as the object
-            # location falls further from the origin, which it especially does for map objects. Unfortunate, but
-            # probably fine for a simple visualization of the face groups.
-            gpu.state.depth_test_set('LESS_EQUAL')
-            gpu.state.depth_mask_set(True)
-            gpu.matrix.push()
-            gpu.matrix.multiply_matrix(bpy.context.active_object.matrix_local)
-            batch.draw(shader)
-            gpu.matrix.pop()
-            gpu.state.depth_mask_set(False)
-
-    #######################################################
-    def register():
-        bpy.types.Scene.dff = bpy.props.PointerProperty(type=DFFSceneProps)
-
-#######################################################
-class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
-
-    bl_idname = "scene.select_ipl"
-    bl_label = "Select IPL File"
-
-    filename_ext = ".ipl"
-
-    filter_glob : bpy.props.StringProperty(
-        default="*.ipl",
-        options={'HIDDEN'})
-
-    def invoke(self, context, event):
-        self.filepath = context.scene.dff.game_root + "/DATA/MAPS/"
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def execute(self, context):
-        if os.path.splitext(self.filepath)[-1] == self.filename_ext:
-            filepath = os.path.normpath(self.filepath)
-            sep_pos = filepath.upper().find(f"DATA{os.sep}MAPS")
-            game_root = filepath[:sep_pos]
-            context.scene.dff.game_root = game_root
-            context.scene.dff.custom_ipl_path = os.path.relpath(filepath, game_root)
-        return {'FINISHED'}
-
 #######################################################
 class MapImportPanel(bpy.types.Panel):
     """Creates a Panel in the scene context of the properties editor"""
@@ -319,6 +246,7 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "load_txd", text="Load TXD files")
         col.prop(settings, "read_mat_split", text="Read Material Split")
         col.prop(settings, "load_collisions", text="Load Map Collisions")
+        col.prop(settings, "load_cull", text="Load Map CULL")
 
         layout.separator()
 
@@ -327,3 +255,10 @@ class MapImportPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("scene.dragonff_map_import")
+
+#######################################################@
+class DFF_MT_AddMapObject(bpy.types.Menu):
+    bl_label = "Map"
+
+    def draw(self, context):
+        self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")

@@ -71,13 +71,128 @@ class ext_2dfx_importer:
         self.effects = effects
 
     #######################################################
+    @staticmethod
+    def create_light_object(color):
+        data = bpy.data.lights.new(name="2dfx_light", type='POINT')
+        data.color = color
+
+        obj = bpy.data.objects.new("2dfx_light", data)
+
+        return obj
+
+    #######################################################
+    @staticmethod
+    def create_particle_object(effect):
+        obj = bpy.data.objects.new("2dfx_particle", None)
+
+        settings = obj.dff.ext_2dfx
+        settings.val_str24_1 = effect
+
+        return obj
+
+    #######################################################
+    @staticmethod
+    def create_ped_attractor_object(attractor_type, queue_euler, use_euler, forward_euler,
+                                    external_script, ped_existing_probability, unk):
+        obj = bpy.data.objects.new("2dfx_ped_attractor", None)
+
+        settings = obj.dff.ext_2dfx
+        settings.ped_attractor_type = attractor_type
+        settings.val_euler_1 = queue_euler
+        obj.rotation_euler = use_euler
+        settings.val_euler_2 = forward_euler
+        settings.val_str8_1 = external_script
+        settings.val_chance_1 = ped_existing_probability
+        settings.val_int_1 = unk
+
+        return obj
+
+    #######################################################
+    @staticmethod
+    def create_sun_glare_object():
+        obj = bpy.data.objects.new("2dfx_sun_glare", None)
+
+        return obj
+
+    #######################################################
+    @staticmethod
+    def create_road_sign_object(body, size, color, rotation_euler):
+        data = bpy.data.curves.new(name="2dfx_road_sign", type='FONT')
+        data.body = body
+        data.align_x = data.align_y = 'CENTER'
+        data.size = 0.5
+
+        font = bpy.data.fonts.get("DejaVu Sans Mono Book")
+        if not font:
+            font_path = os.path.join(bpy.utils.system_resource('DATAFILES'), "fonts", "DejaVuSansMono.woff2")
+            if os.path.isfile(font_path):
+                font = bpy.data.fonts.load(font_path)
+
+        if font:
+            data.font = font
+
+        settings = data.ext_2dfx
+        settings.size = size
+        settings.color = color
+
+        obj = bpy.data.objects.new("2dfx_road_sign", data)
+        obj.rotation_mode = 'ZXY'
+        obj.rotation_euler = rotation_euler
+
+        return obj
+
+    #######################################################
+    @staticmethod
+    def create_trigger_point_object(point_id):
+        obj = bpy.data.objects.new("2dfx_trigger_point", None)
+
+        settings = obj.dff.ext_2dfx
+        settings.val_int_1 = point_id
+
+        return obj
+
+    #######################################################
+    @staticmethod
+    def create_cover_point_object(cover_type, rotation_euler):
+        mesh = create_arrow_mesh("_2dfx_cover_point")
+        obj = bpy.data.objects.new("2dfx_cover_point", mesh)
+        obj.rotation_euler = rotation_euler
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+
+        settings = obj.dff.ext_2dfx
+        settings.val_int_1 = cover_type
+
+        return obj
+
+    #######################################################
+    @staticmethod
+    def create_escalator_object(bottom, top, end, direction, angle=0):
+        obj = bpy.data.objects.new("2dfx_escalator", None)
+        obj.rotation_euler = (0, 0, angle)
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+        obj.lock_rotation_w = True
+        obj.lock_scale[0] = True
+        obj.lock_scale[1] = True
+        obj.lock_scale[2] = True
+
+        settings = obj.dff.ext_2dfx
+        settings.val_vector_1 = bottom
+        settings.val_vector_2 = top
+        settings.val_vector_3 = end
+        settings.escalator_direction = direction
+
+        return obj
+
+    #######################################################
     def import_light(self, entry):
         FL1, FL2 = dff.Light2dfx.Flags1, dff.Light2dfx.Flags2
 
-        data = bpy.data.lights.new(name="2dfx_light", type='POINT')
-        data.color = [i / 255 for i in entry.color[:3]]
+        color = [i / 255 for i in entry.color[:3]]
+        obj = ext_2dfx_importer.create_light_object(color)
 
-        settings = data.ext_2dfx
+        settings = obj.data.ext_2dfx
         settings.alpha = entry.color[3] / 255
         settings.corona_far_clip = entry.coronaFarClip
         settings.point_light_range = entry.pointlightRange
@@ -106,8 +221,6 @@ class ext_2dfx_importer:
         settings.flag2_check_view_vector = entry.check_flag2(FL2.CHECK_DIRECTION)
         settings.flag2_blinking3 = entry.check_flag2(FL2.BLINKING3)
 
-        obj = bpy.data.objects.new("2dfx_light", data)
-
         if entry.lookDirection is not None:
             settings.view_vector = entry.lookDirection
             settings.export_view_vector = True
@@ -116,18 +229,25 @@ class ext_2dfx_importer:
 
     #######################################################
     def import_particle(self, entry):
-        obj = bpy.data.objects.new("2dfx_particle", None)
+        effect = entry.effect
+        return ext_2dfx_importer.create_particle_object(effect)
 
-        settings = obj.dff.ext_2dfx
-        settings.val_str24_1 = entry.effect
-
-        return obj
+    #######################################################
+    def import_ped_attractor(self, entry):
+        attractor_type = str(entry.type)
+        queue_euler = Vector(entry.queue_direction).to_track_quat('Z', 'Y').to_euler()
+        use_euler = Vector(entry.use_direction).to_track_quat('Z', 'Y').to_euler()
+        forward_euler = Vector(entry.forward_direction).to_track_quat('Z', 'Y').to_euler()
+        external_script = entry.external_script
+        ped_existing_probability = entry.ped_existing_probability
+        unk = entry.unk
+        return ext_2dfx_importer.create_ped_attractor_object(attractor_type,
+                                                             queue_euler, use_euler, forward_euler,
+                                                             external_script, ped_existing_probability, unk)
 
     #######################################################
     def import_sun_glare(self, entry):
-        obj = bpy.data.objects.new("2dfx_sun_glare", None)
-
-        return obj
+        return ext_2dfx_importer.create_sun_glare_object()
 
     #######################################################
     def import_enter_exit(self, entry):
@@ -160,57 +280,34 @@ class ext_2dfx_importer:
             body = body + "\n" if body else body
             body += line.replace("_", " ")[:max_chars_num]
 
-        font = bpy.data.fonts.get("DejaVu Sans Mono Book")
-        if not font:
-            font_path = os.path.join(bpy.utils.system_resource('DATAFILES'), "fonts", "DejaVuSansMono.woff2")
-            if os.path.isfile(font_path):
-                font = bpy.data.fonts.load(font_path)
-
-        data = bpy.data.curves.new(name="2dfx_road_sign", type='FONT')
-        data.body = body
-        data.align_x = data.align_y = 'CENTER'
-        data.size = 0.5
-
-        if font:
-            data.font = font
-
-        settings = data.ext_2dfx
-        settings.size = entry.size
-        settings.color = str((entry.flags >> 4) & 0b11)
-
-        obj = bpy.data.objects.new("2dfx_road_sign", data)
-        obj.rotation_mode = 'ZXY'
-        obj.rotation_euler = Vector((
+        size = entry.size
+        color = str((entry.flags >> 4) & 0b11)
+        rotation_euler = (
             entry.rotation.x * (math.pi / 180),
             entry.rotation.y * (math.pi / 180),
             entry.rotation.z * (math.pi / 180)
-        ))
-
-        return obj
+        )
+        return ext_2dfx_importer.create_road_sign_object(body, size, color, rotation_euler)
 
     #######################################################
     def import_trigger_point(self, entry):
-        obj = bpy.data.objects.new("2dfx_trigger_point", None)
-
-        settings = obj.dff.ext_2dfx
-        settings.val_int_1 = entry.point_id
-
-        return obj
+        point_id = entry.point_id
+        return ext_2dfx_importer.create_trigger_point_object(point_id)
 
     #######################################################
     def import_cover_point(self, entry):
-        mesh = create_arrow_mesh("_2dfx_cover_point")
-        obj = bpy.data.objects.new("2dfx_cover_point", mesh)
-        obj.lock_rotation[0] = True
-        obj.lock_rotation[1] = True
-
-        settings = obj.dff.ext_2dfx
-        settings.val_int_1 = entry.cover_type
-
+        cover_type = entry.cover_type
         direction = Vector((entry.direction_x, entry.direction_y, 0))
-        obj.rotation_euler = direction.to_track_quat('Y', 'Z').to_euler()
+        rotation_euler = direction.to_track_quat('Y', 'Z').to_euler()
+        return ext_2dfx_importer.create_cover_point_object(cover_type, rotation_euler)
 
-        return obj
+    #######################################################
+    def import_escalator(self, entry):
+        bottom = tuple(entry.bottom[i] - entry.loc[i] for i in range(3))
+        top = tuple(entry.top[i] - entry.loc[i] for i in range(3))
+        end = tuple(entry.end[i] - entry.loc[i] for i in range(3))
+        direction = str(entry.direction)
+        return ext_2dfx_importer.create_escalator_object(bottom, top, end, direction)
 
     #######################################################
     def get_objects(self):
@@ -220,11 +317,13 @@ class ext_2dfx_importer:
         functions = {
             0: self.import_light,
             1: self.import_particle,
+            3: self.import_ped_attractor,
             4: self.import_sun_glare,
             6: self.import_enter_exit,
             7: self.import_road_sign,
             8: self.import_trigger_point,
             9: self.import_cover_point,
+            10: self.import_escalator,
         }
 
         objects = []

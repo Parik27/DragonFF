@@ -63,10 +63,14 @@ class dff_importer:
 
     #######################################################
     def multiply_matrix(a, b):
-        # For compatibility with 2.79
-        if bpy.app.version < (2, 80, 0):
-            return a * b
         return a @ b
+
+    #######################################################
+    @staticmethod
+    def clean_object_name(name):
+        if "." in name:
+            return name + '.001'
+        return name
     
     #######################################################
     def _init():
@@ -96,7 +100,7 @@ class dff_importer:
             frame = self.current_clump.frame_list[atomic.frame]
             geom = self.current_clump.geometry_list[atomic.geometry]
 
-            mesh = bpy.data.meshes.new(frame.name)
+            mesh = bpy.data.meshes.new(self.clean_object_name(frame.name))
             bm   = bmesh.new()
 
             # Create a material order sorted by geometry splits
@@ -275,12 +279,8 @@ class dff_importer:
                 
     #######################################################
     def set_empty_draw_properties(empty):
-        if (2, 80, 0) > bpy.app.version:
-            empty.empty_draw_type = 'CUBE'
-            empty.empty_draw_size = 0.05
-        else:
-            empty.empty_display_type = 'CUBE'
-            empty.empty_display_size = 0.05
+        empty.empty_display_type = 'CUBE'
+        empty.empty_display_size = 0.05
 
     ##################################################################
     def generate_material_name(material, fallback):
@@ -309,33 +309,33 @@ class dff_importer:
             name = "glass"
 
         colors = {
-            "[255, 60, 0, 255]": "right rear light",
-            "[185, 255, 0, 255]": "left rear light",
-            "[0, 255, 200, 255]": "right front light",
-            "[255, 175, 0, 255]": "left front light",
-            "[255, 0, 255, 255]": "fourth",
-            "[0, 255, 255, 255]": "third",
-            "[255, 0, 175, 255]": "secondary",
-            "[60, 255, 0, 255]": "primary",
-            "[184, 255, 0, 255]": "breaklight l",
-            "[255, 59, 0, 255]": "breaklight r",
-            "[255, 173, 0, 255]": "revlight L",
-            "[0, 255, 198, 255]": "revlight r",
-            "[255, 174, 0, 255]": "foglight l",
-            "[0, 255, 199, 255]": "foglight r",
-            "[183, 255, 0, 255]": "indicator lf",
-            "[255, 58, 0, 255]": "indicator rf",
-            "[182, 255, 0, 255]": "indicator lm",
-            "[255, 57, 0, 255]": "indicator rm",
-            "[181, 255, 0, 255]": "indicator lr",
-            "[255, 56, 0, 255]": "indicator rr",
-            "[0, 16, 255, 255]": "light night",
-            "[0, 17, 255, 255]": "light all-day",
-            "[0, 18, 255, 255]": "default day"
+            (255, 60, 0, 255): "right rear light",
+            (185, 255, 0, 255): "left rear light",
+            (0, 255, 200, 255): "right front light",
+            (255, 175, 0, 255): "left front light",
+            (255, 0, 255, 255): "fourth",
+            (0, 255, 255, 255): "third",
+            (255, 0, 175, 255): "secondary",
+            (60, 255, 0, 255): "primary",
+            (184, 255, 0, 255): "breaklight l",
+            (255, 59, 0, 255): "breaklight r",
+            (255, 173, 0, 255): "revlight L",
+            (0, 255, 198, 255): "revlight r",
+            (255, 174, 0, 255): "foglight l",
+            (0, 255, 199, 255): "foglight r",
+            (183, 255, 0, 255): "indicator lf",
+            (255, 58, 0, 255): "indicator rf",
+            (182, 255, 0, 255): "indicator lm",
+            (255, 57, 0, 255): "indicator rm",
+            (181, 255, 0, 255): "indicator lr",
+            (255, 56, 0, 255): "indicator rr",
+            (0, 16, 255, 255): "light night",
+            (0, 17, 255, 255): "light all-day",
+            (0, 18, 255, 255): "default day"
         }
 
         for color in colors:
-            if eval(color) == list(mat_color):
+            if color == tuple(mat_color):
                 name = colors[color]
                 
         return name if name else fallback
@@ -357,7 +357,7 @@ class dff_importer:
                 continue
             
             # Generate a nice name with index and frame
-            name = "%s.%d" % (frame.name, index)
+            name = "%s.%d" % (self.clean_object_name(frame.name), index)
             name = self.generate_material_name(material, name)
             
             mat = bpy.data.materials.new(name)
@@ -533,8 +533,8 @@ class dff_importer:
 
         self = dff_importer
         
-        armature = bpy.data.armatures.new(frame.name)
-        obj = bpy.data.objects.new(frame.name, armature)
+        armature = bpy.data.armatures.new(self.clean_object_name(frame.name))
+        obj = bpy.data.objects.new(self.clean_object_name(frame.name), armature)
         link_object(obj, dff_importer.current_collection)
 
         skinned_obj_data = None
@@ -752,7 +752,7 @@ class dff_importer:
             # Create and link the object to the scene
             if obj is None:
                 if len(meshes) != 1:
-                    obj = bpy.data.objects.new(frame.name, None)
+                    obj = bpy.data.objects.new(self.clean_object_name(frame.name), None)
                     link_object(obj, dff_importer.current_collection)
 
                     # Set empty display properties to something decent
@@ -761,7 +761,7 @@ class dff_importer:
                 else:
                     # Use a mesh as a frame object
                     obj = meshes[0]
-                    obj.name = frame.name
+                    obj.name = self.clean_object_name(frame.name)
 
                 obj.rotation_mode = 'QUATERNION'
                 obj.matrix_local  = matrix.copy()
@@ -786,8 +786,6 @@ class dff_importer:
 
             self.objects[index] = obj
 
-            # Set a collision model used for export
-            obj["gta_coll"] = self.current_clump.collisions
             if frame.user_data is not None:
                 obj["dff_user_data"] = frame.user_data.to_mem()[12:]
 
@@ -799,15 +797,14 @@ class dff_importer:
         self = dff_importer
 
         for collision in self.current_clump.collisions:
-            col = import_col_mem(collision, os.path.basename(self.file_name), False)
+            col = import_col_mem(collision.data, os.path.basename(self.file_name), False)
 
-            if (2, 80, 0) <= bpy.app.version:
-                for collection in col:
-                    self.current_collection.children.link(collection)
+            for collection in col:
+                self.current_collection.children.link(collection)
 
-                    # Hide objects
-                    for object in collection.objects:
-                        hide_object(object)
+                # Hide objects
+                for object in collection.objects:
+                    hide_object(object)
 
     #######################################################
     def import_2dfx():

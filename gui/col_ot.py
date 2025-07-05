@@ -1,8 +1,15 @@
 import bpy
+import gpu
+import random
 from bpy_extras.io_utils import ExportHelper
+from gpu_extras.batch import batch_for_shader
 from ..ops import col_exporter
+from ..ops.importer_common import create_bmesh_for_mesh, redraw_viewport
 import bmesh
 from mathutils import Vector
+
+if bpy.app.version < (3, 4, 0):
+    import bgl
 
 #######################################################
 class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
@@ -96,22 +103,32 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
     bl_description = "Generate Face Groups for GTA III/VC/SA Collision File"
     bl_label       = "Generate Face Groups"
 
-    def execute(self, context):
+    #######################################################
+    @classmethod
+    def poll(cls, context):
         obj = context.active_object
-        if not (obj and obj.type == 'MESH' and obj.dff.type == 'COL'):
-            return {'CANCELLED'}
+        return (obj and obj.type == 'MESH' and obj.dff.type == 'COL')
 
+    #######################################################
+    def execute(self, context):
         avoid_smalls = context.scene.dff.face_group_avoid_smalls
         min_size = max(5, context.scene.dff.face_group_min)
         max_size = max(min_size, context.scene.dff.face_group_max)
+
+        obj = context.active_object
         mesh = obj.data
+        bm = create_bmesh_for_mesh(mesh, obj.mode)
+
+        # Triangulate mesh
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        bm.faces.ensure_lookup_table()
 
         # Set min/max to object bound_box with a small margin
         mn = Vector(obj.bound_box[0]) - Vector((1, 1, 1))
         mx = Vector(obj.bound_box[6]) + Vector((1, 1, 1))
         big_groups = []
         lil_groups = []
-        big_groups.append({'min': mn, 'max': mx, 'indices': [f.index for f in mesh.polygons]})
+        big_groups.append({'min': mn, 'max': mx, 'indices': [f.index for f in bm.faces]})
         while len(big_groups):
             # Group is done if under max_size
             grp = big_groups.pop()
@@ -136,8 +153,8 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
             inds1 = []
             inds2 = []
             for idx in grp['indices']:
-                face = mesh.polygons[idx]
-                c = face.center
+                face = bm.faces[idx]
+                c = face.calc_center_median()
                 if mn1.x < c.x < mx1.x and mn1.y < c.y < mx1.y and mn1.z < c.z < mx1.z:
                     inds1.append(idx)
                 else:
@@ -155,15 +172,9 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
         # No reason to generate face groups if there's only 1 group
         if len(lil_groups) > 1:
             # Create a face groups attribute for the mesh if there isn't one already
-            if not mesh.attributes.get("face group"):
-                attribute_domain = "POLYGON" if (2, 93, 0) > bpy.app.version else "FACE"
-                mesh.attributes.new(name="face group", type="INT", domain=attribute_domain)
+            layer = bm.faces.layers.int.get("face group") or bm.faces.layers.int.new("face group")
 
             # Sort the face list by face group index
-            bm = bmesh.new()
-            bm.from_mesh(mesh)
-            bm.faces.ensure_lookup_table()
-            layer = bm.faces.layers.int.get("face group")
             min_size = max_size = len(lil_groups[0]['indices'])
             avg_size = 0
             for fg, grp in enumerate(lil_groups):
@@ -178,6 +189,7 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
                   "faces." % (len(lil_groups), min_size, max_size, avg_size))
             bm.faces.sort(key=lambda f: f[layer])
 
+            # Apply
             bm.to_mesh(mesh)
 
         # Delete face groups if they exist now but the generation found them unnecessary
@@ -185,11 +197,11 @@ class OBJECT_OT_facegoups_col(bpy.types.Operator):
             mesh.attributes.remove(mesh.attributes.get("face group"))
             print("No face groups were generated with the current settings.")
 
+        bm.free()
+
         # Make an undo and force a redraw of the viewport
         bpy.ops.ed.undo_push()
-        for area in bpy.context.window.screen.areas:
-            if area.type == 'VIEW_3D':
-                area.tag_redraw()
+        redraw_viewport()
 
         return {'FINISHED'}
 
@@ -201,19 +213,194 @@ class COLLECTION_OT_dff_generate_bounds(bpy.types.Operator):
     bl_label            = "Generate Bounds"
 
     #######################################################
+    @classmethod
+    def poll(cls, context):
+        col = context.collection
+        return (col and not col.dff.auto_bounds)
+
+    #######################################################
     def execute(self, context):
-        collection = context.collection
+        col = context.collection
 
-        if not collection:
-            return {'CANCELLED'}
-
-        bounds_objects = [obj for obj in collection.objects if obj.dff.type == 'COL']
+        bounds_objects = [obj for obj in col.objects if obj.dff.type == 'COL']
         bounds = col_exporter.calculate_bounds(bounds_objects)
-        collection.dff.bounds_max, collection.dff.bounds_min = bounds
+        col.dff.bounds_max, col.dff.bounds_min = bounds
 
         if context.scene.dff.draw_bounds:
-            for area in context.window.screen.areas:
-                if area.type == 'VIEW_3D':
-                    area.tag_redraw()
+            redraw_viewport()
 
         return {'FINISHED'}
+
+#######################################################
+class AddCollisionHelper:
+    bl_options = {'REGISTER', 'UNDO'}
+
+    location: bpy.props.FloatVectorProperty(
+        name="Location",
+        description="Location for the newly added object",
+        subtype='XYZ',
+        default=(0, 0, 0)
+    )
+
+    radius: bpy.props.FloatProperty(
+        name="Radius",
+        description="Radius",
+        default=1,
+        min=0.001
+    )
+
+    #######################################################
+    def invoke(self, context, event):
+        self.location = context.scene.cursor.location
+        return self.execute(context)
+
+#######################################################
+class OBJECT_OT_dff_add_collision_box(bpy.types.Operator, AddCollisionHelper):
+
+    bl_idname = "object.dff_add_collision_box"
+    bl_label = "Add Collision Box"
+    bl_description = "Add collision box to the scene"
+
+    #######################################################
+    def execute(self, context):
+        ret = bpy.ops.object.empty_add(type='CUBE', radius=self.radius, location=self.location)
+        if ret != {'FINISHED'}:
+            return ret
+
+        obj = context.object
+
+        obj.name = "ColBox"
+        obj.dff.type = 'COL'
+
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+        obj.lock_rotation[2] = True
+        obj.lock_rotation_w = True
+
+        return {'FINISHED'}
+
+#######################################################
+class OBJECT_OT_dff_add_collision_sphere(bpy.types.Operator, AddCollisionHelper):
+
+    bl_idname = "object.dff_add_collision_sphere"
+    bl_label = "Add Collision Sphere"
+    bl_description = "Add collision sphere to the scene"
+
+    #######################################################
+    def execute(self, context):
+        ret = bpy.ops.object.empty_add(type='SPHERE', radius=self.radius, location=self.location)
+        if ret != {'FINISHED'}:
+            return ret
+
+        obj = context.object
+
+        obj.name = "ColSphere"
+        obj.dff.type = 'COL'
+
+        obj.lock_rotation[0] = True
+        obj.lock_rotation[1] = True
+        obj.lock_rotation[2] = True
+        obj.lock_rotation_w = True
+
+        return {'FINISHED'}
+
+#######################################################
+class FaceGroupsDrawer:
+
+    _draw_3d_handler = None
+
+    #######################################################
+    def get_draw_enabled(self):
+        return FaceGroupsDrawer._draw_3d_handler is not None
+
+    #######################################################
+    def set_draw_enabled(self, value):
+        FaceGroupsDrawer.enable_draw() if value else FaceGroupsDrawer.disable_draw()
+
+    #######################################################
+    @staticmethod
+    def draw_callback():
+        FaceGroupsDrawer.draw()
+
+    #######################################################
+    @staticmethod
+    def enable_draw():
+        if not FaceGroupsDrawer._draw_3d_handler:
+            callback = FaceGroupsDrawer.draw_callback
+            FaceGroupsDrawer._draw_3d_handler = bpy.types.SpaceView3D.draw_handler_add(callback, (), 'WINDOW', 'POST_VIEW')
+            redraw_viewport()
+
+    #######################################################
+    @staticmethod
+    def disable_draw():
+        if FaceGroupsDrawer._draw_3d_handler:
+            bpy.types.SpaceView3D.draw_handler_remove(FaceGroupsDrawer._draw_3d_handler, 'WINDOW')
+            FaceGroupsDrawer._draw_3d_handler = None
+            redraw_viewport()
+
+    #######################################################
+    @staticmethod
+    def draw():
+        o = bpy.context.active_object
+        if o and o.select_get() and o.type == 'MESH' and o.data.attributes.get('face group'):
+            mesh = bpy.context.active_object.data
+            attr = mesh.attributes['face group'].data
+            if len(attr) == 0:
+                return
+            mesh.calc_loop_triangles()
+
+            # As the face groups are stored as face attributes, we'll generate unique vertices across the whole overlay
+            # because the colors of different faces can't be shared across vertices
+            size = 3 * len(mesh.loop_triangles)
+            vertices = [[0.0,0.0,0.0]] * size
+            vertex_colors = [(0.0,0.0,0.0,0.0)] * size
+            indices = list(range(size))
+            indices = [(i, i+1, i+2) for i in range(0, size, 3)]
+
+            # Each face group gets a random color, but set an explicit seed so the resulting color array remains
+            # deterministic across redraws
+            random.seed(10)
+            color = (0.0, 0.0, 0.0, 0.0)
+            grp = -1
+            idx = 0
+            for i, face in enumerate(mesh.loop_triangles):
+                vertices[idx  ] = mesh.vertices[face.vertices[0]].co
+                vertices[idx+1] = mesh.vertices[face.vertices[1]].co
+                vertices[idx+2] = mesh.vertices[face.vertices[2]].co
+                if grp != attr[i].value:
+                    color = random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), 1.0
+                    grp = attr[i].value
+                vertex_colors[idx  ] = color
+                vertex_colors[idx+1] = color
+                vertex_colors[idx+2] = color
+                idx += 3
+
+            if bpy.app.version < (4, 0, 0):
+                shader = gpu.shader.from_builtin("3D_FLAT_COLOR")
+            else:
+                shader = gpu.shader.from_builtin("FLAT_COLOR")
+            batch = batch_for_shader(
+                shader, 'TRIS',
+                {"pos": vertices, "color": vertex_colors},
+                indices=indices,
+            )
+
+            # Draw the overlay over the existing collision object faces. There will be z-fighting as the object
+            # location falls further from the origin, which it especially does for map objects. Unfortunate, but
+            # probably fine for a simple visualization of the face groups.
+            if bpy.app.version < (3, 4, 0):
+                bgl.glEnable(bgl.GL_DEPTH_TEST)
+                bgl.glDepthFunc(bgl.GL_LEQUAL)
+            else:
+                gpu.state.depth_test_set('LESS_EQUAL')
+                gpu.state.depth_mask_set(True)
+
+            gpu.matrix.push()
+            gpu.matrix.multiply_matrix(bpy.context.active_object.matrix_local)
+            batch.draw(shader)
+            gpu.matrix.pop()
+
+            if bpy.app.version < (3, 4, 0):
+                bgl.glDisable(bgl.GL_DEPTH_TEST)
+            else:
+                gpu.state.depth_mask_set(False)

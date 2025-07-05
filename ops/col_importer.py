@@ -19,7 +19,7 @@ import bmesh
 import mathutils
 
 from ..gtaLib import col
-from ..data import col_materials as mats
+from ..gtaLib.data import col_materials as mats
 from .importer_common import (
     link_object, create_collection, material_helper
 )
@@ -58,17 +58,15 @@ class col_importer:
             obj.location = entity.center
             obj.scale = [entity.radius] * 3
 
-            if (2, 80, 0) > bpy.app.version:
-                obj.empty_draw_type = 'SPHERE'
-            else:
-                obj.empty_display_type = 'SPHERE'
+            obj.empty_display_type = 'SPHERE'
 
             obj.dff.type = 'COL'
             obj.dff.col_material = entity.surface.material
             obj.dff.col_flags = entity.surface.flags
             obj.dff.col_brightness = entity.surface.brightness
-            obj.dff.col_light = entity.surface.light
-            
+            obj.dff.col_day_light = entity.surface.light & 0xf
+            obj.dff.col_night_light = (entity.surface.light >> 4) & 0xf
+
             link_object(obj, collection)
 
     #######################################################
@@ -85,16 +83,14 @@ class col_importer:
             obj.location = mn + half
             obj.scale = half
 
-            if (2, 80, 0) > bpy.app.version:
-                obj.empty_draw_type = 'CUBE'
-            else:
-                obj.empty_display_type = 'CUBE'
+            obj.empty_display_type = 'CUBE'
 
             obj.dff.type = 'COL'
             obj.dff.col_material = entity.surface.material
             obj.dff.col_flags = entity.surface.flags
             obj.dff.col_brightness = entity.surface.brightness
-            obj.dff.col_light = entity.surface.light
+            obj.dff.col_day_light = entity.surface.light & 0xf
+            obj.dff.col_night_light = (entity.surface.light >> 4) & 0xf
 
             link_object(obj, collection)
 
@@ -129,7 +125,8 @@ class col_importer:
             mat = bpy.data.materials.new(name)
             mat.dff.col_mat_index   = surface.material
             mat.dff.col_brightness  = surface.brightness
-            mat.dff.col_light       = surface.light
+            mat.dff.col_day_light   = surface.light & 0xf
+            mat.dff.col_night_light = (surface.light >> 4) & 0xf
 
             helper = material_helper(mat)
             helper.set_base_color(colour)

@@ -211,11 +211,6 @@ class material_helper:
         # so time_inc is added for the key
         keyframes_dict = {} # (time, time_inc): [(val, is_constant_interpolation)] * 4
 
-        data_path_offset = {
-            'nodes["Mapping"].inputs[1].default_value': 2,
-            'nodes["Mapping"].inputs[3].default_value': 0,
-        }
-
         mapping = self.principled.base_color_texture.node_mapping_get()
         default_values = (
             mapping.inputs['Scale'].default_value[0],
@@ -223,6 +218,11 @@ class material_helper:
             mapping.inputs['Location'].default_value[0],
             mapping.inputs['Location'].default_value[1],
         )
+
+        data_path_offset = {
+            f'nodes["{mapping.name}"].inputs[1].default_value': 2,
+            f'nodes["{mapping.name}"].inputs[3].default_value': 0,
+        }
 
         # Set keyframes_dict
         for curve in anim_data.action.fcurves:
@@ -350,11 +350,10 @@ class material_helper:
         self.material = material
         self.principled = None
 
-        if bpy.app.version >= (2, 80, 0):
-            from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-            
-            self.principled = PrincipledBSDFWrapper(self.material,
-                                                    is_readonly=False)
+        from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+
+        self.principled = PrincipledBSDFWrapper(self.material,
+                                                is_readonly=False)
         
         
 
@@ -393,6 +392,7 @@ class dff_exporter:
     version = None
     collection = None
     export_coll = False
+    coll_ext_type = 0
     apply_coll_trans = True
     exclude_geo_faces = False
     dm_to_clumps = False
@@ -405,9 +405,6 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def multiply_matrix(a, b):
-        # For compatibility with 2.79
-        if bpy.app.version < (2, 80, 0):
-            return a * b
         return a @ b
 
     #######################################################
@@ -634,7 +631,6 @@ class dff_exporter:
         # maximum will be 2. If obj.dff.uv_map1 is NOT set, the maximum cannot
         # be greater than 0.
         max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
-        max_uv_layers = (obj.dff.uv_map2 + 1) * obj.dff.uv_map1
 
         extra_vert = None
         if has_night_colors:
@@ -704,16 +700,18 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def populate_geometry_from_faces_data(faces_list, geometry):
-        for face in faces_list:
-            verts = face['verts']
-            geometry.triangles.append(
-                dff.Triangle._make((
-                    verts[1], #b
-                    verts[0], #a
-                    face['mat_idx'], #material
-                    verts[2] #c
-                ))
-            )
+        triangles = [
+            dff.Triangle._make((
+                verts[1], #b
+                verts[0], #a
+                face['mat_idx'], #material
+                verts[2] #c
+            ))
+            for face in faces_list
+            for verts in [face['verts']]
+        ]
+        geometry.triangles.extend(triangles)
+        geometry.triangles.sort(key=lambda triangle: triangle.material)
 
     #######################################################
     @staticmethod
@@ -866,13 +864,9 @@ class dff_exporter:
                 key_shape_values[kb] = kb.value
                 kb.value = 0.0
 
-        if bpy.app.version < (2, 80, 0):
-            mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
-        else:
-            
-            depsgraph   = bpy.context.evaluated_depsgraph_get()
-            object_eval = obj.evaluated_get(depsgraph)
-            mesh        = object_eval.to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
+        depsgraph   = bpy.context.evaluated_depsgraph_get()
+        object_eval = obj.evaluated_get(depsgraph)
+        mesh        = object_eval.to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
             
 
         # Re enable disabled modifiers
@@ -1151,7 +1145,7 @@ class dff_exporter:
                 self.populate_atomic(mesh, frame_index)
 
             # 2DFX
-            ext_2dfx_exporter(self.current_clump.ext_2dfx).export_objects(objects)
+            ext_2dfx_exporter(self.current_clump.ext_2dfx).export_objects(objects, not self.preserve_positions)
 
             self.dff.clumps.append(self.current_clump)
 
@@ -1166,9 +1160,10 @@ class dff_exporter:
             })
 
             if len(mem) != 0:
+                col = dff.ExtensionColl(self.coll_ext_type, mem)
                 if not self.dff.clumps:
                     self.dff.clumps.append(dff.Clump())
-                self.dff.clumps[0].collisions = [mem]
+                self.dff.clumps[0].collisions = [col]
 
         # Skip empty clumps
         if not self.dff.clumps:
@@ -1188,8 +1183,6 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def is_selected(obj):
-        if bpy.app.version < (2, 80, 0):
-            return obj.select
         return obj.select_get()
             
     #######################################################
@@ -1258,6 +1251,7 @@ def export_dff(options):
     dff_exporter.path               = options['directory']
     dff_exporter.version            = options['version']
     dff_exporter.export_coll        = options['export_coll']
+    dff_exporter.coll_ext_type      = options['coll_ext_type']
     dff_exporter.apply_coll_trans   = options['apply_coll_trans']
     dff_exporter.from_outliner      = options['from_outliner']
 

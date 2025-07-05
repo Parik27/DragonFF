@@ -29,6 +29,9 @@ rpGEOMETRYMODULATEMATERIALCOLOR = 0x00000040
 rpGEOMETRYTEXTURED2             = 0x00000080
 rpGEOMETRYNATIVE                = 0x01000000
 
+ptTRIANGLELIST  = 5
+ptTRIANGLESTRIP = 6
+
 #######################################################
 class NativeXboxSkin:
 
@@ -113,13 +116,13 @@ class NativeXboxGeometry:
         vertices_pos = unpack_from("<I", data, self._read(4))[0]
         unk, splits_num = unpack_from("<HH", data, self._read(4))
 
-        flags, vertices_num, vertex_len = unpack_from("<III", data, self._read(12))
+        primitive_type, vertices_num, vertex_len = unpack_from("<III", data, self._read(12))
         self._pos += 16
 
-        if flags & 1 != 0:
-            geometry.flags &= ~rpGEOMETRYTRISTRIP
-        else:
+        if primitive_type == ptTRIANGLESTRIP:
             geometry.flags |= rpGEOMETRYTRISTRIP
+        else:
+            geometry.flags &= ~rpGEOMETRYTRISTRIP
 
         split_headers = []
         for _ in range(splits_num):
@@ -137,7 +140,7 @@ class NativeXboxGeometry:
 
         self._pos = vertices_pos
 
-        compressed_normal = vertex_len != 0x28
+        is_compressed_normal = vertex_len != 0x28
         for _ in range(vertices_num):
             vertex = Sections.read(Vector, data, self._read(12))
             geometry.vertices.append(vertex)
@@ -169,7 +172,7 @@ class NativeXboxGeometry:
                 tex_coord = Sections.read(TexCoords, data, self._read(8))
                 geometry.uv_layers[1].append(tex_coord)
 
-            if not compressed_normal:
+            if not is_compressed_normal:
                 normal = Sections.read(Vector, data, self._read(12))
                 geometry.normals.append(normal)
 

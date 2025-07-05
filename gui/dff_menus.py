@@ -1,13 +1,16 @@
 import bpy
-import gpu
-from gpu_extras.batch import batch_for_shader
 from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
     IMPORT_OT_txd, \
     OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
-from .col_ot import EXPORT_OT_col, OBJECT_OT_facegoups_col, COLLECTION_OT_dff_generate_bounds
+from .col_ot import EXPORT_OT_col, \
+    OBJECT_OT_facegoups_col, \
+    COLLECTION_OT_dff_generate_bounds, \
+    OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
+from .map_ot import EXPORT_OT_ipl_cull
+from .cull_menus import CULLObjectProps, CULLMenus
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -25,15 +28,6 @@ texture_uv_addressing_items = (
     ("2", "Mirror", ""),
     ("3", "Clamp", ""),
     ("4", "Border", "")
-)
-
-box_indices = (
-    (0, 1), (1, 3), (3, 2), (2, 0),
-    (2, 3), (3, 7), (7, 6), (6, 2),
-    (6, 7), (7, 5), (5, 4), (4, 6),
-    (4, 5), (5, 1), (1, 0), (0, 4),
-    (2, 6), (6, 4), (4, 0), (0, 2),
-    (7, 3), (3, 1), (1, 5), (5, 7),
 )
 
 #######################################################
@@ -59,7 +53,8 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         props = [["col_mat_index", "Material"],
                  ["col_flags", "Flags"],
                  ["col_brightness", "Brightness"],
-                 ["col_light", "Light"]]
+                 ["col_day_light", "Day Light"],
+                 ["col_night_light", "Night Light"]]
         
         for prop in props:
             self.draw_labelled_prop(layout.row(), settings, [prop[0]], prop[1])
@@ -159,12 +154,9 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         
         try:
 
-            if bpy.app.version >= (2, 80, 0):
-                prop = context.material.node_tree.nodes["Principled BSDF"].inputs[0]
-                prop_val = "default_value"
-            else:
-                prop = context.material
-                prop_val = "diffuse_color"
+            node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
+            prop = node.inputs[0]
+            prop_val = "default_value"
                 
             row = layout.row()
             row.prop(
@@ -194,15 +186,14 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
     # Callback function from preset_mat_cols enum
     def set_preset_color(self, context):
         try:
-            color = eval(context.material.dff.preset_mat_cols)
+            color = (int(x) for x in context.material.dff.preset_mat_cols[1:-1].split(","))
             color = [i / 255 for i in color]
                 
-            if bpy.app.version >= (2, 80, 0):                
-                node = context.material.node_tree.nodes["Principled BSDF"]
-                node.inputs[0].default_value = color
+            node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
+            node.inputs[0].default_value = color
 
             # Viewport color in Blender 2.8 and Material color in 2.79.
-            context.material.diffuse_color = color[:-1]
+            context.material.diffuse_color = color
 
         except Exception as e:
             print(e)
@@ -230,9 +221,11 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
         op.use_active_collection = False
+        self.layout.operator(EXPORT_OT_ipl_cull.bl_idname,
+                             text="DragonFF CULL (.ipl)")
 
 
-    #######################################################
+#######################################################
 def import_dff_func(self, context):
     self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff, col)")
 
@@ -370,7 +363,8 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "col_material", text="Material")
         box.prop(settings, "col_flags", text="Flags")
         box.prop(settings, "col_brightness", text="Brightness")
-        box.prop(settings, "col_light", text="Light")
+        box.prop(settings, "col_day_light", text="Day Light")
+        box.prop(settings, "col_night_light", text="Night Light")
 
     #######################################################
     def draw_2dfx_menu(self, context):
@@ -379,6 +373,10 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         layout.prop(settings, "effect", text="Effect")
         EXT2DFXMenus.draw_menu(int(settings.effect), layout, context)
+
+    #######################################################
+    def draw_cull_menu(self, context):
+        CULLMenus.draw_menu(self.layout, context)
 
     #######################################################
     def draw_obj_menu(self, context):
@@ -407,6 +405,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         elif settings.type == '2DFX':
             self.draw_2dfx_menu(context)
+
+        elif settings.type == 'CULL':
+            self.draw_cull_menu(context)
 
     #######################################################
     def draw(self, context):
@@ -501,10 +502,11 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     specular_texture : bpy.props.StringProperty ()
 
     # Collision Data
-    col_flags       : bpy.props.IntProperty()
-    col_brightness  : bpy.props.IntProperty()
-    col_light       : bpy.props.IntProperty()
-    col_mat_index   : bpy.props.IntProperty()
+    col_flags       : bpy.props.IntProperty(min=0, max=255)
+    col_brightness  : bpy.props.IntProperty(min=0, max=255)
+    col_day_light   : bpy.props.IntProperty(min=0, max=15)
+    col_night_light : bpy.props.IntProperty(min=0, max=15)
+    col_mat_index   : bpy.props.IntProperty(min=0, max=255)
 
     # UV Animation
     export_animation : bpy.props.BoolProperty   (name="UV Animation")
@@ -541,9 +543,6 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
         ),
         update = MATERIAL_PT_dffMaterials.set_preset_color
     )
-    
-    def register():
-        bpy.types.Material.dff = bpy.props.PointerProperty(type=DFFMaterialProps)
         
 #######################################################
 class DFFObjectProps(bpy.types.PropertyGroup):
@@ -555,6 +554,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('COL', 'Collision Object', 'Object is a collision object'),
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('2DFX', '2DFX', 'Object is a 2D effect'),
+            ('CULL', 'CULL', 'Object is a CULL zone'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
@@ -617,22 +617,37 @@ compatibiility with DFF Viewers"
 
     col_material : bpy.props.IntProperty(
         default = 12,
+        min = 0,
+        max = 255,
         description = "Material used for the Sphere/Cone"
     )
 
     col_flags : bpy.props.IntProperty(
         default = 0,
+        min = 0,
+        max = 255,
         description = "Flags for the Sphere/Cone"
     )
 
     col_brightness : bpy.props.IntProperty(
         default = 0,
+        min = 0,
+        max = 255,
         description = "Brightness used for the Sphere/Cone"
     )
-    
-    col_light : bpy.props.IntProperty(
+
+    col_day_light : bpy.props.IntProperty(
         default = 0,
-        description = "Light used for the Sphere/Cone"
+        min = 0,
+        max = 15,
+        description = "Day Light used for the Sphere/Cone"
+    )
+
+    col_night_light : bpy.props.IntProperty(
+        default = 0,
+        min = 0,
+        max = 15,
+        description = "Night Light used for the Sphere/Cone"
     )
 
     # Atomic properties
@@ -675,12 +690,11 @@ compatibiility with DFF Viewers"
     # 2DFX properties
     ext_2dfx : bpy.props.PointerProperty(type=EXT2DFXObjectProps)
 
+    # CULL properties
+    cull: bpy.props.PointerProperty(type=CULLObjectProps)
+
     # Miscellaneous properties
     is_frame_locked : bpy.props.BoolProperty()
-
-    #######################################################    
-    def register():
-        bpy.types.Object.dff = bpy.props.PointerProperty(type=DFFObjectProps)
 
 #######################################################
 class DFFCollectionProps(bpy.types.PropertyGroup):
@@ -706,44 +720,6 @@ class DFFCollectionProps(bpy.types.PropertyGroup):
 
     bounds_min: bpy.props.FloatVectorProperty()
     bounds_max: bpy.props.FloatVectorProperty()
-
-    #######################################################
-    def draw_bounds():
-        if not bpy.context.scene.dff.draw_bounds:
-            return
-
-        col = bpy.context.collection
-        if col and not col.dff.auto_bounds:
-            settings = col.dff
-
-            bounds_min = settings.bounds_min
-            bounds_max= settings.bounds_max
-
-            coords = (
-                (bounds_min[0], bounds_min[1], bounds_min[2]),
-                (bounds_min[0], bounds_min[1], bounds_max[2]),
-                (bounds_min[0], bounds_max[1], bounds_min[2]),
-                (bounds_min[0], bounds_max[1], bounds_max[2]),
-                (bounds_max[0], bounds_min[1], bounds_min[2]),
-                (bounds_max[0], bounds_min[1], bounds_max[2]),
-                (bounds_max[0], bounds_max[1], bounds_min[2]),
-                (bounds_max[0], bounds_max[1], bounds_max[2]),
-            )
-
-            if (4, 0, 0) > bpy.app.version:
-                shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
-            else:
-                shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-
-            batch = batch_for_shader(shader, 'LINES', {"pos": coords}, indices=box_indices)
-
-            shader.bind()
-            shader.uniform_float("color", (0.84, 0.84, 0.54, 1))
-            batch.draw(shader)
-
-    #######################################################
-    def register():
-        bpy.types.Collection.dff = bpy.props.PointerProperty(type=DFFCollectionProps)
 
 #######################################################
 class TXDImportPanel(bpy.types.Panel):
@@ -896,3 +872,25 @@ class SCENE_PT_dffAtomics(bpy.types.Panel):
         if not scene_dff.real_time_update:
             col = row.column()
             col.operator(SCENE_OT_dff_update.bl_idname, icon='FILE_REFRESH', text="")
+
+#######################################################@
+class DFF_MT_AddCollisionObject(bpy.types.Menu):
+    bl_label = "Collision"
+
+    def draw(self, context):
+        self.layout.operator(OBJECT_OT_dff_add_collision_box.bl_idname, text="Box", icon="CUBE")
+        self.layout.operator(OBJECT_OT_dff_add_collision_sphere.bl_idname, text="Sphere", icon="SPHERE")
+
+#######################################################@
+class DFF_MT_AddObject(bpy.types.Menu):
+    bl_label = "DragonFF"
+
+    def draw(self, context):
+        self.layout.menu("DFF_MT_AddCollisionObject", text="Collision")
+        self.layout.menu("DFF_MT_Add2DFXObject", text="2DFX")
+        self.layout.menu("DFF_MT_AddMapObject", text="Map")
+
+#######################################################
+def add_object_dff_func(self, context):
+    self.layout.separator()
+    self.layout.menu("DFF_MT_AddObject", text="DragonFF")
