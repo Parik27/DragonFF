@@ -174,6 +174,11 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
                 return {'FINISHED'}
 
+        if self.from_outliner or self.mass_export:
+            preserve_positions, preserve_rotations = self.preserve_positions, self.preserve_rotations
+        else:
+            preserve_positions, preserve_rotations = True, True
+
         start = time.time ()
         try:
             dff_exporter.export_dff(
@@ -182,8 +187,8 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "directory"          : self.directory,
                     "selected"           : self.only_selected,
                     "mass_export"        : False if self.from_outliner else self.mass_export,
-                    "preserve_positions" : self.preserve_positions,
-                    "preserve_rotations" : self.preserve_rotations,
+                    "preserve_positions" : preserve_positions,
+                    "preserve_rotations" : preserve_rotations,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
                     "coll_ext_type"      : int(self.coll_ext_type),
