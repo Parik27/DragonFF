@@ -1138,34 +1138,59 @@ class dff_exporter:
         self.file_name = filename
 
         State.update_scene()
-        objects = {}
-
-        # Export collections
+        
+        # Determine which collections to process
         if self.from_outliner:
-            collections = [bpy.context.view_layer.objects.active.users_collection[0]]
+            active_object = bpy.context.view_layer.objects.active
+            if active_object:
+                collections = active_object.users_collection
+            else:
+                collections = []
         else:
             collections = [c for c in bpy.data.collections if c.dff.type != 'NON'] + [bpy.context.scene.collection]
+        
+        if self.mass_export:
+            export_tasks = []
+            processed_collections = set()
 
-        for collection in collections:
-            for obj in collection.objects:
-                    
-                if not self.selected or obj.select_get():
-                    objects[obj] = obj.dff.frame_index
+            for collection in collections:
+                if collection in processed_collections or collection.dff.type == 'NON':
+                    continue
 
-            if self.mass_export:
-                objects = sorted(objects, key=objects.get)
-                self.export_objects(objects,
-                                    collection.name)
-                objects            = {}
+                # Gather objects for this specific collection
+                task_objects = {}
+                for obj in collection.objects:
+                    if not self.selected or obj.select_get():
+                        task_objects[obj] = obj.dff.frame_index
+                
+                if task_objects:
+                    sorted_objects = sorted(task_objects, key=task_objects.get)
+                    export_tasks.append((sorted_objects, collection.name))
+                
+                processed_collections.add(collection)
+
+            for objects, name in export_tasks:
                 self.frame_objects = {}
-                self.collection = collection
+                self.collection = bpy.data.collections.get(name)
 
-        if not self.mass_export:
-            if self.from_outliner:
+                self.export_objects(objects, name)
+
+        else:
+            all_objects = {}
+            for collection in collections:
+                # For single DFF export, all objects from all valid collections are merged.
+                for obj in collection.objects:
+                    if not self.selected or obj.select_get():
+                        all_objects[obj] = obj.dff.frame_index
+
+            if self.from_outliner and collections:
                 self.collection = collections[0]
 
-            objects = sorted(objects, key=objects.get)
-            self.export_objects(objects)
+            sorted_objects = sorted(all_objects, key=all_objects.get)
+
+            # Reset frame_objects before the single export to ensure a clean state.
+            self.frame_objects = {}
+            self.export_objects(sorted_objects)
                 
 #######################################################
 def export_dff(options):
