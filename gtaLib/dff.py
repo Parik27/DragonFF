@@ -125,6 +125,7 @@ types = {
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
     "Native Data PLG"         : 1296,
+    "SkyGFX"                  : 60909,
     "Pipeline Set"            : 39056115,
     "Specular Material"       : 39056118,
     "2d Effect"               : 39056120,
@@ -2640,6 +2641,10 @@ class dff:
 
                         self._read(chunk.size)
 
+                    elif chunk.type == types["SkyGFX"]:
+                        sky_gfx = unpack_from("<B", self.data, self._read(chunk.size))[0]
+                        atomic.extensions["sky_gfx"] = sky_gfx
+
                     else:
                         self._read(chunk.size)
 
@@ -2822,6 +2827,13 @@ class dff:
             ext_data += Sections.write_chunk(
                 pack("<I", pipeline),
                 types["Pipeline Set"]
+            )
+
+        sky_gfx = atomic.extensions.get("sky_gfx")
+        if sky_gfx is not None:
+            ext_data += Sections.write_chunk(
+                pack("<B", sky_gfx),
+                types["SkyGFX"]
             )
 
         data += Sections.write_chunk(ext_data, types["Extension"])

@@ -250,6 +250,12 @@ class dff_importer:
             if 'right_to_render' in atomic.extensions:
                 obj.dff.right_to_render = atomic.extensions['right_to_render'].value2
 
+            # Set SkyGFX
+            sky_gfx = atomic.extensions.get('sky_gfx')
+            if sky_gfx is not None:
+                obj.dff.enable_sky_gfx = True
+                obj.dff.sky_gfx = sky_gfx
+
             obj.dff.atomic_index = atomic_index
 
             # Delete temporary properties used earlier

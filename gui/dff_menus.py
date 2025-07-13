@@ -374,6 +374,11 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         box.prop(settings, "right_to_render", text="Right To Render")
 
+        row = box.row()
+        row.prop(settings, "enable_sky_gfx", text="SkyGFX")
+        if settings.enable_sky_gfx:
+            row.prop(settings, "sky_gfx", text="")
+
     #######################################################
     def draw_col_menu(self, context):
         layout = self.layout
@@ -694,6 +699,18 @@ compatibiility with DFF Viewers"
         default = 1,
         min = 0,
         description = "Right To Render value (only for skinned object)"
+    )
+
+    enable_sky_gfx : bpy.props.BoolProperty(
+        default = False,
+        description = "Enable SkyGFX (Wind Shader)"
+    )
+
+    sky_gfx : bpy.props.IntProperty(
+        default = 1,
+        min = 0,
+        max = 255,
+        name = "SkyGFX Value"
     )
 
     frame_index : bpy.props.IntProperty(
