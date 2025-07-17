@@ -18,13 +18,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                                               maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH')
-    
+
     filter_glob         : bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
-    
+
     directory           : bpy.props.StringProperty(maxlen=1024,
                                               default="",
-                                              subtype='FILE_PATH')
+                                              subtype='DIR_PATH')
 
     mass_export         : bpy.props.BoolProperty(
         name            = "Mass Export",
@@ -247,12 +247,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
 
     filter_glob   : bpy.props.StringProperty(default="*.dff;*.txd;*.col",
                                               options={'HIDDEN'})
-    
+
     directory     : bpy.props.StringProperty(maxlen=1024,
                                               default="",
-                                              subtype='FILE_PATH',
-                                              options={'HIDDEN'})
-    
+                                              subtype='DIR_PATH',
+                                              options={'HIDDEN'},)
+
     # Stores all the file names to read (not just the firsst)
     files : bpy.props.CollectionProperty(
         type    = bpy.types.OperatorFileListElement,
@@ -265,7 +265,8 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
          description = "Filepath used for importing the DFF/COL file",
          maxlen      = 1024,
          default     = "",
-         options     = {'HIDDEN'}
+         options     = {'HIDDEN'},
+         subtype     = 'FILE_PATH'
      )
 
     txd_skip_mipmaps :  bpy.props.BoolProperty(
