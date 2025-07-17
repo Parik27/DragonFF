@@ -253,8 +253,7 @@ class dff_importer:
             # Set SkyGFX
             sky_gfx = atomic.extensions.get('sky_gfx')
             if sky_gfx is not None:
-                obj.dff.enable_sky_gfx = True
-                obj.dff.sky_gfx = sky_gfx
+                obj.dff.sky_gfx = sky_gfx != 0
 
             obj.dff.atomic_index = atomic_index
 

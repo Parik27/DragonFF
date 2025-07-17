@@ -2642,8 +2642,9 @@ class dff:
                         self._read(chunk.size)
 
                     elif chunk.type == types["SkyGFX"]:
-                        sky_gfx = unpack_from("<B", self.data, self._read(chunk.size))[0]
-                        atomic.extensions["sky_gfx"] = sky_gfx
+                        if chunk.size > 0:
+                            sky_gfx = unpack_from("<B", self.data, self._read(chunk.size))[0]
+                            atomic.extensions["sky_gfx"] = sky_gfx
 
                     else:
                         self._read(chunk.size)

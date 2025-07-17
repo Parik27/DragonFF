@@ -958,8 +958,8 @@ class dff_exporter:
             ))
             atomic.extensions['right_to_render'] = right_to_render
 
-        if obj.dff.enable_sky_gfx:
-            atomic.extensions['sky_gfx'] = obj.dff.sky_gfx
+        if obj.dff.sky_gfx:
+            atomic.extensions['sky_gfx'] = 1
 
         self.dff.atomic_list.append(atomic)
 
