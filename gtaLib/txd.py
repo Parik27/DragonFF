@@ -224,12 +224,22 @@ class ImageDecoder:
 
         for y in range(0, height, 4):
             for x in range(0, width, 4):
-                alpha0, alpha1, alpha2, alpha3, alpha4, color0, color1, bits = unpack_from("<2B3H2HI", data, pos)
-                pos += 16
+                alpha0 = data[pos]
+                alpha1 = data[pos + 1]
+                alpha_bits = unpack_from("<6B", data, pos + 2)
+                pos += 8
+
+                # Combine alpha bits into 48-bit integer
+                alpha_indices = (alpha_bits[0] | (alpha_bits[1] << 8) | (alpha_bits[2] << 16) |
+                                (alpha_bits[3] << 24) | (alpha_bits[4] << 32) | (alpha_bits[5] << 40))
+
+                color0, color1, bits = unpack_from("<2HI", data, pos)
+                pos += 8
 
                 r0, g0, b0 = ImageDecoder._decode565(color0)
                 r1, g1, b1 = ImageDecoder._decode565(color1)
 
+                # Calculate alpha values
                 if alpha0 > alpha1:
                     alphas = (
                         alpha0,
@@ -253,8 +263,6 @@ class ImageDecoder:
                         255
                     )
 
-                alpha_indices = (alpha4, alpha3, alpha2)
-
                 # Decode this block into 4x4 pixels
                 for j in range(4):
                     for i in range(4):
@@ -272,19 +280,13 @@ class ImageDecoder:
                                 r, g, b = ImageDecoder._c2b(r0, r1), ImageDecoder._c2b(g0, g1), ImageDecoder._c2b(b0, b1)
                         elif control == 3:
                             if color0 > color1:
-                                r, g, b = ImageDecoder._c3(r0, r1),ImageDecoder. _c3(g0, g1), ImageDecoder._c3(b0, b1)
+                                r, g, b = ImageDecoder._c3(r0, r1), ImageDecoder._c3(g0, g1), ImageDecoder._c3(b0, b1)
                             else:
                                 r, g, b = 0, 0, 0
 
-                        # Get alpha index
-                        shift = 3 * (15 - ((3 - i) + (j * 4)))
-                        shift_s = shift % 16
-                        row_s = shift // 16
-                        row_e = (shift + 2) // 16
-                        alpha_index = (alpha_indices[2 - row_s] >> shift_s) & 7
-                        if row_s != row_e:
-                            shift_e = 16 - shift_s
-                            alpha_index += (alpha_indices[2 - row_e] & ((2 ** (3 - shift_e)) - 1)) << shift_e
+                        # Get alpha index (3 bits per pixel)
+                        pixel_idx = j * 4 + i
+                        alpha_index = (alpha_indices >> (3 * pixel_idx)) & 0x7
                         a = alphas[alpha_index]
 
                         idx = 4 * ((y + j) * width + (x + i))
