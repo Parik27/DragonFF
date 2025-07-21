@@ -29,7 +29,7 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
     
     directory      : bpy.props.StringProperty(maxlen=1024,
                                               default="",
-                                              subtype='FILE_PATH')
+                                              subtype='DIR_PATH')
 
     only_selected   :  bpy.props.BoolProperty(
         name        = "Only Selected",

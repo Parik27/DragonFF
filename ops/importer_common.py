@@ -17,6 +17,7 @@
 import bpy
 import bmesh
 
+from ..gtaLib.dff import strlen
 from ..gtaLib.data import presets
 
 #######################################################
@@ -169,7 +170,7 @@ class material_helper:
 
         self.material.dff.export_specular = True
         self.material.dff.specular_level = plugin.level
-        self.material.dff.specular_texture = plugin.texture.decode('ascii')
+        self.material.dff.specular_texture = plugin.texture[:strlen(plugin.texture)].decode('ascii')
 
         # Set preset specular level
         level_key = round(plugin.level, 2)
