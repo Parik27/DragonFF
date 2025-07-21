@@ -239,7 +239,7 @@ class dff_importer:
             if 'pipeline' in atomic.extensions:
                 pipeline = "0x%X" % (atomic.extensions['pipeline'])
 
-                if pipeline in ["0x53F20098", "0x53F2009A"]:
+                if pipeline in ("0x53F20098", "0x53F2009A", "0x53F2009C"):
                     obj.dff.pipeline        = pipeline
                     obj.dff.custom_pipeline = ""
                 else:

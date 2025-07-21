@@ -679,8 +679,9 @@ compatibiility with DFF Viewers"
         items = (
             ('NONE', 'None', 'Export without setting a pipeline'),
             ('0x53F20098', 'Buildings', 'Refl. Building Pipleine (0x53F20098)'),
+            ('0x53F2009A', 'Vehicles', 'Vehicles (0x53F2009A)'),
             (
-                '0x53F2009A',
+                '0x53F2009C',
                 'Night Vertex Colors',
                 'Night Vertex Colors (0x53F2009C)'
             ),
