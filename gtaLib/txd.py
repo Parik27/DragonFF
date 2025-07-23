@@ -757,7 +757,10 @@ class txd:
                         from .native_ps2 import NativePS2Texture
                         texture = NativePS2Texture.from_mem(self.data[self.pos:])
                         self._read(texture.pos - chunk.size)
-
+                    elif platform_id == NativePlatformType.XBOX:
+                        from .native_xbox import NativeXboxTexture
+                        texture = NativeXboxTexture.from_mem(self.data[self.pos:])
+                        self._read(texture.pos - chunk.size)
                     elif (platform_id >> 24) == NativePlatformType.GC:
                         from .native_gc import NativeGCTexture
                         texture = NativeGCTexture.from_mem(self.data[self.pos:], self.rw_version)

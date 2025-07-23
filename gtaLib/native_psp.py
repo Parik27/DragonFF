@@ -379,7 +379,7 @@ class NativePSPTexture(TextureNative):
             data_len = width * height * self.depth // 8
 
             pixels = self._read_raw(data_len)
-            pixels = NativePSPTexture.unswizzle(pixels, self.width, self.height, self.depth)
+            pixels = NativePSPTexture.unswizzle(pixels, width, height, self.depth)
 
             self.pixels.append(pixels)
 

@@ -17,6 +17,7 @@
 from struct import unpack_from, calcsize
 
 from .dff import RGBA, Sections, TexCoords, Triangle, Vector
+from .txd import ImageDecoder, TextureNative, PaletteType
 
 # geometry flags
 rpGEOMETRYTRISTRIP              = 0x00000001
@@ -31,6 +32,12 @@ rpGEOMETRYNATIVE                = 0x01000000
 
 ptTRIANGLELIST  = 5
 ptTRIANGLESTRIP = 6
+
+# compressed formats
+D3DFMT_DXT1 = 0x0000000C
+D3DFMT_DXT2 = 0x0000000D
+D3DFMT_DXT3 = 0x0000000E
+D3DFMT_DXT5 = 0x0000000F
 
 #######################################################
 class NativeXboxSkin:
@@ -223,3 +230,139 @@ class NativeXboxSplitHeader:
         self.vertex_start = vertex_start
         self.vertex_end = vertex_end
         self.indices_num = indices_num
+
+#######################################################
+class NativeXboxTexture(TextureNative):
+
+    #######################################################
+    def __init__(self):
+        super().__init__()
+        self.compression = 0
+
+    #######################################################
+    def to_rgba(self, level=0):
+        width  = self.get_width(level)
+        height = self.get_height(level)
+        pixels = self.pixels[level]
+        compression = self.compression
+
+        if compression:
+            if compression == D3DFMT_DXT1:
+                return ImageDecoder.bc1(pixels, width, height, 0x00)
+            elif compression == D3DFMT_DXT2:
+                return ImageDecoder.bc2(pixels, width, height, True)
+            elif compression == D3DFMT_DXT3:
+                return ImageDecoder.bc2(pixels, width, height, False)
+            elif compression == D3DFMT_DXT5:
+                return ImageDecoder.bc3(pixels, width, height, False)
+
+        return super().to_rgba(level)
+
+    #######################################################
+    @staticmethod
+    def from_mem(data):
+        self = NativeXboxTexture()
+        self.pos = 0
+        self.data = data
+
+        (
+            self.platform_id, self.filter_mode, self.uv_addressing
+        ) = unpack_from("<IHH", self.data, self._read(8))
+
+        self.name = self._read_raw(32)
+        self.name = self.name.decode("utf-8").replace('\0', '')
+
+        self.mask = self._read_raw(32)
+        self.mask = self.mask.decode("utf-8").replace('\0', '')
+
+        (
+            self.raster_format_flags, has_alpha, unk, self.width, self.height,
+            self.depth, self.num_levels, self.raster_type, self.compression, pixels_len,
+        ) = unpack_from("<I4H4BI", data, self._read(20))
+
+        palette_format = self.get_raster_palette_type()
+
+        if palette_format == PaletteType.PALETTE_8:
+            self.palette = self._read_raw(1024)
+        elif palette_format == PaletteType.PALETTE_4:
+            self.palette = self._read_raw(128)
+
+        self.convert_palette()
+
+        for i in range(self.num_levels):
+            width, height = self.get_width(i), self.get_height(i)
+
+            if self.compression == D3DFMT_DXT1:
+                data_len = max(width * height // 2, 8)
+            elif self.compression:
+                data_len = max(width * height, 16)
+            else:
+                data_len = width * height * self.depth // 8
+
+            pixels = self._read_raw(data_len)
+            if not self.compression:
+                pixels = NativeXboxTexture.unswizzle(pixels, width, height, self.depth // 8)
+
+            self.pixels.append(pixels)
+
+        return self
+
+    #######################################################
+    def convert_palette(self):
+        palette = self.palette
+
+        if palette:
+            res = bytearray(len(palette))
+            for b in range(0, len(palette), 4):
+                res[b+0] = palette[b+2]
+                res[b+1] = palette[b+1]
+                res[b+2] = palette[b+0]
+                res[b+3] = palette[b+3]
+            self.palette = res
+
+    #######################################################
+    @staticmethod
+    def unswizzle(data, width, height, bpp):
+        maskU = 0
+        maskV = 0
+        i = 1
+        j = 1
+
+        while True:
+            if i < width:
+                maskU |= j
+                j <<= 1
+
+            if i < height:
+                maskV |= j
+                j <<= 1
+
+            i <<= 1
+            if i >= width and i >= height:
+                break
+
+        res = bytearray(width * height * bpp)
+
+        v = 0
+        for y in range(height):
+            u = 0
+            for x in range(width):
+                src_pos = (u | v) * bpp
+                dst_pos = (y * width + x) * bpp
+                res[dst_pos:dst_pos+bpp] = data[src_pos:src_pos+bpp]
+                u = (u - maskU) & maskU
+            v = (v - maskV) & maskV
+
+        return res
+
+    #######################################################
+    def _read(self, size):
+        current_pos = self.pos
+        self.pos += size
+
+        return current_pos
+
+    #######################################################
+    def _read_raw(self, size):
+        offset = self._read(size)
+        return self.data[offset:offset+size]
