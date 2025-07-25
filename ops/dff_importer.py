@@ -160,38 +160,38 @@ class dff_importer:
                         vert_index += 3
                         continue
 
-                    face_vertices = (f.a, f.b, f.c)
+                face_vertices = (f.a, f.b, f.c)
 
-                    try:
-                        face = bm.faces.new(
-                            [
-                                bm.verts[f.a],
-                                bm.verts[f.b],
-                                bm.verts[f.c]
-                            ])
+                try:
+                    face = bm.faces.new(
+                        [
+                            bm.verts[f.a],
+                            bm.verts[f.b],
+                            bm.verts[f.c]
+                        ])
 
-                    except ValueError:
+                except ValueError:
 
-                        # Skip a face with less than 3 vertices
-                        if len(set(face_vertices)) < 3:
-                            vert_index += 3
-                            continue
+                    # Skip a face with less than 3 vertices
+                    if len(set(face_vertices)) < 3:
+                        vert_index += 3
+                        continue
 
-                        # Create backface
-                        if self.create_backfaces:
-                            bm.verts.new(geom.vertices[f.a])
-                            bm.verts.new(geom.vertices[f.b])
-                            bm.verts.new(geom.vertices[f.c])
+                    # Create backface
+                    if self.create_backfaces:
+                        bm.verts.new(geom.vertices[f.a])
+                        bm.verts.new(geom.vertices[f.b])
+                        bm.verts.new(geom.vertices[f.c])
 
-                            bm.verts.ensure_lookup_table()
-                            bm.verts.index_update()
+                        bm.verts.ensure_lookup_table()
+                        bm.verts.index_update()
 
-                            face = bm.faces.new(bm.verts[-3:])
+                        face = bm.faces.new(bm.verts[-3:])
 
-                        else:
-                            skipped_backfaces_num += 1
-                            vert_index += 3
-                            continue
+                    else:
+                        skipped_backfaces_num += 1
+                        vert_index += 3
+                        continue
 
                 if len(mat_indices) > 0:
                     face.material_index = mat_indices[f.material]

@@ -65,10 +65,11 @@ class map_importer:
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.scale = obj.scale
 
-                modifier = new_obj.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
-                # When added to some objects (empties?), returned modifier is None
-                if modifier is not None:
-                    modifier.use_edge_angle = False
+                if not self.settings.create_backfaces:
+                    modifier = new_obj.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
+                    # When added to some objects (empties?), returned modifier is None
+                    if modifier is not None:
+                        modifier.use_edge_angle = False
 
                 if '{}.dff'.format(model) in bpy.data.collections:
                     bpy.data.collections['{}.dff'.format(model)].objects.link(
