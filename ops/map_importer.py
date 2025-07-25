@@ -143,10 +143,11 @@ class map_importer:
                     'image_ext'        : 'PNG',
                     'connect_bones'    : False,
                     'use_mat_split'    : self.settings.read_mat_split,
-                    'remove_doubles'   : True,
+                    'remove_doubles'   : not self.settings.create_backfaces,
+                    'create_backfaces' : self.settings.create_backfaces,
                     'group_materials'  : True,
                     'import_normals'   : True,
-                    "materials_naming" : "DEF",
+                    'materials_naming' : "DEF",
                 }
             )
 

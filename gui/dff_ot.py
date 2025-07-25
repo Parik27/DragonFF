@@ -307,6 +307,13 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         name        = "Use Edge Split",
         default     = True
     )
+
+    create_backfaces  :  bpy.props.BoolProperty(
+        name        = "Create Backfaces",
+        description = "Create backfaces by duplicating existing faces. Incompatible with Use Edge Split",
+        default     = False
+    )
+
     group_materials :  bpy.props.BoolProperty(
         name        = "Group Similar Materials",
         default     = True
@@ -364,6 +371,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
 
         box_dff.prop(self, "read_mat_split")
         box_dff.prop(self, "remove_doubles")
+        box_dff.prop(self, "create_backfaces")
         box_dff.prop(self, "import_normals")
         box_dff.prop(self, "group_materials")
         box_dff.prop(self, "materials_naming")
@@ -431,6 +439,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'connect_bones'    : self.connect_bones,
                         'use_mat_split'    : self.read_mat_split,
                         'remove_doubles'   : self.remove_doubles,
+                        'create_backfaces' : self.create_backfaces,
                         'group_materials'  : self.group_materials,
                         'import_normals'   : self.import_normals,
                         'materials_naming' : self.materials_naming,

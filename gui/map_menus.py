@@ -122,6 +122,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    create_backfaces:  bpy.props.BoolProperty(
+        name        = "Create Backfaces",
+        description = "Create backfaces by duplicating existing faces. Incompatible with Use Edge Split",
+        default     = False
+    )
+
     load_collisions: bpy.props.BoolProperty(
         name        = "Load Map Collisions",
         default     = False
@@ -256,6 +262,7 @@ class MapImportPanel(bpy.types.Panel):
 
         col.prop(settings, "skip_lod")
         col.prop(settings, "read_mat_split")
+        col.prop(settings, "create_backfaces")
         col.prop(settings, "load_collisions")
         col.prop(settings, "load_cull")
 

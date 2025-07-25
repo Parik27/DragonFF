@@ -41,6 +41,7 @@ class dff_importer:
     current_collection = None
     use_mat_split      = False
     remove_doubles     = False
+    create_backfaces   = False
     import_normals     = False
     group_materials    = False
     version            = ""
@@ -148,6 +149,7 @@ class dff_importer:
             use_custom_normals = geom.has_normals and self.import_normals
             last_face_index = len(faces) - 1
             vert_index = -1
+            skipped_backfaces_num = 0
 
             for fi, f in enumerate(faces):
 
@@ -158,57 +160,82 @@ class dff_importer:
                         vert_index += 3
                         continue
 
-                try:
-                    face = bm.faces.new(
-                        [
-                            bm.verts[f.a],
-                            bm.verts[f.b],
-                            bm.verts[f.c]
-                        ])
+                    face_vertices = (f.a, f.b, f.c)
 
-                    if len(mat_indices) > 0:
-                        face.material_index = mat_indices[f.material]
+                    try:
+                        face = bm.faces.new(
+                            [
+                                bm.verts[f.a],
+                                bm.verts[f.b],
+                                bm.verts[f.c]
+                            ])
 
-                    # Setting UV coordinates
-                    for loop in face.loops:
-                        if use_face_loops:
-                            vert_index += 1
+                    except ValueError:
+
+                        # Skip a face with less than 3 vertices
+                        if len(set(face_vertices)) < 3:
+                            vert_index += 3
+                            continue
+
+                        # Create backface
+                        if self.create_backfaces:
+                            bm.verts.new(geom.vertices[f.a])
+                            bm.verts.new(geom.vertices[f.b])
+                            bm.verts.new(geom.vertices[f.c])
+
+                            bm.verts.ensure_lookup_table()
+                            bm.verts.index_update()
+
+                            face = bm.faces.new(bm.verts[-3:])
+
                         else:
-                            vert_index = loop.vert.index
-                        for i, layer in enumerate(geom.uv_layers):
+                            skipped_backfaces_num += 1
+                            vert_index += 3
+                            continue
 
-                            bl_layer = uv_layers[i]
+                if len(mat_indices) > 0:
+                    face.material_index = mat_indices[f.material]
 
-                            uv_coords = layer[vert_index]
+                # Setting UV coordinates
+                for loop_index, loop in enumerate(face.loops):
+                    if use_face_loops:
+                        vert_index += 1
+                    else:
+                        vert_index = face_vertices[loop_index]
+                    for i, layer in enumerate(geom.uv_layers):
 
-                            loop[bl_layer].uv = (
-                                uv_coords.u,
-                                1 - uv_coords.v # Y coords are flipped in Blender
-                            )
-                        # Vertex colors
-                        if geom.flags & dff.rpGEOMETRYPRELIT:
-                            loop[vertex_color] = [
-                                c / 255.0 for c in
-                                geom.prelit_colors[vert_index]
-                            ]
-                        # Night/Extra Vertex Colors
-                        if extra_vertex_color:
-                            extension = geom.extensions['extra_vert_color']
-                            loop[extra_vertex_color] = [
-                                c / 255.0 for c in
-                                extension.colors[vert_index]
-                            ]
+                        bl_layer = uv_layers[i]
 
-                        # Normals
-                        if use_custom_normals:
-                            normals.append(geom.normals[vert_index])
-                            
-                    face.smooth = True
-                except BaseException as e:
-                    vert_index += 3
-                    print(e)
-                    
+                        uv_coords = layer[vert_index]
+
+                        loop[bl_layer].uv = (
+                            uv_coords.u,
+                            1 - uv_coords.v # Y coords are flipped in Blender
+                        )
+                    # Vertex colors
+                    if geom.flags & dff.rpGEOMETRYPRELIT:
+                        loop[vertex_color] = [
+                            c / 255.0 for c in
+                            geom.prelit_colors[vert_index]
+                        ]
+                    # Night/Extra Vertex Colors
+                    if extra_vertex_color:
+                        extension = geom.extensions['extra_vert_color']
+                        loop[extra_vertex_color] = [
+                            c / 255.0 for c in
+                            extension.colors[vert_index]
+                        ]
+
+                    # Normals
+                    if use_custom_normals:
+                        normals.append(geom.normals[vert_index])
+
+                face.smooth = True
+
             bm.to_mesh(mesh)
+
+            if skipped_backfaces_num:
+                print('Skipped %d backfaces for atomic %d' % (skipped_backfaces_num, atomic_index))
 
             # Set loop normals
             if normals:
@@ -880,6 +907,7 @@ def import_dff(options):
     dff_importer.use_bone_connect = options['connect_bones']
     dff_importer.use_mat_split    = options['use_mat_split']
     dff_importer.remove_doubles   = options['remove_doubles']
+    dff_importer.create_backfaces = options['create_backfaces']
     dff_importer.group_materials  = options['group_materials']
     dff_importer.import_normals   = options['import_normals']
     dff_importer.materials_naming = options['materials_naming']
