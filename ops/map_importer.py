@@ -117,22 +117,29 @@ class map_importer:
             print(str(inst.id), 'loaded from cache')
         else:
 
-            dff_filepath = "%s/%s.dff" % (self.settings.dff_folder, model)
-            txd_filepath = "%s/%s.txd" % (self.settings.dff_folder, txd)
+            dff_filename = "%s.dff" % model
+            txd_filename = "%s.txd" % txd
+
+            dff_filepath = map_utilites.MapDataUtility.find_path_case_insensitive(self.settings.dff_folder, dff_filename)
+            txd_filepath = map_utilites.MapDataUtility.find_path_case_insensitive(self.settings.dff_folder, txd_filename)
 
             # Import dff from a file if file exists
-            if not os.path.isfile(dff_filepath):
+            if not dff_filepath:
+                print("DFF not found:", os.path.join(self.settings.dff_folder, dff_filename))
                 return
 
             txd_images = {}
-            if self.settings.load_txd and os.path.isfile(txd_filepath):
-                txd_images = txd_importer.import_txd(
-                    {
-                        'file_name'      : txd_filepath,
-                        'skip_mipmaps'   : True,
-                        'pack'           : self.settings.txd_pack,
-                    }
-                ).images
+            if self.settings.load_txd:
+                if txd_filepath:
+                    txd_images = txd_importer.import_txd(
+                        {
+                            'file_name'      : txd_filepath,
+                            'skip_mipmaps'   : True,
+                            'pack'           : self.settings.txd_pack,
+                        }
+                    ).images
+                else:
+                    print("TXD not found:", os.path.join(self.settings.dff_folder, txd_filename))
 
             importer = dff_importer.import_dff(
                 {
@@ -313,7 +320,7 @@ class map_importer:
             # Get a list of the .col files available
             col_files_all = set()
             for filename in os.listdir(self.settings.dff_folder):
-                if filename.endswith(".col"):
+                if filename.lower().endswith(".col"):
                     col_files_all.add(filename)
 
             # Run through all instances and determine which .col files to load

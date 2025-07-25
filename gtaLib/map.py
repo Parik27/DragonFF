@@ -103,6 +103,31 @@ class SectionUtility:
 #######################################################
 class MapDataUtility:
 
+    # Finds the path to a file case-insensitively
+    #######################################################
+    @staticmethod
+    def find_path_case_insensitive(base_path, filename):
+        current_path = os.path.join(base_path, filename)
+
+        if os.path.isfile(current_path):
+            return current_path
+
+        current_path = base_path
+        parts = os.path.normpath(filename).split(os.sep)
+
+        for part in parts:
+            try:
+                entries = os.listdir(current_path)
+            except FileNotFoundError:
+                return None
+
+            match = next((entry for entry in entries if entry.lower() == part.lower()), None)
+            if match is None:
+                return None
+            current_path = os.path.join(current_path, match)
+
+        return current_path
+
     # Check if file stream contains binary IPL data by reading its header
     #######################################################
     @staticmethod
@@ -125,7 +150,8 @@ class MapDataUtility:
         if os.path.isabs(filename):
             return filename
 
-        return os.path.join(game_root, filename)
+        fullpath = MapDataUtility.find_path_case_insensitive(game_root, filename)
+        return fullpath or os.path.join(game_root, filename)
 
     # Merge Dictionaries of Lists
     #######################################################
@@ -287,7 +313,7 @@ class MapDataUtility:
         if is_custom_ipl:
             # Find paths to all IDEs
             ide_paths = []
-            for root_path, _, files in os.walk(os.path.join(game_root, "DATA/MAPS")):
+            for root_path, _, files in os.walk(os.path.join(game_root, "data/maps")):
                 for file in files:
                     if file.lower().endswith(".ide"):
                         fullpath = os.path.join(root_path, file)
