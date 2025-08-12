@@ -1022,7 +1022,13 @@ class SkinPLG:
             native_chunk = unpack_from("<3I", data)
             platform = unpack_from("<I", data, 12)[0]
 
-            if platform == NativePlatformType.PS2:
+            if platform == NativePlatformType.OGL:
+                # Use the already created SkinPLG from NativeDataPLG
+                self = geometry.extensions.get("skin") or self
+
+                from .native_wdgl import NativeOGLSkin
+                NativeOGLSkin.unpack(self, data[16:])
+            elif platform == NativePlatformType.PS2:
                 from .native_ps2 import NativePS2Skin
                 NativePS2Skin.unpack(self, data[16:], geometry)
             elif platform == NativePlatformType.XBOX:
@@ -1034,6 +1040,8 @@ class SkinPLG:
             elif platform == NativePlatformType.PSP:
                 from .native_psp import NativePSPSkin
                 NativePSPSkin.unpack(self, data[16:], geometry)
+            else:
+                print("Unsupported native platform %d" % (platform))
 
         return self
 
@@ -2156,7 +2164,9 @@ class dff:
             geometry.split_headers.append(split_header)
 
             if geometry.flags & rpGEOMETRYNATIVE != 0:
-                continue
+                # War Drum OpenGL stores indices here instead of other native geometry
+                if not opengl:
+                    continue
 
             unpack_format = "<H" if opengl else "<H2x"
             total_iterations = split_header.indices_count
@@ -2227,26 +2237,35 @@ class dff:
     #######################################################
     def read_native_data_plg(self, parent_chunk, geometry):
         native_chunk = self.read_chunk() # wrong size
-        chunk_size = parent_chunk.size - 16
 
-        platform = unpack_from("<I", self.data, self._read(4))[0]
+        if native_chunk.type == types["Struct"]:
+            chunk_size = parent_chunk.size - 16
 
-        if platform == NativePlatformType.PS2:
-            from .native_ps2 import NativePS2Geometry
-            NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.XBOX:
-            from .native_xbox import NativeXboxGeometry
-            NativeXboxGeometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.GC:
-            from .native_gc import NativeGCGeometry
-            NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.PSP:
-            from .native_psp import NativePSPGeometry
-            NativePSPGeometry.unpack(geometry, self.raw(chunk_size))
+            platform = unpack_from("<I", self.data, self._read(4))[0]
+
+            if platform == NativePlatformType.PS2:
+                from .native_ps2 import NativePS2Geometry
+                NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.XBOX:
+                from .native_xbox import NativeXboxGeometry
+                NativeXboxGeometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.GC:
+                from .native_gc import NativeGCGeometry
+                NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.PSP:
+                from .native_psp import NativePSPGeometry
+                NativePSPGeometry.unpack(geometry, self.raw(chunk_size))
+            else:
+                print("Unsupported native platform %d" % (platform))
+
+            geometry.native_platform_type = platform
+
         else:
-            print("Unsupported native platform %d" % (platform))
+            chunk_size = parent_chunk.size
+            self.pos -= 12
 
-        geometry.native_platform_type = platform
+            from .native_wdgl import NativeWDGLGeometry
+            NativeWDGLGeometry.unpack(geometry, self.data[self.pos:])
 
         self._read(chunk_size)
 
