@@ -2151,6 +2151,9 @@ class dff:
         calculated_size = 12 + header.mesh_count * 8 + (header.total_indices * 2)
         opengl = calculated_size >= parent_chunk.size
 
+        # Native geometry usually doesn't store triangles in this section
+        has_indices = parent_chunk.size > 12 + header.mesh_count * 8
+
         geometry.split_headers = []
 
         is_tri_strip = header.flags == 1
@@ -2165,7 +2168,7 @@ class dff:
 
             if geometry.flags & rpGEOMETRYNATIVE != 0:
                 # War Drum OpenGL stores indices here instead of other native geometry
-                if not opengl:
+                if not has_indices:
                     continue
 
             unpack_format = "<H" if opengl else "<H2x"
