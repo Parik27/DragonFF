@@ -668,3 +668,75 @@ class OBJECT_OT_dff_clear_parent_bone(bpy.types.Operator):
             obj.parent_bone = ""
 
         return {'FINISHED'}
+
+#######################################################
+class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
+    
+    bl_idname           = "export_txd.scene"
+    bl_description      = "Export a Renderware TXD File"
+    bl_label            = "DragonFF TXD (.txd)"
+    filename_ext        = ".txd"
+
+    filepath            : bpy.props.StringProperty(name="File path",
+                                              maxlen=1024,
+                                              default="",
+                                              subtype='FILE_PATH')
+
+    filter_glob         : bpy.props.StringProperty(default="*.txd",
+                                              options={'HIDDEN'})
+
+    directory           : bpy.props.StringProperty(maxlen=1024,
+                                              default="",
+                                              subtype='DIR_PATH')
+
+    mass_export         : bpy.props.BoolProperty(
+        name            = "Mass Export",
+        default         = False
+    )
+
+    export_version      : bpy.props.EnumProperty(
+        items =
+        (
+            ('0x33002', "GTA 3 (v3.3.0.2)", "Grand Theft Auto 3 PC (v3.3.0.2)"),
+            ('0x34003', "GTA VC (v3.4.0.3)", "Grand Theft Auto VC PC (v3.4.0.3)"),
+            ('0x36003', "GTA SA (v3.6.0.3)", "Grand Theft Auto SA PC (v3.6.0.3)"),
+        ),
+        name = "Version Export",
+        default = '0x36003'
+    )
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "mass_export")
+        layout.prop(self, "export_version")
+        
+        return None
+
+    #######################################################
+    def execute(self, context):
+        start = time.time()
+        try:
+            from ..ops import txd_exporter
+            txd_exporter.export_txd(
+                {
+                    "file_name"          : self.filepath,
+                    "directory"          : self.directory,
+                    "mass_export"        : self.mass_export,
+                    "export_version"     : self.export_version,
+                }
+            )
+        except Exception as e:
+            self.report({"ERROR"}, "Export failed: {}".format(str(e)))
+            return {'FINISHED'}
+
+        end = time.time()
+        print("Exported TXD successfully in %.4f seconds" % (end - start))
+        
+        return {'FINISHED'}
+
+    #######################################################
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}

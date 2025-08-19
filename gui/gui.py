@@ -22,3 +22,6 @@ from .dff_ot import *
 from .map_ot import *
 from .map_menus import *
 from .gizmos import *
+
+# Explicitly import EXPORT_OT_txd to ensure it's available
+from .dff_ot import EXPORT_OT_txd
