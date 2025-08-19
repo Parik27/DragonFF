@@ -599,12 +599,41 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def triangulate_mesh(mesh):
+    def triangulate_mesh(mesh, preserve_loop_normals):
+        loop_normals = [loop.normal.copy() for loop in mesh.loops] if preserve_loop_normals else []
+
+        # Check that the mesh is already triangulated
+        if all(len(polygon.vertices) == 3 for polygon in mesh.polygons):
+            return loop_normals
+
         bm = bmesh.new()
         bm.from_mesh(mesh)
-        bmesh.ops.triangulate(bm, faces=bm.faces)
+
+        if preserve_loop_normals:
+            face_verts_to_loop_idx_map = {}
+            loop_idx = 0
+            for face in bm.faces:
+                vert_to_loop_idx = {}
+                for vert in face.verts:
+                    vert_to_loop_idx[vert] = loop_idx
+                    loop_idx += 1
+                face_verts_to_loop_idx_map[face] = vert_to_loop_idx
+
+        face_map = bmesh.ops.triangulate(bm, faces=bm.faces)['face_map']
+
+        if preserve_loop_normals:
+            normals = []
+            for face in bm.faces:
+                face_orig = face_map.get(face, face)
+                vert_to_loop_idx = face_verts_to_loop_idx_map[face_orig]
+                for vert in face.verts:
+                    normals.append(loop_normals[vert_to_loop_idx[vert]])
+            loop_normals = normals
+
         bm.to_mesh(mesh)
         bm.free()
+
+        return loop_normals
 
     #######################################################
     @staticmethod
@@ -754,7 +783,13 @@ class dff_exporter:
 
         mesh, shape_keys = self.convert_to_mesh(obj)
 
-        self.triangulate_mesh(mesh)
+        use_loop_normals = obj.dff.export_split_normals
+        if use_loop_normals:
+            normals = self.triangulate_mesh(mesh, True)
+        else:
+            normals = [vert.normal.copy() for vert in mesh.vertices]
+            self.triangulate_mesh(mesh, False)
+
         # NOTE: Mesh.calc_normals is no longer needed and has been removed
         if bpy.app.version < (4, 0, 0):
             mesh.calc_normals()
@@ -780,7 +815,8 @@ class dff_exporter:
 
             for loop_index in polygon.loop_indices:
                 loop = mesh.loops[loop_index]
-                vertex = mesh.vertices[loop.vertex_index]
+                vert_index = loop.vertex_index
+                vertex = mesh.vertices[vert_index]
                 uvs = []
                 vert_cols = []
                 bones = []
@@ -802,18 +838,18 @@ class dff_exporter:
 
                 if shape_keys:
                     for kb in shape_keys.key_blocks:
-                        sk_cos.append(kb.data[loop.vertex_index].co)
+                        sk_cos.append(kb.data[vert_index].co)
 
-                key = (loop.vertex_index,
-                       tuple(loop.normal),
+                normal = normals[loop_index if use_loop_normals else vert_index]
+
+                key = (vert_index,
+                       tuple(normal),
                        tuple(tuple(uv) for uv in uvs))
-
-                normal = loop.normal if obj.dff.export_split_normals else vertex.normal
 
                 if key not in verts_indices:
                     face['verts'].append (len(vertices_list))
                     verts_indices[key] = len(vertices_list)
-                    vertices_list.append({"idx": loop.vertex_index,
+                    vertices_list.append({"idx": vert_index,
                                           "co": vertex.co,
                                           "normal": normal,
                                           "uvs": uvs,
@@ -821,7 +857,7 @@ class dff_exporter:
                                           "bones": bones,
                                           "sk_cos": sk_cos})
                 else:
-                    face['verts'].append (verts_indices[key])
+                    face['verts'].append(verts_indices[key])
 
             faces_list.append(face)
 
