@@ -20,28 +20,10 @@ import struct
 from mathutils import Vector
 
 from ..gtaLib import txd
+from ..gtaLib.txd import ImageEncoder
 from ..gtaLib.dff import Sections, Chunk, TexDict, PITexDict, Texture
 from ..gtaLib.dff import types, NativePlatformType
 from ..gtaLib.dff import strlen
-
-#######################################################
-class ImageEncoder:
-    
-    @staticmethod
-    def rgba_to_bgra8888(rgba_data):
-        ret = bytearray()
-        for i in range(0, len(rgba_data), 4):
-            r, g, b, a = rgba_data[i:i+4]
-            ret.extend([b, g, r, a])
-        return bytes(ret)
-    
-    @staticmethod
-    def rgba_to_bgra888(rgba_data):
-        ret = bytearray()
-        for i in range(0, len(rgba_data), 4):
-            r, g, b = rgba_data[i:i+3]
-            ret.extend([b, g, r])
-        return bytes(ret)
 
 #######################################################
 class txd_exporter:
