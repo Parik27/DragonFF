@@ -694,15 +694,10 @@ class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
         default         = False
     )
 
-    export_version      : bpy.props.EnumProperty(
-        items =
-        (
-            ('0x33002', "GTA 3 (v3.3.0.2)", "Grand Theft Auto 3 PC (v3.3.0.2)"),
-            ('0x34003', "GTA VC (v3.4.0.3)", "Grand Theft Auto VC PC (v3.4.0.3)"),
-            ('0x36003', "GTA SA (v3.6.0.3)", "Grand Theft Auto SA PC (v3.6.0.3)"),
-        ),
-        name = "Version Export",
-        default = '0x36003'
+    only_used_textures  : bpy.props.BoolProperty(
+        name            = "Only Used Textures",
+        description     = "Export only textures that are used in the scene materials",
+        default         = False
     )
 
     #######################################################
@@ -710,7 +705,7 @@ class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
         layout = self.layout
 
         layout.prop(self, "mass_export")
-        layout.prop(self, "export_version")
+        layout.prop(self, "only_used_textures")
         
         return None
 
@@ -724,7 +719,7 @@ class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
                     "file_name"          : self.filepath,
                     "directory"          : self.directory,
                     "mass_export"        : self.mass_export,
-                    "export_version"     : self.export_version,
+                    "only_used_textures" : self.only_used_textures,
                 }
             )
         except Exception as e:
@@ -738,5 +733,11 @@ class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
 
     #######################################################
     def invoke(self, context, event):
+        if not self.filepath:
+            if context.blend_data.filepath:
+                self.filepath = context.blend_data.filepath
+            else:
+                self.filepath = "untitled"
+                
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
