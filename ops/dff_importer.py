@@ -26,25 +26,22 @@ from ..gtaLib import dff
 from .importer_common import (
     link_object, create_collection,
     material_helper, set_object_mode,
-    hide_object)
+    hide_object, invert_matrix_safe)
 from .col_importer import import_col_mem
-from ..ops import txd_importer
 from ..ops.ext_2dfx_importer import ext_2dfx_importer
 from ..ops.state import State
 
 #######################################################
 class dff_importer:
 
-    load_txd           = False
-    txd_filename       = ""
-    skip_mipmaps       = True
-    txd_pack           = True
+    txd_images         = {}
     image_ext          = "png"
     materials_naming   = "DEF"
     use_bone_connect   = False
     current_collection = None
     use_mat_split      = False
     remove_doubles     = False
+    create_backfaces   = False
     import_normals     = False
     group_materials    = False
     version            = ""
@@ -62,6 +59,13 @@ class dff_importer:
     #######################################################
     def multiply_matrix(a, b):
         return a @ b
+
+    #######################################################
+    @staticmethod
+    def clean_object_name(name):
+        if "." in name:
+            return name + '.001'
+        return name
     
     #######################################################
     def _init():
@@ -77,7 +81,6 @@ class dff_importer:
         self.bones = {}
         self.frame_bones = {}
         self.materials = {}
-        self.txd_images = {}
         self.warning = ""
 
     #######################################################
@@ -91,7 +94,7 @@ class dff_importer:
             frame = self.dff.frame_list[atomic.frame]
             geom = self.dff.geometry_list[atomic.geometry]
 
-            mesh = bpy.data.meshes.new(frame.name)
+            mesh = bpy.data.meshes.new(self.clean_object_name(frame.name))
             bm   = bmesh.new()
 
             # Create a material order sorted by geometry splits
@@ -146,6 +149,7 @@ class dff_importer:
             use_custom_normals = geom.has_normals and self.import_normals
             last_face_index = len(faces) - 1
             vert_index = -1
+            skipped_backfaces_num = 0
 
             for fi, f in enumerate(faces):
 
@@ -156,6 +160,8 @@ class dff_importer:
                         vert_index += 3
                         continue
 
+                face_vertices = (f.a, f.b, f.c)
+
                 try:
                     face = bm.faces.new(
                         [
@@ -164,49 +170,72 @@ class dff_importer:
                             bm.verts[f.c]
                         ])
 
-                    if len(mat_indices) > 0:
-                        face.material_index = mat_indices[f.material]
+                except ValueError:
 
-                    # Setting UV coordinates
-                    for loop in face.loops:
-                        if use_face_loops:
-                            vert_index += 1
-                        else:
-                            vert_index = loop.vert.index
-                        for i, layer in enumerate(geom.uv_layers):
+                    # Skip a face with less than 3 vertices
+                    if len(set(face_vertices)) < 3:
+                        vert_index += 3
+                        continue
 
-                            bl_layer = uv_layers[i]
+                    # Create backface
+                    if self.create_backfaces:
+                        bm.verts.new(geom.vertices[f.a])
+                        bm.verts.new(geom.vertices[f.b])
+                        bm.verts.new(geom.vertices[f.c])
 
-                            uv_coords = layer[vert_index]
+                        bm.verts.ensure_lookup_table()
+                        bm.verts.index_update()
 
-                            loop[bl_layer].uv = (
-                                uv_coords.u,
-                                1 - uv_coords.v # Y coords are flipped in Blender
-                            )
-                        # Vertex colors
-                        if geom.flags & dff.rpGEOMETRYPRELIT:
-                            loop[vertex_color] = [
-                                c / 255.0 for c in
-                                geom.prelit_colors[vert_index]
-                            ]
-                        # Night/Extra Vertex Colors
-                        if extra_vertex_color:
-                            extension = geom.extensions['extra_vert_color']
-                            loop[extra_vertex_color] = [
-                                c / 255.0 for c in
-                                extension.colors[vert_index]
-                            ]
+                        face = bm.faces.new(bm.verts[-3:])
 
-                        # Normals
-                        if use_custom_normals:
-                            normals.append(geom.normals[vert_index])
-                            
-                    face.smooth = True
-                except BaseException as e:
-                    vert_index += 3
-                    print(e)
-                    
+                    else:
+                        skipped_backfaces_num += 1
+                        vert_index += 3
+                        continue
+
+                if len(mat_indices) > 0:
+                    face.material_index = mat_indices[f.material]
+
+                # Setting UV coordinates
+                for loop_index, loop in enumerate(face.loops):
+                    if use_face_loops:
+                        vert_index += 1
+                    else:
+                        vert_index = face_vertices[loop_index]
+                    for i, layer in enumerate(geom.uv_layers):
+
+                        bl_layer = uv_layers[i]
+
+                        uv_coords = layer[vert_index]
+
+                        loop[bl_layer].uv = (
+                            uv_coords.u,
+                            1 - uv_coords.v # Y coords are flipped in Blender
+                        )
+                    # Vertex colors
+                    if geom.flags & dff.rpGEOMETRYPRELIT:
+                        loop[vertex_color] = [
+                            c / 255.0 for c in
+                            geom.prelit_colors[vert_index]
+                        ]
+                    # Night/Extra Vertex Colors
+                    if extra_vertex_color:
+                        extension = geom.extensions['extra_vert_color']
+                        loop[extra_vertex_color] = [
+                            c / 255.0 for c in
+                            extension.colors[vert_index]
+                        ]
+
+                    # Normals
+                    if use_custom_normals:
+                        normals.append(geom.normals[vert_index])
+
+                face.smooth = True
+
             bm.to_mesh(mesh)
+
+            if skipped_backfaces_num:
+                print('Skipped %d backfaces for atomic %d' % (skipped_backfaces_num, atomic_index))
 
             # Set loop normals
             if normals:
@@ -237,7 +266,7 @@ class dff_importer:
             if 'pipeline' in atomic.extensions:
                 pipeline = "0x%X" % (atomic.extensions['pipeline'])
 
-                if pipeline in ["0x53F20098", "0x53F2009A"]:
+                if pipeline in ("0x53F20098", "0x53F2009A", "0x53F2009C"):
                     obj.dff.pipeline        = pipeline
                     obj.dff.custom_pipeline = ""
                 else:
@@ -247,6 +276,11 @@ class dff_importer:
             # Set Right To Render
             if 'right_to_render' in atomic.extensions:
                 obj.dff.right_to_render = atomic.extensions['right_to_render'].value2
+
+            # Set SkyGFX
+            sky_gfx = atomic.extensions.get('sky_gfx')
+            if sky_gfx is not None:
+                obj.dff.sky_gfx = sky_gfx != 0
 
             obj.dff.atomic_index = atomic_index
 
@@ -348,7 +382,7 @@ class dff_importer:
                 continue
             
             # Generate a nice name with index and frame
-            name = "%s.%d" % (frame.name, index)
+            name = "%s.%d" % (self.clean_object_name(frame.name), index)
             name = self.generate_material_name(material, name)
             
             mat = bpy.data.materials.new(name)
@@ -524,8 +558,8 @@ class dff_importer:
 
         self = dff_importer
         
-        armature = bpy.data.armatures.new(frame.name)
-        obj = bpy.data.objects.new(frame.name, armature)
+        armature = bpy.data.armatures.new(self.clean_object_name(frame.name))
+        obj = bpy.data.objects.new(self.clean_object_name(frame.name), armature)
         link_object(obj, dff_importer.current_collection)
 
         skinned_obj_data = None
@@ -565,7 +599,7 @@ class dff_importer:
             if skinned_obj_data is not None:
                 matrix = skinned_obj_data.bone_matrices[bone.index]
                 matrix = mathutils.Matrix(matrix).transposed()
-                matrix = matrix.inverted()
+                invert_matrix_safe(matrix)
 
                 e_bone.transform(matrix, scale=True, roll=False)
                 e_bone.roll = self.align_roll(e_bone.vector,
@@ -741,7 +775,7 @@ class dff_importer:
             # Create and link the object to the scene
             if obj is None:
                 if len(meshes) != 1:
-                    obj = bpy.data.objects.new(frame.name, None)
+                    obj = bpy.data.objects.new(self.clean_object_name(frame.name), None)
                     link_object(obj, dff_importer.current_collection)
 
                     # Set empty display properties to something decent
@@ -750,7 +784,7 @@ class dff_importer:
                 else:
                     # Use a mesh as a frame object
                     obj = meshes[0]
-                    obj.name = frame.name
+                    obj.name = self.clean_object_name(frame.name)
 
                 obj.rotation_mode = 'QUATERNION'
                 obj.matrix_local  = matrix.copy()
@@ -799,22 +833,6 @@ class dff_importer:
         self.dff = dff.dff()
         self.dff.load_file(file_name)
         self.file_name = file_name
-
-        # Load the TXD
-        if self.load_txd:
-            # Import txd from a file if file exists
-            base_path = os.path.dirname(file_name)
-            txd_filename = self.txd_filename if self.txd_filename \
-                else os.path.basename(file_name)[:-4] + ".txd"
-            txd_path = os.path.join(base_path, txd_filename)
-            if os.path.isfile(txd_path):
-                self.txd_images = txd_importer.import_txd(
-                    {
-                        'file_name'    : txd_path,
-                        'skip_mipmaps' : self.skip_mipmaps,
-                        'pack'         : self.txd_pack,
-                    }
-                ).images
 
         # Create a new group/collection
         self.current_collection = create_collection(
@@ -884,14 +902,12 @@ def set_parent_bone(obj, armature, bone_name):
 def import_dff(options):
 
     # Shadow function
-    dff_importer.load_txd         = options['load_txd']
-    dff_importer.txd_filename     = options['txd_filename']
-    dff_importer.skip_mipmaps     = options['skip_mipmaps']
-    dff_importer.txd_pack         = options['txd_pack']
+    dff_importer.txd_images       = options['txd_images']
     dff_importer.image_ext        = options['image_ext']
     dff_importer.use_bone_connect = options['connect_bones']
     dff_importer.use_mat_split    = options['use_mat_split']
     dff_importer.remove_doubles   = options['remove_doubles']
+    dff_importer.create_backfaces = options['create_backfaces']
     dff_importer.group_materials  = options['group_materials']
     dff_importer.import_normals   = options['import_normals']
     dff_importer.materials_naming = options['materials_naming']

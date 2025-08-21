@@ -19,7 +19,7 @@ import bmesh
 import mathutils
 
 from ..gtaLib import col
-from ..data import col_materials as mats
+from ..gtaLib.data import col_materials as mats
 from .importer_common import (
     link_object, create_collection, material_helper
 )

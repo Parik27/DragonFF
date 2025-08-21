@@ -20,6 +20,7 @@ import os
 import math
 import mathutils
 
+from .importer_common import create_bmesh_for_mesh
 from ..gtaLib import col
 
 class col_exporter:
@@ -35,12 +36,7 @@ class col_exporter:
         self = col_exporter
 
         mesh = obj.data
-
-        if obj.mode == "EDIT":
-            bm = bmesh.from_edit_mesh(mesh)
-        else:
-            bm = bmesh.new()
-            bm.from_mesh(mesh)
+        bm = create_bmesh_for_mesh(mesh, obj.mode)
 
         if self.apply_transformations:
             matrix = obj.matrix_world
@@ -274,6 +270,8 @@ def calculate_bounds(objects, apply_transformations=True):
                 # Multiplied by 2 because empty_display_size is a radius
                 dimensions = [
                     max(x * obj.empty_display_size * 2 for x in obj.scale)] * 3
+            elif obj.empty_display_type == 'CUBE':
+                dimensions = obj.scale * 2
             else:
                 dimensions = obj.scale
 
