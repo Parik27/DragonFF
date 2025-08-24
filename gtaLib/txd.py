@@ -16,7 +16,7 @@
 
 from enum import IntEnum
 from math import ceil
-from struct import unpack_from
+from struct import unpack_from, pack
 from collections import namedtuple
 
 from .dff import Sections, NativePlatformType
@@ -644,15 +644,36 @@ class TextureNative:
                                       prop & 0b1000 != 0)
 
     #######################################################
+    def write_platform_properties(self):
+        platform_properties = self.platform_properties
+        prop = 0
+
+        if self.platform_id == NativePlatformType.D3D8:
+            if hasattr(platform_properties, 'dxt_type'):
+                prop = platform_properties.dxt_type
+
+        else:
+            if hasattr(platform_properties, 'alpha') and platform_properties.alpha:
+                prop |= 0b0001
+            if hasattr(platform_properties, 'cube_texture') and platform_properties.cube_texture:
+                prop |= 0b0010
+            if hasattr(platform_properties, 'auto_mipmaps') and platform_properties.auto_mipmaps:
+                prop |= 0b0100
+            if hasattr(platform_properties, 'compressed') and platform_properties.compressed:
+                prop |= 0b1000
+
+        return pack('<B', prop)
+
+    #######################################################
     def from_mem(data):
 
         self = TextureNative()
 
         pos = 0
         (
-            self.platform_id, self.filter_mode, self.uv_addressing, self.name,
+            self.platform_id, self.filter_mode, self.uv_addressing, unk, self.name,
             self.mask
-        ) = unpack_from("<IHH32s32s", data, pos)
+        ) = unpack_from("<I2BH32s32s", data, pos)
         pos += 72
 
         self.name = self.name[:strlen(self.name)].decode("utf-8")
@@ -677,6 +698,47 @@ class TextureNative:
             pos += 4 + len(pixels)
 
         return self
+
+    #######################################################
+    def to_mem(self):
+
+        data = bytearray()
+
+        # Header: platform_id, filter_mode, uv_addressing, name(32), mask(32) = 72 bytes
+        name_bytes = self.name.encode('utf-8')[:31].ljust(32, b'\0')
+        mask_bytes = self.mask.encode('utf-8')[:31].ljust(32, b'\0')
+
+        data.extend(pack('<I2B2x',
+            self.platform_id,
+            self.filter_mode,
+            self.uv_addressing
+        ))
+        data.extend(name_bytes)
+        data.extend(mask_bytes)
+
+        # Raster info: format_flags, d3d_format, width, height, depth, num_levels, raster_type = 15 bytes
+        data.extend(pack('<IIHHBBB',
+            self.raster_format_flags,
+            self.d3d_format,
+            self.width,
+            self.height,
+            self.depth,
+            self.num_levels,
+            self.raster_type
+        ))
+
+        # Platform properties: 1 byte
+        data.extend(self.write_platform_properties())
+
+        # Palette data (if any)
+        data.extend(self.palette)
+
+        # Pixel data for each mipmap level
+        for pixels in self.pixels:
+            data.extend(pack('<I', len(pixels)))
+            data.extend(pixels)
+
+        return data
 
 #######################################################
 class Image:
@@ -952,6 +1014,43 @@ class txd:
         with open(filename, mode='rb') as file:
             content = file.read()
             self.load_memory(content)
+
+    #######################################################
+    def write_native_texture(self, texture):
+
+        data = Sections.write_chunk(texture.to_mem(), types["Struct"])
+        data += Sections.write_chunk(bytearray(), types["Extension"])
+
+        return Sections.write_chunk(data, types["Texture Native"])
+
+    #######################################################
+    def write_texture_dictionary(self):
+
+        data = Sections.write(TexDict, (len(self.native_textures), self.device_id), types["Struct"])
+
+        for texture in self.native_textures:
+            data += self.write_native_texture(texture)
+
+        data += Sections.write_chunk(bytearray(), types["Extension"])
+
+        return Sections.write_chunk(data, types["Texture Dictionary"])
+
+    #######################################################
+    def write_memory(self, version):
+
+        data = bytearray()
+        Sections.set_library_id(version, 0xFFFF)
+
+        data += self.write_texture_dictionary()
+
+        return data
+
+    #######################################################
+    def write_file(self, filename, version):
+
+        with open(filename, mode='wb') as file:
+            content = self.write_memory(version)
+            file.write(content)
 
     #######################################################
     def __init__(self):

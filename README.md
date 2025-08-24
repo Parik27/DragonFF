@@ -15,7 +15,7 @@ The following is a list of supported features by the addon
 - [X] Model files
 - [X] Texture Files
   - [X] Import
-  - [X] Export
+  - [X] Export *(partial, experimental)*
 - [X] Collision files (including the ones packed in dff)
   - [X] Import
   - [X] Export
