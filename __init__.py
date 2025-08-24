@@ -35,12 +35,15 @@ _classes = [
     gui.IMPORT_OT_dff,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
-    gui.EXPORT_OT_ipl_cull,
+    gui.EXPORT_OT_ipl,
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
     gui.SCENE_OT_dff_import_map,
     gui.SCENE_OT_ipl_select,
+    gui.SCENE_OT_import_ide,
+    gui.EXPORT_OT_ide,
+    gui.EXPORT_OT_pawn,
     gui.OBJECT_OT_dff_generate_bone_props,
     gui.OBJECT_OT_dff_set_parent_bone,
     gui.OBJECT_OT_dff_clear_parent_bone,
@@ -56,6 +59,8 @@ _classes = [
     gui.OBJECT_OT_dff_add_2dfx_cover_point,
     gui.OBJECT_OT_dff_add_2dfx_escalator,
     gui.OBJECT_OT_dff_add_cull,
+    gui.OBJECT_OT_dff_add_garage,
+    gui.OBJECT_OT_dff_add_enex,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
@@ -69,9 +74,11 @@ _classes = [
     gui.DFFObjectProps,
     gui.DFFCollectionProps,
     gui.MapImportPanel,
+    gui.MapProperties,
     gui.DFFFrameProps,
     gui.DFFAtomicProps,
     gui.DFFSceneProps,
+    gui.DFFMapObjectProps,
     gui.DFF_MT_ExportChoice,
     gui.DFF_MT_EditArmature,
     gui.DFF_MT_Pose,
@@ -105,6 +112,7 @@ def register():
     bpy.types.TextCurve.ext_2dfx = bpy.props.PointerProperty(type=gui.RoadSign2DFXObjectProps)
     bpy.types.Material.dff = bpy.props.PointerProperty(type=gui.DFFMaterialProps)
     bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
+    bpy.types.Object.dff_map = bpy.props.PointerProperty(type=gui.DFFMapObjectProps)
     bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
 
     bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)

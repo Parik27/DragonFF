@@ -17,7 +17,7 @@
 import bpy
 
 from .col_ot import FaceGroupsDrawer
-from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull
+from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull, OBJECT_OT_dff_add_garage, OBJECT_OT_dff_add_enex
 from ..gtaLib.data import map_data
 
 #######################################################
@@ -138,6 +138,16 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    load_grge: bpy.props.BoolProperty(
+        name        = "Load Map GRGE",
+        default     = False
+    )
+
+    load_enex: bpy.props.BoolProperty(
+        name        = "Load Map ENEX",
+        default     = False
+    )
+
     game_root : bpy.props.StringProperty(
         name = 'Game root',
         default = 'C:/Program Files (x86)/Steam/steamapps/common/',
@@ -225,6 +235,70 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     )
 
 #######################################################
+class DFFMapObjectProps(bpy.types.PropertyGroup):
+
+    ipl_section: bpy.props.EnumProperty(
+    name="IPL Section",
+    items=(("inst", "inst", ""), ("cull", "cull", ""), ("grge", "grge", ""), ("enex", "enex", "")),
+    default="inst",
+    update=lambda self, ctx: (
+        setattr(ctx.active_object, '["ipl_section"]', self.ipl_section)
+        if (ctx.active_object and self is ctx.active_object.dff_map) else None
+        )
+    )
+
+    # IPL Data (Instance Placement)
+    object_id: bpy.props.IntProperty(name="Object ID", default=0)
+    model_name: bpy.props.StringProperty(name="Model Name", default="")
+    interior: bpy.props.IntProperty(name="Interior", default=0)
+    lod: bpy.props.IntProperty(name="LOD", default=0)
+
+    # IDE Data (Object Definition)
+    ide_object_id: bpy.props.IntProperty(name="Object ID", default=0)
+    ide_model_name: bpy.props.StringProperty(name="Model Name", default="")
+    ide_txd_name: bpy.props.StringProperty(name="TXD Name", default="")
+    ide_draw_distance: bpy.props.IntProperty(name="Draw Distance", default=0)
+    ide_flags: bpy.props.IntProperty(name="Flags", default=0)
+
+    ide_id: bpy.props.IntProperty(name="ID", default=0,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_id",self.ide_id))
+    ide_model: bpy.props.StringProperty(name="Model", default="",
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_model",self.ide_model))
+    ide_txd: bpy.props.StringProperty(name="TXD", default="",
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_txd",self.ide_txd))
+    ide_meshes: bpy.props.IntProperty(name="Mesh Count", default=1, min=1,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_meshes",self.ide_meshes))
+    ide_draw1: bpy.props.FloatProperty(name="DrawDist 1", default=0.0, min=0.0,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_draw1",self.ide_draw1))
+    ide_draw2: bpy.props.FloatProperty(name="DrawDist 2", default=0.0, min=0.0,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_draw2",self.ide_draw2))
+    ide_draw3: bpy.props.FloatProperty(name="DrawDist 3", default=0.0, min=0.0,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_draw3",self.ide_draw3))
+    ide_type: bpy.props.IntProperty(name="Line Type (1..4)", default=0, min=0, max=4,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_type",self.ide_type))
+    ide_section: bpy.props.EnumProperty(
+        name="Section",
+        items=(("objs","objs",""),("tobj","tobj",""),("anim","anim","")),
+        default="objs",
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_section",self.ide_section)
+    )
+    ide_time_on: bpy.props.IntProperty(name="Time On", default=0, min=0, max=24,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_time_on",self.ide_time_on))
+    ide_time_off: bpy.props.IntProperty(name="Time Off", default=24, min=0, max=24,
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_time_off",self.ide_time_off))
+    ide_anim: bpy.props.StringProperty(name="Anim", default="",
+        update=lambda self,ctx: DFFMapObjectProps._sync(self,ctx,"ide_anim",self.ide_anim))
+    
+    pawn_model_name: bpy.props.StringProperty(name="Model Name", default="")
+    pawn_txd_name:   bpy.props.StringProperty(name="Texture Name", default="")
+
+    @staticmethod
+    def _sync(self_ref, context, key, value):
+        obj = context.active_object
+        if obj and hasattr(obj, "dff_map") and obj.dff_map is self_ref:
+            obj[key] = value
+
+#######################################################
 class MapImportPanel(bpy.types.Panel):
     """Creates a Panel in the scene context of the properties editor"""
     bl_label = "DragonFF - Map Import"
@@ -265,6 +339,8 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "create_backfaces")
         col.prop(settings, "load_collisions")
         col.prop(settings, "load_cull")
+        col.prop(settings, "load_grge")
+        col.prop(settings, "load_enex")
 
         layout.separator()
 
@@ -274,9 +350,183 @@ class MapImportPanel(bpy.types.Panel):
         row = layout.row()
         row.operator("scene.dragonff_map_import")
 
+        row = layout.row()
+        row.operator("scene.ide_import")
+
 #######################################################@
 class DFF_MT_AddMapObject(bpy.types.Menu):
     bl_label = "Map"
 
     def draw(self, context):
         self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")
+        self.layout.operator(OBJECT_OT_dff_add_garage.bl_idname, text="GRGE", icon="HOME")
+        self.layout.operator(OBJECT_OT_dff_add_enex.bl_idname, text="ENEX", icon="CYLINDER")
+
+#######################################################
+class MapExportPanel(bpy.types.Panel):
+    """Creates a Panel in the scene context of the properties editor"""
+    bl_label = "DragonFF - Map Export"
+    bl_idname = "SCENE_PT_map_export"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "scene"
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+        settings = context.scene.dff
+
+        flow = layout.grid_flow(row_major=True,
+                                columns=0,
+                                even_columns=True,
+                                even_rows=False,
+                                align=True)
+
+        col = flow.column()
+        col.operator("scene.ide_export", text="Export IDE", icon='TEXT')
+        col.separator()
+        col.operator("export_scene.dff_ipl", text="Export IPL", icon='TEXT')
+        col.separator()
+        col.operator("scene.pwn_export", text="Export PWN", icon='TEXT')
+
+#######################################################
+class MapProperties(bpy.types.Panel):
+    bl_label = "DragonFF - Map Properties"
+    bl_idname = "SCENE_PT_map_properties"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "scene"
+
+    def draw(self, context):
+        layout = self.layout
+        obj = context.active_object
+
+        if not obj or not hasattr(obj, "dff_map") or obj.dff_map is None:
+            layout.label(text="No map properties for this object.")
+            return
+
+        props = obj.dff_map
+
+        sec_cp = obj.get("ipl_section", None)
+        sec_pg = getattr(props, "ipl_section", None)
+        inferred = None
+        if hasattr(obj, "dff") and hasattr(obj.dff, "type"):
+            inferred = "cull" if obj.dff.type == "CULL" else ("inst" if obj.dff.type == "OBJ" else None)
+        section = sec_cp or sec_pg or inferred or "inst"
+
+        header = layout.box().row(align=True)
+        header.label(text="IPL Section:")
+        header.prop(props, "ipl_section", text="")
+
+        box = layout.box()
+        box.label(text="World Transform:")
+        col = box.column(align=True)
+        col.label(text=f"Position: {tuple(round(v, 3) for v in obj.location)}")
+        if hasattr(obj, "rotation_quaternion"):
+            r = obj.rotation_quaternion
+            col.label(text=f"Rotation (quat): {round(r[0],3)}, {round(r[1],3)}, {round(r[2],3)}, {round(r[3],3)}")
+        else:
+            e = obj.rotation_euler
+            col.label(text=f"Rotation: {tuple(round(v, 3) for v in e)}")
+        col.label(text=f"Scale: {tuple(round(v, 3) for v in obj.scale)}")
+
+        if section == "inst":
+
+            # IPL Data
+            box = layout.box()
+            box.label(text="IPL Data (INST):")
+            box.prop(props, "object_id", text="Object ID")
+            box.prop(props, "model_name", text="Model Name")
+            box.prop(props, "interior", text="Interior")
+            box.prop(props, "lod", text="LOD")
+
+            # IDE
+            box = layout.box()
+            box.label(text="IDE Data (Object Definition):")
+            row = box.row(align=True)
+            row.prop(props, "ide_section", text="Section")
+            row.prop(props, "ide_flags", text="Flags")
+            col = box.column(align=True)
+            col.prop(props, "ide_object_id", text="Object ID")
+            col.prop(props, "ide_model_name", text="Model Name")
+            col.prop(props, "ide_txd_name", text="TXD Name")
+            col.prop(props, "ide_meshes", text="Mesh Count")
+            col.prop(props, "ide_draw1", text="DrawDist 1")
+            col.prop(props, "ide_draw2", text="DrawDist 2")
+            col.prop(props, "ide_draw3", text="DrawDist 3")
+            if props.ide_section == 'tobj':
+                col = box.column(align=True)
+                col.prop(props, "ide_time_on", text="Time On")
+                col.prop(props, "ide_time_off", text="Time Off")
+            elif props.ide_section == 'anim':
+                box.prop(props, "ide_anim", text="Anim Name")
+
+            # Pawn
+            box = layout.box()
+            box.label(text="Pawn Data:")
+            box.prop(props, "pawn_model_name", text="Model Name")
+            box.prop(props, "pawn_txd_name",   text="Texture Name")
+
+        elif section == "grge":
+            box = layout.box()
+            box.label(text="GRGE (Garage) Data:")
+
+            grid = box.grid_flow(row_major=True, columns=2, even_columns=True, even_rows=True, align=True)
+
+            for key, label in (
+                ("grge_posX",  "PosX"),
+                ("grge_posY",  "PosY"),
+                ("grge_posZ",  "PosZ"),
+                ("grge_lineX", "LineX"),
+                ("grge_lineY", "LineY"),
+                ("grge_cubeX", "CubeX"),
+                ("grge_cubeY", "CubeY"),
+                ("grge_cubeZ", "CubeZ"),
+            ):
+                if key in obj:
+                    grid.prop(obj, f'["{key}"]', text=label)
+                else:
+                    row = grid.row(align=True)
+                    row.label(text=f"{label}: <missing>")
+
+            for key, label in (
+                ("grge_flag", "Door:"),
+                ("grge_type", "Garage:"),
+            ):
+                if key in obj:
+                    grid.prop(obj, f'["{key}"]', text=label)
+                else:
+                    row = grid.row(align=True)
+                    row.label(text=f"{label} <missing>")
+
+            if "grge_name" in obj:
+                box.prop(obj, '["grge_name"]', text="Name")
+            else:
+                box.label(text="Name: <missing>")
+
+        elif section == "cull":
+            box = layout.box()
+            box.label(text="CULL Zone:")
+            for key, label in (
+                ("cull_center_x", "Center X"),
+                ("cull_center_y", "Center Y"),
+                ("cull_center_z", "Center Z"),
+                ("cull_radius",   "Radius"),
+                ("cull_flags",    "Flags"),
+                ("cull_min_x",    "Min X"),
+                ("cull_min_y",    "Min Y"),
+                ("cull_min_z",    "Min Z"),
+                ("cull_max_x",    "Max X"),
+                ("cull_max_y",    "Max Y"),
+                ("cull_max_z",    "Max Z"),
+            ):
+                if key in obj:
+                    box.prop(obj, f'["{key}"]', text=label)
+
+        else:
+            box = layout.box()
+            box.label(text=f"IPL Data ({section}):")
+            box.prop(props, "object_id", text="Object ID")
+            box.prop(props, "model_name", text="Model Name")
+            box.prop(props, "interior", text="Interior")
+            box.prop(props, "lod", text="LOD")

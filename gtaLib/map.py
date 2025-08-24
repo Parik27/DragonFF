@@ -29,12 +29,16 @@ class MapData:
     object_instances: list
     object_data: dict
     cull_instances: list
+    garage_instances: list
+    enex_instances: list
 
 #######################################################
 @dataclass
 class TextIPLData:
     object_instances: list
     cull_instances: list
+    garage_instances: list 
+    enex_instances: list
 
 # Base for all IPL / IDE section reader / writer classes
 #######################################################
@@ -353,6 +357,8 @@ class MapDataUtility:
         # Extract relevant sections
         object_instances = []
         cull_instances = []
+        garage_instances = []
+        enex_instances = []
         object_data = {}
 
         # Get all insts into a flat list (array)
@@ -367,6 +373,14 @@ class MapDataUtility:
         if 'cull' in ipl:
             for entry in ipl['cull']:
                 cull_instances.append(entry)
+
+        if 'grge' in ipl:
+            for entry in ipl['grge']:
+                garage_instances.append(entry)
+
+        if 'enex' in ipl:
+            for entry in ipl['enex']:
+                enex_instances.append(entry)
 
         # Get all objs and tobjs into flat ID keyed dictionaries
         if 'objs' in ide:
@@ -384,7 +398,9 @@ class MapDataUtility:
         return MapData(
             object_instances = object_instances,
             object_data = object_data,
-            cull_instances = cull_instances
+            cull_instances = cull_instances,
+            garage_instances = garage_instances,
+            enex_instances = enex_instances
         )
 
     ########################################################################
@@ -413,10 +429,10 @@ class MapDataUtility:
             section_utility.write(file_stream, [])
 
             section_utility = SectionUtility("grge")
-            section_utility.write(file_stream, [])
+            section_utility.write(file_stream, ipl_data.garage_instances or []) 
 
             section_utility = SectionUtility("enex")
-            section_utility.write(file_stream, [])
+            section_utility.write(file_stream, ipl_data.enex_instances or [])
 
             section_utility = SectionUtility("pick")
             section_utility.write(file_stream, [])

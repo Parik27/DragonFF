@@ -8,7 +8,7 @@ from .col_ot import EXPORT_OT_col, \
     COLLECTION_OT_dff_generate_bounds, \
     OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
-from .map_ot import EXPORT_OT_ipl_cull
+from .map_ot import EXPORT_OT_ipl, EXPORT_OT_ide, EXPORT_OT_pawn
 from .cull_menus import CULLObjectProps, CULLMenus
 from ..gtaLib.data import presets
 
@@ -243,8 +243,15 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
         op.use_active_collection = False
-        self.layout.operator(EXPORT_OT_ipl_cull.bl_idname,
-                             text="DragonFF CULL (.ipl)")
+        self.layout.operator(EXPORT_OT_ipl.bl_idname,
+                             text="DragonFF Item Placement (.ipl)")
+        
+        self.layout.operator(EXPORT_OT_ide.bl_idname,
+                             text="DragonFF Item Definition (.ide)")
+        
+        self.layout.operator(EXPORT_OT_pawn.bl_idname,
+                             text="DragonFF Pawn Script (.pwn)")
+
 
 
 #######################################################
@@ -579,6 +586,8 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('2DFX', '2DFX', 'Object is a 2D effect'),
             ('CULL', 'CULL', 'Object is a CULL zone'),
+            ('GRGE', 'GRGE', 'Object is a GRGE zone'),
+            ('ENEX', 'ENEX', 'Object is an ENEX zone'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
