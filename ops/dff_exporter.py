@@ -1175,6 +1175,7 @@ class dff_exporter:
         self = dff_exporter
 
         self.file_name = filename
+        self.frame_objects = {}
 
         State.update_scene()
         objects = {}
