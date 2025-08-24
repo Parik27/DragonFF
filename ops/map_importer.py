@@ -91,6 +91,32 @@ class map_importer:
                         obj, inst
                     )
 
+                    # Store IPL
+                    obj.ide.obj_id = inst.id
+                    obj.ide.model_name = self.object_data[inst.id].modelName
+                    if hasattr(inst, 'interior'):
+                        obj.ipl.interior = inst.interior
+                    if hasattr(inst, 'lod'):
+                        obj.ipl.lod = inst.lod
+
+                    # Store IDE data
+                    ide_data = self.object_data[inst.id]
+                    obj.ide.txd_name = ide_data.txdName
+                    if hasattr(ide_data, 'drawDistance'):
+                        obj.ide.draw_distance = ide_data.drawDistance
+                    if hasattr(ide_data, 'drawDistance1'):
+                        obj.ide.draw_distance1 = ide_data.drawDistance1
+                    if hasattr(ide_data, 'drawDistance2'):
+                        obj.ide.draw_distance2 = ide_data.drawDistance2
+                    if hasattr(ide_data, 'drawDistance3'):
+                        obj.ide.draw_distance3 = ide_data.drawDistance3
+                    obj.ide.flags = ide_data.flags
+                    obj.ide.obj_type = 'objs'  # Mark as regular object
+                    if hasattr(ide_data, 'timeOn'):
+                        obj.ide.obj_type = 'tobj'  # Mark as time object
+                        obj.ide.time_on = ide_data.timeOn
+                        obj.ide.time_off = ide_data.timeOff
+
             cached_2dfx = [obj for obj in model_cache if obj.dff.type == "2DFX"]
             for obj in cached_2dfx:
                 new_obj = bpy.data.objects.new(obj.name, obj.data)
@@ -166,6 +192,32 @@ class map_importer:
                 map_importer.apply_transformation_to_object(
                     obj, inst
                 )
+
+                # Store IPL data
+                obj.ide.obj_id = inst.id
+                obj.ide.model_name = self.object_data[inst.id].modelName
+                if hasattr(inst, 'interior'):
+                    obj.ipl.interior = inst.interior
+                if hasattr(inst, 'lod'):
+                    obj.ipl.lod = inst.lod
+
+                # Store IDE data
+                ide_data = self.object_data[inst.id]
+                obj.ide.txd_name = ide_data.txdName
+                if hasattr(ide_data, 'drawDistance'):
+                    obj.ide.draw_distance = ide_data.drawDistance
+                if hasattr(ide_data, 'drawDistance1'):
+                    obj.ide.draw_distance1 = ide_data.drawDistance1
+                if hasattr(ide_data, 'drawDistance2'):
+                    obj.ide.draw_distance2 = ide_data.drawDistance2
+                if hasattr(ide_data, 'drawDistance3'):
+                    obj.ide.draw_distance3 = ide_data.drawDistance3
+                obj.ide.flags = ide_data.flags
+                obj.ide.obj_type = 'objs'  # Mark as regular object
+                if hasattr(ide_data, 'timeOn'):
+                    obj.ide.obj_type = 'tobj'  # Mark as time object
+                    obj.ide.time_on = ide_data.timeOn
+                    obj.ide.time_off = ide_data.timeOff
 
             # Set root object as 2DFX parent
             if root_objects:

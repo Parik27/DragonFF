@@ -36,6 +36,12 @@ class TextIPLData:
     object_instances: list
     cull_instances: list
 
+#######################################################
+@dataclass
+class TextIDEData:
+    objs_instances: list
+    tobj_instances: list
+
 # Base for all IPL / IDE section reader / writer classes
 #######################################################
 class SectionUtility:
@@ -438,8 +444,27 @@ class MapDataUtility:
 
     ########################################################################
     @staticmethod
+    def write_text_ide_to_stream(file_stream, ide_data:TextIDEData):
+        file_stream.write("# IDE generated with DragonFF\n")
+
+        section_utility = SectionUtility("objs")
+        section_utility.write(file_stream, ide_data.objs_instances)
+
+        section_utility = SectionUtility("tobj")
+        section_utility.write(file_stream, ide_data.tobj_instances)
+
+    ########################################################################
+    @staticmethod
     def write_ipl_data(filename, game_id, ipl_data:TextIPLData):
         self = MapDataUtility
 
         with open(filename, 'w') as file_stream:
             self.write_text_ipl_to_stream(file_stream, game_id, ipl_data)
+
+    ########################################################################
+    @staticmethod
+    def write_ide_data(filename, ide_data:TextIDEData):
+        self = MapDataUtility
+
+        with open(filename, 'w') as file_stream:
+            self.write_text_ide_to_stream(file_stream, ide_data)

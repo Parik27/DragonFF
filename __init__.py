@@ -35,7 +35,8 @@ _classes = [
     gui.IMPORT_OT_dff,
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_col,
-    gui.EXPORT_OT_ipl_cull,
+    gui.EXPORT_OT_ipl,
+    gui.EXPORT_OT_ide,
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
@@ -69,9 +70,12 @@ _classes = [
     gui.DFFObjectProps,
     gui.DFFCollectionProps,
     gui.MapImportPanel,
+    gui.MapObjectPanel,
     gui.DFFFrameProps,
     gui.DFFAtomicProps,
     gui.DFFSceneProps,
+    gui.IDEObjectProps,
+    gui.IPLObjectProps,
     gui.DFF_MT_ExportChoice,
     gui.DFF_MT_EditArmature,
     gui.DFF_MT_Pose,
@@ -105,6 +109,8 @@ def register():
     bpy.types.TextCurve.ext_2dfx = bpy.props.PointerProperty(type=gui.RoadSign2DFXObjectProps)
     bpy.types.Material.dff = bpy.props.PointerProperty(type=gui.DFFMaterialProps)
     bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
+    bpy.types.Object.ide = bpy.props.PointerProperty(type=gui.IDEObjectProps)
+    bpy.types.Object.ipl = bpy.props.PointerProperty(type=gui.IPLObjectProps)
     bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
 
     bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
@@ -125,6 +131,8 @@ def unregister():
     del bpy.types.TextCurve.ext_2dfx
     del bpy.types.Material.dff
     del bpy.types.Object.dff
+    del bpy.types.Object.ide
+    del bpy.types.Object.ipl
     del bpy.types.Collection.dff
 
     bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)

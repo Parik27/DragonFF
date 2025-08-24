@@ -8,7 +8,7 @@ from .col_ot import EXPORT_OT_col, \
     COLLECTION_OT_dff_generate_bounds, \
     OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
-from .map_ot import EXPORT_OT_ipl_cull
+from .map_ot import EXPORT_OT_ipl, EXPORT_OT_ide
 from .cull_menus import CULLObjectProps, CULLMenus
 from ..gtaLib.data import presets
 
@@ -243,9 +243,6 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
         op.use_active_collection = False
-        self.layout.operator(EXPORT_OT_ipl_cull.bl_idname,
-                             text="DragonFF CULL (.ipl)")
-
 
 #######################################################
 def import_dff_func(self, context):
