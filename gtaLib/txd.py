@@ -636,11 +636,8 @@ class TextureNative:
         ) = unpack_from("<IHH32s32s", data, pos)
         pos += 72
 
-        self.name = self.name.decode("utf-8").replace('\0', '')
-        try:
-            self.mask = self.mask.decode("utf-8").replace('\0', '')
-        except UnicodeDecodeError:
-            self.mask = ''
+        self.name = self.name[:strlen(self.name)].decode("utf-8")
+        self.mask = self.mask[:strlen(self.mask)].decode("utf-8")
 
         (
             self.raster_format_flags, self.d3d_format, self.width, self.height,

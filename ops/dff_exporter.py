@@ -598,13 +598,14 @@ class dff_exporter:
         return dm_entries
 
     #######################################################
+    @staticmethod
     def triangulate_mesh(mesh, preserve_loop_normals):
         loop_normals = [loop.normal.copy() for loop in mesh.loops] if preserve_loop_normals else []
 
         # Check that the mesh is already triangulated
         if all(len(polygon.vertices) == 3 for polygon in mesh.polygons):
             return loop_normals
-        
+
         bm = bmesh.new()
         bm.from_mesh(mesh)
 
@@ -633,8 +634,6 @@ class dff_exporter:
         bm.free()
 
         return loop_normals
-
-
 
     #######################################################
     @staticmethod
@@ -791,7 +790,6 @@ class dff_exporter:
             normals = [vert.normal.copy() for vert in mesh.vertices]
             self.triangulate_mesh(mesh, False)
 
-        self.triangulate_mesh(mesh)
         # NOTE: Mesh.calc_normals is no longer needed and has been removed
         if bpy.app.version < (4, 0, 0):
             mesh.calc_normals()
@@ -842,18 +840,11 @@ class dff_exporter:
                     for kb in shape_keys.key_blocks:
                         sk_cos.append(kb.data[vert_index].co)
 
-                
+                normal = normals[loop_index if use_loop_normals else vert_index]
+
                 key = (vert_index,
                        tuple(normal),
                        tuple(tuple(uv) for uv in uvs))
-
-                normal = normals[loop_index if use_loop_normals else vert_index]
-
-                key = (loop.vertex_index,
-                       tuple(loop.normal),
-                       tuple(tuple(uv) for uv in uvs))
-
-                normal = loop.normal if obj.dff.export_split_normals else vertex.normal
 
                 if key not in verts_indices:
                     face['verts'].append (len(vertices_list))
