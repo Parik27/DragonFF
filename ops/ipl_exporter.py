@@ -16,6 +16,7 @@
 
 import bpy
 
+from ..gtaLib.data.map_data import game_version
 from ..gtaLib.map import TextIPLData, MapDataUtility
 from ..ops.cull_exporter import cull_exporter
 
@@ -24,7 +25,7 @@ class ipl_exporter:
 
     only_selected = False
     game_id = None
-    export_inst = False
+    export_inst = True
     export_cull = False
 
     inst_objects = []
@@ -46,7 +47,8 @@ class ipl_exporter:
                 continue
 
             if self.export_inst and obj.dff.type == 'OBJ':
-                self.inst_objects.append(obj)
+                if hasattr(obj, 'ide') and obj.ide.obj_id and not obj.parent:
+                    self.inst_objects.append(obj)
 
             if self.export_cull and obj.dff.type == 'CULL':
                 self.cull_objects.append(obj)
@@ -60,8 +62,39 @@ class ipl_exporter:
 
         self = ipl_exporter
 
-        # TODO
-        return ""
+        # Get data from ide/ipl properties
+        obj_id = obj.ide.obj_id
+        model_name = obj.ide.model_name or obj.name
+        interior = obj.ipl.interior or '0'
+        lod = obj.ipl.lod or '-1'
+
+        # Get transformation data
+        loc = obj.location
+        rot = obj.rotation_quaternion
+        scale = obj.scale
+
+        # Note: the W component is negated
+        rot_w = -rot.w
+        rot_x = rot.x
+        rot_y = rot.y
+        rot_z = rot.z
+
+        if self.game_id == game_version.III:
+            # GTA III format: ID, ModelName, PosX, PosY, PosZ, ScaleX, ScaleY, ScaleZ, RotX, RotY, RotZ, RotW
+            return f"{obj_id}, {model_name}, {loc.x:.6f}, {loc.y:.6f}, {loc.z:.6f}, {scale.x:.6f}, {scale.y:.6f}, {scale.z:.6f}, {rot_x:.6f}, {rot_y:.6f}, {rot_z:.6f}, {rot_w:.6f}"
+
+        elif self.game_id == game_version.VC:
+            # GTA VC format: ID, ModelName, Interior, PosX, PosY, PosZ, ScaleX, ScaleY, ScaleZ, RotX, RotY, RotZ, RotW
+            return f"{obj_id}, {model_name}, {interior}, {loc.x:.6f}, {loc.y:.6f}, {loc.z:.6f}, {scale.x:.6f}, {scale.y:.6f}, {scale.z:.6f}, {rot_x:.6f}, {rot_y:.6f}, {rot_z:.6f}, {rot_w:.6f}"
+
+        elif self.game_id == game_version.SA:
+            # GTA SA format: ID, ModelName, Interior, PosX, PosY, PosZ, RotX, RotY, RotZ, RotW, LOD
+            # Note: SA doesn't have scale in IPL
+            return f"{obj_id}, {model_name}, {interior}, {loc.x:.6f}, {loc.y:.6f}, {loc.z:.6f}, {rot_x:.6f}, {rot_y:.6f}, {rot_z:.6f}, {rot_w:.6f}, {lod}"
+
+        else:
+            # Default to SA format
+            return f"{obj_id}, {model_name}, {interior}, {loc.x:.6f}, {loc.y:.6f}, {loc.z:.6f}, {rot_x:.6f}, {rot_y:.6f}, {rot_z:.6f}, {rot_w:.6f}, {lod}"
 
     #######################################################
     @staticmethod
@@ -76,12 +109,12 @@ class ipl_exporter:
         object_instances = [self.format_inst_line(obj) for obj in self.inst_objects]
         cull_instacnes = cull_exporter.export_objects(self.cull_objects, self.game_id)
 
-        ipl_Data = TextIPLData(
+        ipl_data = TextIPLData(
             object_instances,
             cull_instacnes,
         )
 
-        MapDataUtility.write_ipl_data(filename, self.game_id, ipl_Data)
+        MapDataUtility.write_ipl_data(filename, self.game_id, ipl_data)
 
 #######################################################
 def export_ipl(options):

@@ -23,8 +23,8 @@ import bmesh
 from bpy.props import StringProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
+from ..ops import map_importer, ide_exporter, ipl_exporter
 
-from ..ops import map_exporter, map_importer
 from ..ops.cull_importer import cull_importer
 from ..ops.importer_common import link_object
 
@@ -240,39 +240,67 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
         return {'FINISHED'}
 
 #######################################################
+class EXPORT_OT_ide(bpy.types.Operator, ExportHelper):
+    """Export IDE file"""
+    bl_idname           = "export_scene.dff_ide"
+    bl_description      = "Export a GTA IDE File"
+    bl_label            = "DragonFF IDE (.ide)"
+    filename_ext        = ".ide"
+
+    filepath            : bpy.props.StringProperty(name="File path",
+                                              maxlen=1024,
+                                              default="",
+                                              subtype='FILE_PATH')
+
+    filter_glob         : bpy.props.StringProperty(default="*.ide",
+                                              options={'HIDDEN'})
+
+    only_selected       : bpy.props.BoolProperty(
+        name            = "Only Selected",
+        description     = "Export only selected objects",
+        default         = False
+    )
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "only_selected")
+
+    #######################################################
+    def execute(self, context):
+        start = time.time()
+        try:
+            ide_exporter.export_ide(
+                {
+                    "file_name"     : self.filepath,
+                    "only_selected" : self.only_selected,
+                }
+            )
+
+            total_objs_num = len(ide_exporter.ide_exporter.objs_objects)
+            total_tobj_num = len(ide_exporter.ide_exporter.tobj_objects)
+
+            if not (total_objs_num + total_tobj_num):
+                report = "No objects with IDE data found"
+                self.report({"ERROR"}, report)
+                return {'CANCELLED'}, report
+
+            self.report({"INFO"}, f"Finished export {total_objs_num} objs and {total_tobj_num} tobj in {time.time() - start:.2f}s")
+
+        except Exception as e:
+            self.report({"ERROR"}, str(e))
+
+        return {'FINISHED'}
+
+#######################################################
 class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
-    bl_idname = "export_scene.dff_ipl"
-    bl_label = "DragonFF IPL Export"
-    bl_description = "Export a GTA IPL file with INST, CULL, or both sections"
-    filename_ext = ".ipl"
+    """Export IPL file"""
+    bl_idname           = "export_scene.dff_ipl"
+    bl_description      = "Export a GTA IPL File"
+    bl_label            = "DragonFF IPL (.ipl)"
+    filename_ext        = ".ipl"
 
-    export_inst: bpy.props.BoolProperty(
-        name="Export INST (object placements)",
-        default=True,
-        description="Export object placement (INST) section"
-    )
-    export_cull: bpy.props.BoolProperty(
-        name="Export CULL zones",
-        default=True,
-        description="Export CULL (zone) section"
-    )
-
-    export_grge: bpy.props.BoolProperty(
-        name="Export GRGE zones",
-        default=True,
-        description="Export GRGE (zone) section"
-    )
-
-    export_enex: bpy.props.BoolProperty(
-        name="Export ENEX zones",
-        default=True,
-        description="Export ENEX (zone) section"
-    )
-
-    only_selected: bpy.props.BoolProperty(
-        name="Only Selected",
-        default=False
-    )
     stream_distance: bpy.props.FloatProperty(
         name="Stream Distance",
         default=300.0,
@@ -300,9 +328,22 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
         description="Offset for the z coordinate of the objects"
     )
 
-    filter_glob: bpy.props.StringProperty(
-        default="*.ipl",
-        options={'HIDDEN'}
+    only_selected       : bpy.props.BoolProperty(
+        name            = "Only Selected",
+        description     = "Export only selected objects",
+        default         = False
+    )
+
+    export_inst         : bpy.props.BoolProperty(
+        name            = "Export INST",
+        description     = "Export INST entries",
+        default         = True
+    )
+
+    export_cull         : bpy.props.BoolProperty(
+        name            = "Export CULL",
+        description     = "Export CULL entries",
+        default         = False
     )
 
     #######################################################
@@ -318,6 +359,11 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
         layout.prop(self, "z_offset")
         layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
 
+        box = layout.box()
+        box.label(text="Export Entries")
+        box.prop(self, "export_inst", text="INST")
+        box.prop(self, "export_cull", text="CULL")
+
     #######################################################
     def execute(self, context):
         start = time.time()
@@ -328,24 +374,22 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
             export_enex = self.export_enex
             map_exporter.export_ipl(
                 {
-                    "file_name": self.filepath,
-                    "only_selected": self.only_selected,
-                    "game_id": context.scene.dff.game_version_dropdown,
-                    "export_inst": export_inst,
-                    "export_cull": export_cull,
-                    "export_grge": export_grge,
-                    "export_enex": export_enex,
-                    "x_offset": self.x_offset,
-                    "y_offset": self.y_offset,
-                    "z_offset": self.z_offset,
+                    "file_name"     : self.filepath,
+                    "only_selected" : self.only_selected,
+                    "game_id"       : context.scene.dff.game_version_dropdown,
+                    "export_inst"   : self.export_inst,
+                    "export_cull"   : self.export_cull,
                 }
             )
 
-            if not map_exporter.ipl_exporter.total_objects_num:
-                self.report({"ERROR"}, "No objects with IPL data found")
-                return {'CANCELLED'}
+            total_objects_num = ipl_exporter.ipl_exporter.total_objects_num
 
-            self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
+            if not total_objects_num:
+                report = "No objects with IPL data found"
+                self.report({"ERROR"}, report)
+                return {'CANCELLED'}, report
+
+            self.report({"INFO"}, f"Finished export {total_objects_num} objects in {time.time() - start:.2f}s")
 
         except Exception as e:
             self.report({"ERROR"}, str(e))
