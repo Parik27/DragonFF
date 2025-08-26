@@ -29,7 +29,7 @@ class MapData:
     object_instances: list
     object_data: dict
     cull_instances: list
-    garage_instances: list
+    grge_instances: list
     enex_instances: list
 
 #######################################################
@@ -37,7 +37,7 @@ class MapData:
 class TextIPLData:
     object_instances: list
     cull_instances: list
-    garage_instances: list 
+    grge_instances: list
     enex_instances: list
 
 #######################################################
@@ -363,7 +363,7 @@ class MapDataUtility:
         # Extract relevant sections
         object_instances = []
         cull_instances = []
-        garage_instances = []
+        grge_instances = []
         enex_instances = []
         object_data = {}
 
@@ -380,9 +380,10 @@ class MapDataUtility:
             for entry in ipl['cull']:
                 cull_instances.append(entry)
 
+        # Get all garages into a flat list (array)
         if 'grge' in ipl:
             for entry in ipl['grge']:
-                garage_instances.append(entry)
+                grge_instances.append(entry)
 
         if 'enex' in ipl:
             for entry in ipl['enex']:
@@ -405,7 +406,7 @@ class MapDataUtility:
             object_instances = object_instances,
             object_data = object_data,
             cull_instances = cull_instances,
-            garage_instances = garage_instances,
+            grge_instances = grge_instances,
             enex_instances = enex_instances
         )
 
@@ -435,7 +436,7 @@ class MapDataUtility:
             section_utility.write(file_stream, [])
 
             section_utility = SectionUtility("grge")
-            section_utility.write(file_stream, ipl_data.garage_instances or []) 
+            section_utility.write(file_stream, ipl_data.grge_instances)
 
             section_utility = SectionUtility("enex")
             section_utility.write(file_stream, ipl_data.enex_instances or [])

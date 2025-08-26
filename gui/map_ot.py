@@ -24,10 +24,10 @@ from bpy.props import StringProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
 from ..ops import map_importer, ide_exporter, ipl_exporter
-
-from ..ops.cull_importer import cull_importer
+from ..ops.ipl.cull_importer import cull_importer
+from ..ops.ipl.grge_importer import grge_importer
 from ..ops.importer_common import link_object
-
+from ..gtaLib.data import map_data
 
 #######################################################
 class SCENE_OT_dff_import_map(bpy.types.Operator):
@@ -48,7 +48,6 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
     _col_loaded = True
 
     _cull_loaded = True
-
     _grge_loaded = True
     _enex_loaded = True
 
@@ -73,13 +72,12 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
                 self._progress_current += 1
                 self._cull_loaded = True
 
-            # Import Garages if there are any left to load
+            # Import GRGE if there are any left to load
             elif not self._grge_loaded:
-                for g in getattr(importer, 'garage_instances', []):
-                    try:
-                        importer.import_garage(context, g)
-                    except Exception as ex:
-                        print("Can't import GRGE... skipping", ex)
+
+                for grge in importer.grge_instances:
+                    importer.import_grge(context, grge)
+
                 self._progress_current += 1
                 self._grge_loaded = True
 
@@ -171,7 +169,7 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
         else:
             self._cull_loaded = True
 
-        if self._importer.garage_instances:
+        if self._importer.grge_instances:
             self._grge_loaded = False
             self._progress_total += 1
         else:
@@ -346,39 +344,49 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
         default         = False
     )
 
+    export_grge         : bpy.props.BoolProperty(
+        name            = "Export GRGE",
+        description     = "Export GRGE entries",
+        default         = False
+    )
+
     #######################################################
     def draw(self, context):
+        settings = context.scene.dff
+
         layout = self.layout
-        layout.prop(self, "export_inst")
-        layout.prop(self, "export_cull")
-        layout.prop(self, "export_grge")
-        layout.prop(self, "export_enex")
         layout.prop(self, "only_selected")
         layout.prop(self, "x_offset")
         layout.prop(self, "y_offset")
         layout.prop(self, "z_offset")
-        layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
+        layout.prop(settings, "game_version_dropdown", text="Game")
 
         box = layout.box()
         box.label(text="Export Entries")
-        box.prop(self, "export_inst", text="INST")
-        box.prop(self, "export_cull", text="CULL")
+        grid = box.grid_flow(columns=3, even_columns=True, even_rows=True)
+        grid.prop(self, "export_inst", text="INST")
+        grid.prop(self, "export_cull", text="CULL")
+
+        if settings.game_version_dropdown == map_data.game_version.SA:
+            grid.prop(self, "export_grge", text="GRGE")
+
+        grid.prop(self, "export_enex")
 
     #######################################################
     def execute(self, context):
+        settings = context.scene.dff
+
         start = time.time()
         try:
-            export_inst = self.export_inst
-            export_cull = self.export_cull
-            export_grge = self.export_grge
-            export_enex = self.export_enex
             map_exporter.export_ipl(
                 {
                     "file_name"     : self.filepath,
                     "only_selected" : self.only_selected,
-                    "game_id"       : context.scene.dff.game_version_dropdown,
+                    "game_id"       : settings.game_version_dropdown,
                     "export_inst"   : self.export_inst,
                     "export_cull"   : self.export_cull,
+                    "export_grge"   : self.export_grge if settings.game_version_dropdown == map_data.game_version.SA else False,
+                    "export_enex"   : self.export_enex,
                 }
             )
 
@@ -455,36 +463,37 @@ class OBJECT_OT_dff_add_cull(bpy.types.Operator):
         obj.select_set(True)
 
         return {'FINISHED'}
+
 #######################################################
-class OBJECT_OT_dff_add_garage(bpy.types.Operator):
-    bl_idname = "object.dff_add_garage"
+class OBJECT_OT_dff_add_grge(bpy.types.Operator):
+
+    bl_idname = "object.dff_add_grge"
     bl_label = "Add GRGE Zone"
-    bl_description = "Add a GRGE zone to the scene"
+    bl_description = "Add GRGE zone to the scene"
     bl_options = {'REGISTER', 'UNDO'}
 
     location: bpy.props.FloatVectorProperty(
         name="Location",
-        description="Location for the newly added garage sphere",
+        description="Location for the newly added object",
         subtype='XYZ',
-        default=(0.0, 0.0, 0.0)
+        default=(0, 0, 0)
     )
 
-    grge_type: bpy.props.IntProperty(
-        name="Garage Type",
-        description="Garage type ID",
-        default=5
+    scale: bpy.props.FloatVectorProperty(
+        name="Scale",
+        description="Scale for the newly added object",
+        subtype='XYZ',
+        default=(1, 1, 1)
     )
 
-    grge_flag: bpy.props.IntProperty(
-        name="Garage Flag",
-        description="Garage flag value",
+    angle: bpy.props.FloatProperty(
+        name="Angle",
+        description="Angle along the Z axis",
+        subtype='ANGLE',
+        min=-math.pi * 2,
+        max=math.pi * 2,
+        step=100,
         default=0
-    )
-
-    grge_name: bpy.props.StringProperty(
-        name="Garage Name",
-        description="Optional garage name",
-        default="Garage"
     )
 
     #######################################################
@@ -494,42 +503,14 @@ class OBJECT_OT_dff_add_garage(bpy.types.Operator):
 
     #######################################################
     def execute(self, context):
-        MapImporter = map_importer.map_importer
-        if getattr(MapImporter, "settings", None) is None:
-            MapImporter.settings = context.scene.dff
-
-        # Always resolve the correct collection dynamically (III/VC/SA/etc.)
-        coll = MapImporter.create_grge_collection(context)
-
-        me = MapImporter.create_grge_sphere()
-        obj = bpy.data.objects.new(f"GRGE_{self.grge_name}", me)
-        obj.location = self.location
-        obj.hide_render = True
-
-        mat = bpy.data.materials.get("_GRGE") or bpy.data.materials.new("_GRGE")
-        mat.diffuse_color = (0.0, 0.35, 1.0, 1.0)
-        if not obj.data.materials:
-            obj.data.materials.append(mat)
-        else:
-            obj.data.materials[0] = mat
-
-        obj.dff.type = "GRGE"
-        if hasattr(obj, "dff_map"):
-            obj.dff_map.ipl_section = "grge"
-        else:
-            obj["ipl_section"] = "grge"
-
-        obj["grge_type"] = int(self.grge_type)
-        obj["grge_flag"] = int(self.grge_flag)
-        obj["grge_name"] = self.grge_name
-
-        for k in ("grge_posX","grge_posY","grge_posZ","grge_lineX","grge_lineY",
-                "grge_cubeX","grge_cubeY","grge_cubeZ"):
-            if k not in obj:
-                obj[k] = 0.0
-
-        # Link exactly like add_cull does, but to the resolved GRGE collection
-        link_object(obj, coll)
+        obj = grge_importer.create_grge_object(
+            location=self.location,
+            scale=self.scale,
+            flags=0,
+            angle=self.angle
+        )
+        obj.dff.grge.grge_type = 5
+        link_object(obj, context.collection)
 
         context.view_layer.objects.active = obj
         for o in context.selected_objects:
@@ -537,6 +518,7 @@ class OBJECT_OT_dff_add_garage(bpy.types.Operator):
         obj.select_set(True)
 
         return {'FINISHED'}
+
 #######################################################
 class OBJECT_OT_dff_add_enex(bpy.types.Operator):
     bl_idname = "object.dff_add_enex"

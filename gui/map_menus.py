@@ -17,7 +17,9 @@
 import bpy
 
 from .col_ot import FaceGroupsDrawer
-from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull, OBJECT_OT_dff_add_garage, OBJECT_OT_dff_add_enex
+from .map_ot import SCENE_OT_ipl_select, \
+    EXPORT_OT_ipl, EXPORT_OT_ide, \
+    OBJECT_OT_dff_add_cull, OBJECT_OT_dff_add_grge, OBJECT_OT_dff_add_enex
 from ..gtaLib.data import map_data
 
 #######################################################
@@ -329,7 +331,7 @@ class DFFMapObjectProps(bpy.types.PropertyGroup):
 
     ipl_section: bpy.props.EnumProperty(
     name="IPL Section",
-    items=(("inst", "inst", ""), ("cull", "cull", ""), ("grge", "grge", ""), ("enex", "enex", "")),
+    items=(("inst", "inst", ""), ("cull", "cull", ""), ("enex", "enex", "")),
     default="inst",
     update=lambda self, ctx: (
         setattr(ctx.active_object, '["ipl_section"]', self.ipl_section)
@@ -428,9 +430,13 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "read_mat_split")
         col.prop(settings, "create_backfaces")
         col.prop(settings, "load_collisions")
-        col.prop(settings, "load_cull")
-        col.prop(settings, "load_grge")
-        col.prop(settings, "load_enex")
+
+        box = col.box()
+        box.label(text="Import Entries")
+        grid = box.grid_flow(columns=3, even_columns=True, even_rows=True)
+        grid.prop(settings, "load_cull", text="CULL")
+        grid.prop(settings, "load_grge", text="GRGE")
+        grid.prop(settings, "load_enex", text="ENEX")
 
         layout.separator()
 
@@ -443,10 +449,10 @@ class MapImportPanel(bpy.types.Panel):
         layout.separator()
 
         row = layout.row()
-        row.operator("export_scene.dff_ipl", text="Export IPL")
+        row.operator(EXPORT_OT_ipl.bl_idname, text="Export IPL")
 
         row = layout.row()
-        row.operator("export_scene.dff_ide", text="Export IDE")
+        row.operator(EXPORT_OT_ide.bl_idname, text="Export IDE")
 
 #######################################################
 class MapObjectPanel(bpy.types.Panel):
@@ -460,7 +466,7 @@ class MapObjectPanel(bpy.types.Panel):
     #######################################################
     @classmethod
     def poll(cls, context):
-        return context.object is not None
+        return context.object and context.object.dff.type == 'OBJ'
 
     #######################################################
     def draw(self, context):
@@ -554,7 +560,7 @@ class DFF_MT_AddMapObject(bpy.types.Menu):
 
     def draw(self, context):
         self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")
-        self.layout.operator(OBJECT_OT_dff_add_garage.bl_idname, text="GRGE", icon="HOME")
+        self.layout.operator(OBJECT_OT_dff_add_grge.bl_idname, text="GRGE", icon="HOME")
         self.layout.operator(OBJECT_OT_dff_add_enex.bl_idname, text="ENEX", icon="CYLINDER")
 
 #######################################################
@@ -661,43 +667,6 @@ class MapProperties(bpy.types.Panel):
             box.label(text="Pawn Data:")
             box.prop(props, "pawn_model_name", text="Model Name")
             box.prop(props, "pawn_txd_name",   text="Texture Name")
-
-        elif section == "grge":
-            box = layout.box()
-            box.label(text="GRGE (Garage) Data:")
-
-            grid = box.grid_flow(row_major=True, columns=2, even_columns=True, even_rows=True, align=True)
-
-            for key, label in (
-                ("grge_posX",  "PosX"),
-                ("grge_posY",  "PosY"),
-                ("grge_posZ",  "PosZ"),
-                ("grge_lineX", "LineX"),
-                ("grge_lineY", "LineY"),
-                ("grge_cubeX", "CubeX"),
-                ("grge_cubeY", "CubeY"),
-                ("grge_cubeZ", "CubeZ"),
-            ):
-                if key in obj:
-                    grid.prop(obj, f'["{key}"]', text=label)
-                else:
-                    row = grid.row(align=True)
-                    row.label(text=f"{label}: <missing>")
-
-            for key, label in (
-                ("grge_flag", "Door:"),
-                ("grge_type", "Garage:"),
-            ):
-                if key in obj:
-                    grid.prop(obj, f'["{key}"]', text=label)
-                else:
-                    row = grid.row(align=True)
-                    row.label(text=f"{label} <missing>")
-
-            if "grge_name" in obj:
-                box.prop(obj, '["grge_name"]', text="Name")
-            else:
-                box.label(text="Name: <missing>")
 
         elif section == "cull":
             box = layout.box()

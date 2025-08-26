@@ -19,7 +19,8 @@ import bpy
 
 from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
-from .cull_importer import cull_importer
+from .ipl.cull_importer import cull_importer
+from .ipl.grge_importer import grge_importer
 from .importer_common import hide_object
 
 #######################################################
@@ -29,14 +30,14 @@ class map_importer:
     object_data = []
     object_instances = []
     cull_instances = []
+    grge_instances = []
     col_files = []
-    garage_instances = []
-    garage_collection_name = None
     enex_instances = []
     collision_collection = None
     object_instances_collection = None
     mesh_collection = None
     cull_collection = None
+    grge_collection = None
     enex_collection = None
     enex_collection_name = None
     map_section = ""
@@ -52,30 +53,7 @@ class map_importer:
             return True
         except ReferenceError:
             return False
-    #######################################################
-    @staticmethod
-    def create_grge_collection(context):
-        self = map_importer
-        if self.settings is None:
-            self.settings = context.scene.dff
 
-        grge_name = f"{self.settings.game_version_dropdown} GRGE"
-
-        coll = self.garage_collection if map_importer.fix_id(self.garage_collection) else None
-        if coll is None and self.garage_collection_name:
-            coll = bpy.data.collections.get(self.garage_collection_name)
-
-        if coll is None:
-            coll = bpy.data.collections.get(grge_name)
-            if coll is None:
-                coll = bpy.data.collections.new(grge_name)
-
-        if coll.name not in {c.name for c in context.scene.collection.children}:
-            context.scene.collection.children.link(coll)
-
-        self.garage_collection = coll
-        self.garage_collection_name = coll.name
-        return coll
     #######################################################
     def assign_map_properties(obj, ipl_data):
         obj.dff_map.object_id = ipl_data.get("object_id", 0)
@@ -286,7 +264,7 @@ class map_importer:
 
             # Move dff collection to a top collection named for the file it came from
             if not self.object_instances_collection:
-                self.create_object_instances_collection(context)
+                self.object_instances_collection = self.create_object_instances_collection(context)
 
             context.scene.collection.children.unlink(importer.current_collection)
             self.object_instances_collection.children.link(importer.current_collection)
@@ -319,7 +297,7 @@ class map_importer:
         self = map_importer
 
         if not self.collision_collection:
-            self.create_collisions_collection(context)
+            self.collision_collection = self.create_entries_collection(context, "Collisions")
 
         collection = bpy.data.collections.new(filename)
         self.collision_collection.children.link(collection)
@@ -336,74 +314,21 @@ class map_importer:
         self = map_importer
 
         if not self.cull_collection:
-            self.create_cull_collection(context)
+            self.cull_collection = self.create_entries_collection(context, "CULL")
 
         obj = cull_importer.import_cull(cull)
-
         self.cull_collection.objects.link(obj)
 
     #######################################################
     @staticmethod
-    def create_grge_sphere():
-        name = "_GRGE_"
-        me = bpy.data.meshes.get(name)
-        if me:
-            return me
-
-        import bmesh
-        me = bpy.data.meshes.new(name)
-        bm = bmesh.new()
-        bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=1.25)
-        bm.to_mesh(me)
-        bm.free()
-        return me
-
-    #######################################################
-    @staticmethod
-    def import_garage(context, g):
+    def import_grge(context, grge):
         self = map_importer
-        if not self.garage_collection:
-            self.create_garage_collection(context)
 
-        # calculate the GRGE center
-        x0, y0, z0 = float(g.posX), float(g.posY), float(g.posZ)
-        lx, ly      = float(g.lineX), float(g.lineY)
-        x1, y1, z1 = float(g.cubeX), float(g.cubeY), float(g.cubeZ)
-        cx = (x0 + (x0+lx) + x1 + (x1-lx)) * 0.25
-        cy = (y0 + (y0+ly) + y1 + (y1-ly)) * 0.25
-        cz = (z0 + z1) * 0.5
+        if not self.grge_collection:
+            self.grge_collection = self.create_entries_collection(context, "GRGE")
 
-        # create a tiny blue sphere mesh
-        me = self.create_grge_sphere()
-        name = f"GRGE_{getattr(g,'name','') or 'Garage'}"
-        sphere = bpy.data.objects.new(name, me)
-        sphere.location = (cx, cy, cz)
-        sphere.hide_render = True
-
-        mat = bpy.data.materials.get("_GRGE") or bpy.data.materials.new("_GRGE")
-        mat.diffuse_color = (0.0, 0.35, 1.0, 1.0)
-        if not sphere.data.materials:
-            sphere.data.materials.append(mat)
-        else:
-            sphere.data.materials[0] = mat
-
-        sphere["grge_flag"] = int(getattr(g, 'doorType', ""))
-        sphere["grge_type"] = int(getattr(g, 'garageType', ""))
-        sphere["grge_name"] = str(getattr(g, 'name', ""))
-
-        for k in ("posX","posY","posZ","lineX","lineY","cubeX","cubeY","cubeZ","rotZ"):
-            if hasattr(g, k):
-                sphere[f"grge_{k}"] = float(getattr(g, k))
-
-        coll = map_importer.create_grge_collection(context)
-        coll.objects.link(sphere)
-
-        sphere.dff.type = "GRGE"
-
-        if hasattr(sphere, "dff_map"):
-            sphere.dff_map.ipl_section = "grge"
-        else:
-            sphere["ipl_section"] = "grge"
+        obj = grge_importer.import_grge(grge)
+        self.grge_collection.objects.link(obj)
 
     #######################################################
     @staticmethod
@@ -539,53 +464,28 @@ class map_importer:
         coll_name = self.map_section
         if os.path.isabs(coll_name):
             coll_name = os.path.basename(coll_name)
-        self.object_instances_collection = bpy.data.collections.new(coll_name)
-        self.mesh_collection.children.link(self.object_instances_collection)
+        coll =  bpy.data.collections.new(coll_name)
+        self.mesh_collection.children.link(coll)
+
+        return coll
 
     #######################################################
     @staticmethod
-    def create_collisions_collection(context):
+    def create_entries_collection(context, postfix):
         self = map_importer
 
-        coll_name = '%s Collisions' % self.settings.game_version_dropdown
-        self.collision_collection = bpy.data.collections.get(coll_name)
+        coll_name = '%s %s' % (self.settings.game_version_dropdown, postfix)
+        coll = bpy.data.collections.get(coll_name)
 
-        if not self.collision_collection:
-            self.collision_collection = bpy.data.collections.new(coll_name)
-            context.scene.collection.children.link(self.collision_collection)
+        if not coll:
+            coll = bpy.data.collections.new(coll_name)
+            context.scene.collection.children.link(coll)
 
             # Hide collection
             context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
             context.view_layer.active_layer_collection.hide_viewport = True
 
-    #######################################################
-    @staticmethod
-    def create_cull_collection(context):
-        self = map_importer
-
-        coll_name = '%s CULL' % self.settings.game_version_dropdown
-        self.cull_collection = bpy.data.collections.get(coll_name)
-
-        if not self.cull_collection:
-            self.cull_collection = bpy.data.collections.new(coll_name)
-            context.scene.collection.children.link(self.cull_collection)
-
-            # Hide collection
-            context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
-            context.view_layer.active_layer_collection.hide_viewport = True
-
-    #######################################################
-    @staticmethod
-    def create_garage_collection(context):
-        self = map_importer
-        coll_name = '%s GRGE' % self.settings.game_version_dropdown
-        self.garage_collection = bpy.data.collections.get(coll_name)
-        if not self.garage_collection:
-            self.garage_collection = bpy.data.collections.new(coll_name)
-            context.scene.collection.children.link(self.garage_collection)
-            # hide by default
-            context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
-            context.view_layer.active_layer_collection.hide_viewport = True
+        return coll
 
     #######################################################
     @staticmethod
@@ -618,6 +518,7 @@ class map_importer:
         self.enex_collection = coll
         self.enex_collection_name = coll.name
         return coll
+
     #######################################################
     @staticmethod
     def load_map(settings):
@@ -629,8 +530,7 @@ class map_importer:
         self.mesh_collection = None
         self.collision_collection = None
         self.cull_collection = None
-        self.garage_collection = None
-        self.enex_instances = []
+        self.grge_collection = None
         self.settings = settings
 
         if self.settings.use_custom_map_section:
@@ -654,9 +554,9 @@ class map_importer:
             self.cull_instances = []
 
         if self.settings.load_grge:
-            self.garage_instances = map_data.garage_instances
+            self.grge_instances = map_data.grge_instances
         else:
-            self.garage_instances = []
+            self.grge_instances = []
 
         if self.settings.load_enex:
             self.enex_instances = map_data.enex_instances

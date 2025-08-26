@@ -16,7 +16,7 @@
 
 import bpy
 
-from ..gtaLib.data.map_data import game_version
+from ...gtaLib.data.map_data import game_version
 
 #######################################################
 class CULLObjectProps(bpy.types.PropertyGroup):

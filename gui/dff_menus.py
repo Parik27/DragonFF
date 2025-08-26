@@ -8,8 +8,8 @@ from .col_ot import EXPORT_OT_col, \
     COLLECTION_OT_dff_generate_bounds, \
     OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
-from .map_ot import EXPORT_OT_ipl, EXPORT_OT_ide
-from .cull_menus import CULLObjectProps, CULLMenus
+from .ipl.cull_menus import CULLObjectProps, CULLMenus
+from .ipl.grge_menus import GRGEObjectProps, GRGEMenus
 from ..gtaLib.data import presets
 
 texture_filters_items = (
@@ -399,6 +399,10 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         CULLMenus.draw_menu(self.layout, context)
 
     #######################################################
+    def draw_grge_menu(self, context):
+        GRGEMenus.draw_menu(self.layout, context)
+
+    #######################################################
     def draw_obj_menu(self, context):
 
         layout = self.layout
@@ -428,6 +432,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         elif settings.type == 'CULL':
             self.draw_cull_menu(context)
+
+        elif settings.type == 'GRGE':
+            self.draw_grge_menu(context)
 
     #######################################################
     def draw(self, context):
@@ -721,6 +728,9 @@ compatibiility with DFF Viewers"
 
     # CULL properties
     cull: bpy.props.PointerProperty(type=CULLObjectProps)
+
+    # GRGE properties
+    grge: bpy.props.PointerProperty(type=GRGEObjectProps)
 
     # Miscellaneous properties
     is_frame_locked : bpy.props.BoolProperty()

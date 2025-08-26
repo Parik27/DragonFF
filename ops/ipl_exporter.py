@@ -18,7 +18,8 @@ import bpy
 
 from ..gtaLib.data.map_data import game_version
 from ..gtaLib.map import TextIPLData, MapDataUtility
-from ..ops.cull_exporter import cull_exporter
+from ..ops.ipl.cull_exporter import cull_exporter
+from ..ops.ipl.grge_exporter import grge_exporter
 
 #######################################################
 class ipl_exporter:
@@ -27,9 +28,11 @@ class ipl_exporter:
     game_id = None
     export_inst = True
     export_cull = False
+    export_grge = False
 
     inst_objects = []
     cull_objects = []
+    grge_objects = []
     total_objects_num = 0
 
     #######################################################
@@ -41,6 +44,8 @@ class ipl_exporter:
 
         self.inst_objects = []
         self.cull_objects = []
+        self.grge_objects = []
+        self.total_objects_num = 0
 
         for obj in context.scene.objects:
             if self.only_selected and not obj.select_get():
@@ -49,11 +54,15 @@ class ipl_exporter:
             if self.export_inst and obj.dff.type == 'OBJ':
                 if hasattr(obj, 'ide') and obj.ide.obj_id and not obj.parent:
                     self.inst_objects.append(obj)
+                    self.total_objects_num += 1
 
             if self.export_cull and obj.dff.type == 'CULL':
                 self.cull_objects.append(obj)
+                self.total_objects_num += 1
 
-        self.total_objects_num = len(self.inst_objects) + len(self.cull_objects)
+            if self.export_grge and obj.dff.type == 'GRGE':
+                self.grge_objects.append(obj)
+                self.total_objects_num += 1
 
     #######################################################
     @staticmethod
@@ -108,10 +117,12 @@ class ipl_exporter:
 
         object_instances = [self.format_inst_line(obj) for obj in self.inst_objects]
         cull_instacnes = cull_exporter.export_objects(self.cull_objects, self.game_id)
+        grge_instacnes = grge_exporter.export_objects(self.grge_objects)
 
         ipl_data = TextIPLData(
             object_instances,
             cull_instacnes,
+            grge_instacnes,
         )
 
         MapDataUtility.write_ipl_data(filename, self.game_id, ipl_data)
@@ -124,5 +135,6 @@ def export_ipl(options):
     ipl_exporter.game_id       = options['game_id']
     ipl_exporter.export_inst   = options['export_inst']
     ipl_exporter.export_cull   = options['export_cull']
+    ipl_exporter.export_grge   = options['export_grge']
 
     ipl_exporter.export_ipl(options['file_name'])
