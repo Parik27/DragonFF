@@ -16,7 +16,7 @@
 
 from math import tan
 
-from ..gtaLib.data.map_data import game_version
+from ...gtaLib.data.map_data import game_version
 
 #######################################################
 class cull_exporter:

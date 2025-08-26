@@ -17,7 +17,9 @@
 import bpy
 
 from .col_ot import FaceGroupsDrawer
-from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull
+from .map_ot import SCENE_OT_ipl_select, \
+    EXPORT_OT_ipl, EXPORT_OT_ide, \
+    OBJECT_OT_dff_add_cull, OBJECT_OT_dff_add_grge
 from ..gtaLib.data import map_data
 
 #######################################################
@@ -228,6 +230,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    load_grge: bpy.props.BoolProperty(
+        name        = "Load Map GRGE",
+        default     = False
+    )
+
     game_root : bpy.props.StringProperty(
         name = 'Game root',
         default = 'C:/Program Files (x86)/Steam/steamapps/common/',
@@ -354,7 +361,12 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "read_mat_split")
         col.prop(settings, "create_backfaces")
         col.prop(settings, "load_collisions")
-        col.prop(settings, "load_cull")
+
+        box = col.box()
+        box.label(text="Import Entries")
+        grid = box.grid_flow(columns=3, even_columns=True, even_rows=True)
+        grid.prop(settings, "load_cull", text="CULL")
+        grid.prop(settings, "load_grge", text="GRGE")
 
         layout.separator()
 
@@ -367,10 +379,10 @@ class MapImportPanel(bpy.types.Panel):
         layout.separator()
 
         row = layout.row()
-        row.operator("export_scene.dff_ipl", text="Export IPL")
+        row.operator(EXPORT_OT_ipl.bl_idname, text="Export IPL")
 
         row = layout.row()
-        row.operator("export_scene.dff_ide", text="Export IDE")
+        row.operator(EXPORT_OT_ide.bl_idname, text="Export IDE")
 
 #######################################################
 class MapObjectPanel(bpy.types.Panel):
@@ -478,3 +490,4 @@ class DFF_MT_AddMapObject(bpy.types.Menu):
 
     def draw(self, context):
         self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")
+        self.layout.operator(OBJECT_OT_dff_add_grge.bl_idname, text="GRGE", icon="HOME")

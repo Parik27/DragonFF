@@ -18,7 +18,8 @@ import bpy
 import os
 from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
-from .cull_importer import cull_importer
+from .ipl.cull_importer import cull_importer
+from .ipl.grge_importer import grge_importer
 from .importer_common import hide_object
 
 #######################################################
@@ -28,11 +29,13 @@ class map_importer:
     object_data = []
     object_instances = []
     cull_instances = []
+    grge_instances = []
     col_files = []
     collision_collection = None
     object_instances_collection = None
     mesh_collection = None
     cull_collection = None
+    grge_collection = None
     map_section = ""
     settings = None
 
@@ -228,7 +231,7 @@ class map_importer:
 
             # Move dff collection to a top collection named for the file it came from
             if not self.object_instances_collection:
-                self.create_object_instances_collection(context)
+                self.object_instances_collection = self.create_object_instances_collection(context)
 
             context.scene.collection.children.unlink(importer.current_collection)
             self.object_instances_collection.children.link(importer.current_collection)
@@ -261,7 +264,7 @@ class map_importer:
         self = map_importer
 
         if not self.collision_collection:
-            self.create_collisions_collection(context)
+            self.collision_collection = self.create_entries_collection(context, "Collisions")
 
         collection = bpy.data.collections.new(filename)
         self.collision_collection.children.link(collection)
@@ -278,11 +281,21 @@ class map_importer:
         self = map_importer
 
         if not self.cull_collection:
-            self.create_cull_collection(context)
+            self.cull_collection = self.create_entries_collection(context, "CULL")
 
         obj = cull_importer.import_cull(cull)
-
         self.cull_collection.objects.link(obj)
+
+    #######################################################
+    @staticmethod
+    def import_grge(context, grge):
+        self = map_importer
+
+        if not self.grge_collection:
+            self.grge_collection = self.create_entries_collection(context, "GRGE")
+
+        obj = grge_importer.import_grge(grge)
+        self.grge_collection.objects.link(obj)
 
     #######################################################
     @staticmethod
@@ -300,40 +313,28 @@ class map_importer:
         coll_name = self.map_section
         if os.path.isabs(coll_name):
             coll_name = os.path.basename(coll_name)
-        self.object_instances_collection = bpy.data.collections.new(coll_name)
-        self.mesh_collection.children.link(self.object_instances_collection)
+        coll =  bpy.data.collections.new(coll_name)
+        self.mesh_collection.children.link(coll)
+
+        return coll
 
     #######################################################
     @staticmethod
-    def create_collisions_collection(context):
+    def create_entries_collection(context, postfix):
         self = map_importer
 
-        coll_name = '%s Collisions' % self.settings.game_version_dropdown
-        self.collision_collection = bpy.data.collections.get(coll_name)
+        coll_name = '%s %s' % (self.settings.game_version_dropdown, postfix)
+        coll = bpy.data.collections.get(coll_name)
 
-        if not self.collision_collection:
-            self.collision_collection = bpy.data.collections.new(coll_name)
-            context.scene.collection.children.link(self.collision_collection)
+        if not coll:
+            coll = bpy.data.collections.new(coll_name)
+            context.scene.collection.children.link(coll)
 
             # Hide collection
             context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
             context.view_layer.active_layer_collection.hide_viewport = True
 
-    #######################################################
-    @staticmethod
-    def create_cull_collection(context):
-        self = map_importer
-
-        coll_name = '%s CULL' % self.settings.game_version_dropdown
-        self.cull_collection = bpy.data.collections.get(coll_name)
-
-        if not self.cull_collection:
-            self.cull_collection = bpy.data.collections.new(coll_name)
-            context.scene.collection.children.link(self.cull_collection)
-
-            # Hide collection
-            context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
-            context.view_layer.active_layer_collection.hide_viewport = True
+        return coll
 
     #######################################################
     @staticmethod
@@ -346,6 +347,7 @@ class map_importer:
         self.mesh_collection = None
         self.collision_collection = None
         self.cull_collection = None
+        self.grge_collection = None
         self.settings = settings
 
         if self.settings.use_custom_map_section:
@@ -367,6 +369,11 @@ class map_importer:
             self.cull_instances = map_data.cull_instances
         else:
             self.cull_instances = []
+
+        if self.settings.load_grge:
+            self.grge_instances = map_data.grge_instances
+        else:
+            self.grge_instances = []
 
         if self.settings.load_collisions:
 
