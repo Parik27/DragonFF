@@ -396,7 +396,7 @@ class MapObjectPanel(bpy.types.Panel):
     #######################################################
     @classmethod
     def poll(cls, context):
-        return context.object is not None
+        return context.object and context.object.dff.type == 'OBJ'
 
     #######################################################
     def draw(self, context):
