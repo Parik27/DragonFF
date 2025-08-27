@@ -23,11 +23,11 @@ import bmesh
 from bpy.props import StringProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
-from ..ops import map_importer, ide_exporter, ipl_exporter
-from ..ops.ipl.cull_importer import cull_importer
-from ..ops.ipl.grge_importer import grge_importer
+
+from ..ops import map_exporter, map_importer
+from ..ops.cull_importer import cull_importer
 from ..ops.importer_common import link_object
-from ..gtaLib.data import map_data
+
 
 #######################################################
 class SCENE_OT_dff_import_map(bpy.types.Operator):
@@ -48,6 +48,7 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
     _col_loaded = True
 
     _cull_loaded = True
+
     _grge_loaded = True
     _enex_loaded = True
 
@@ -72,12 +73,13 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
                 self._progress_current += 1
                 self._cull_loaded = True
 
-            # Import GRGE if there are any left to load
+            # Import Garages if there are any left to load
             elif not self._grge_loaded:
-
-                for grge in importer.grge_instances:
-                    importer.import_grge(context, grge)
-
+                for g in getattr(importer, 'garage_instances', []):
+                    try:
+                        importer.import_garage(context, g)
+                    except Exception as ex:
+                        print("Can't import GRGE... skipping", ex)
                 self._progress_current += 1
                 self._grge_loaded = True
 
@@ -108,7 +110,7 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
                     importer.import_collision(context, col_file)
                     self._progress_current += 1
 
-            # Import objcets instances
+            # Import object instances
             else:
                 # As the number of objects increases, loading performance starts to get crushed by scene updates, so
                 # we try to keep loading at least 5% of the total scene object count on each timer pulse.
@@ -169,7 +171,7 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
         else:
             self._cull_loaded = True
 
-        if self._importer.grge_instances:
+        if self._importer.garage_instances:
             self._grge_loaded = False
             self._progress_total += 1
         else:
@@ -238,67 +240,39 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
         return {'FINISHED'}
 
 #######################################################
-class EXPORT_OT_ide(bpy.types.Operator, ExportHelper):
-    """Export IDE file"""
-    bl_idname           = "export_scene.dff_ide"
-    bl_description      = "Export a GTA IDE File"
-    bl_label            = "DragonFF IDE (.ide)"
-    filename_ext        = ".ide"
+class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
+    bl_idname = "export_scene.dff_ipl"
+    bl_label = "DragonFF IPL Export"
+    bl_description = "Export a GTA IPL file with INST, CULL, or both sections"
+    filename_ext = ".ipl"
 
-    filepath            : bpy.props.StringProperty(name="File path",
-                                              maxlen=1024,
-                                              default="",
-                                              subtype='FILE_PATH')
-
-    filter_glob         : bpy.props.StringProperty(default="*.ide",
-                                              options={'HIDDEN'})
-
-    only_selected       : bpy.props.BoolProperty(
-        name            = "Only Selected",
-        description     = "Export only selected objects",
-        default         = False
+    export_inst: bpy.props.BoolProperty(
+        name="Export INST (object placements)",
+        default=True,
+        description="Export object placement (INST) section"
+    )
+    export_cull: bpy.props.BoolProperty(
+        name="Export CULL zones",
+        default=True,
+        description="Export CULL (zone) section"
     )
 
-    #######################################################
-    def draw(self, context):
-        layout = self.layout
+    export_grge: bpy.props.BoolProperty(
+        name="Export GRGE zones",
+        default=True,
+        description="Export GRGE (zone) section"
+    )
 
-        layout.prop(self, "only_selected")
+    export_enex: bpy.props.BoolProperty(
+        name="Export ENEX zones",
+        default=True,
+        description="Export ENEX (zone) section"
+    )
 
-    #######################################################
-    def execute(self, context):
-        start = time.time()
-        try:
-            ide_exporter.export_ide(
-                {
-                    "file_name"     : self.filepath,
-                    "only_selected" : self.only_selected,
-                }
-            )
-
-            total_objs_num = len(ide_exporter.ide_exporter.objs_objects)
-            total_tobj_num = len(ide_exporter.ide_exporter.tobj_objects)
-
-            if not (total_objs_num + total_tobj_num):
-                report = "No objects with IDE data found"
-                self.report({"ERROR"}, report)
-                return {'CANCELLED'}, report
-
-            self.report({"INFO"}, f"Finished export {total_objs_num} objs and {total_tobj_num} tobj in {time.time() - start:.2f}s")
-
-        except Exception as e:
-            self.report({"ERROR"}, str(e))
-
-        return {'FINISHED'}
-
-#######################################################
-class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
-    """Export IPL file"""
-    bl_idname           = "export_scene.dff_ipl"
-    bl_description      = "Export a GTA IPL File"
-    bl_label            = "DragonFF IPL (.ipl)"
-    filename_ext        = ".ipl"
-
+    only_selected: bpy.props.BoolProperty(
+        name="Only Selected",
+        default=False
+    )
     stream_distance: bpy.props.FloatProperty(
         name="Stream Distance",
         default=300.0,
@@ -326,78 +300,52 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
         description="Offset for the z coordinate of the objects"
     )
 
-    only_selected       : bpy.props.BoolProperty(
-        name            = "Only Selected",
-        description     = "Export only selected objects",
-        default         = False
-    )
-
-    export_inst         : bpy.props.BoolProperty(
-        name            = "Export INST",
-        description     = "Export INST entries",
-        default         = True
-    )
-
-    export_cull         : bpy.props.BoolProperty(
-        name            = "Export CULL",
-        description     = "Export CULL entries",
-        default         = False
-    )
-
-    export_grge         : bpy.props.BoolProperty(
-        name            = "Export GRGE",
-        description     = "Export GRGE entries",
-        default         = False
+    filter_glob: bpy.props.StringProperty(
+        default="*.ipl",
+        options={'HIDDEN'}
     )
 
     #######################################################
     def draw(self, context):
-        settings = context.scene.dff
-
         layout = self.layout
+        layout.prop(self, "export_inst")
+        layout.prop(self, "export_cull")
+        layout.prop(self, "export_grge")
+        layout.prop(self, "export_enex")
         layout.prop(self, "only_selected")
         layout.prop(self, "x_offset")
         layout.prop(self, "y_offset")
         layout.prop(self, "z_offset")
-        layout.prop(settings, "game_version_dropdown", text="Game")
-
-        box = layout.box()
-        box.label(text="Export Entries")
-        grid = box.grid_flow(columns=3, even_columns=True, even_rows=True)
-        grid.prop(self, "export_inst", text="INST")
-        grid.prop(self, "export_cull", text="CULL")
-
-        if settings.game_version_dropdown == map_data.game_version.SA:
-            grid.prop(self, "export_grge", text="GRGE")
-
-        grid.prop(self, "export_enex")
+        layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
 
     #######################################################
     def execute(self, context):
-        settings = context.scene.dff
-
         start = time.time()
         try:
+            export_inst = self.export_inst
+            export_cull = self.export_cull
+            export_grge = self.export_grge
+            export_enex = self.export_enex
             map_exporter.export_ipl(
                 {
-                    "file_name"     : self.filepath,
-                    "only_selected" : self.only_selected,
-                    "game_id"       : settings.game_version_dropdown,
-                    "export_inst"   : self.export_inst,
-                    "export_cull"   : self.export_cull,
-                    "export_grge"   : self.export_grge if settings.game_version_dropdown == map_data.game_version.SA else False,
-                    "export_enex"   : self.export_enex,
+                    "file_name": self.filepath,
+                    "only_selected": self.only_selected,
+                    "game_id": context.scene.dff.game_version_dropdown,
+                    "export_inst": export_inst,
+                    "export_cull": export_cull,
+                    "export_grge": export_grge,
+                    "export_enex": export_enex,
+                    "x_offset": self.x_offset,
+                    "y_offset": self.y_offset,
+                    "z_offset": self.z_offset,
                 }
             )
 
-            total_objects_num = ipl_exporter.ipl_exporter.total_objects_num
+            if not map_exporter.ipl_exporter.total_objects_num:
+                self.report({"ERROR"}, "No objects with IPL data found")
+                return {'CANCELLED'}
 
-            if not total_objects_num:
-                report = "No objects with IPL data found"
-                self.report({"ERROR"}, report)
-                return {'CANCELLED'}, report
-
-            self.report({"INFO"}, f"Finished export {total_objects_num} objects in {time.time() - start:.2f}s")
+            self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
 
         except Exception as e:
             self.report({"ERROR"}, str(e))
@@ -455,61 +403,6 @@ class OBJECT_OT_dff_add_cull(bpy.types.Operator):
             flags=0,
             angle=self.angle
         )
-        link_object(obj, context.collection)
-
-        context.view_layer.objects.active = obj
-        for o in context.selected_objects:
-            o.select_set(False)
-        obj.select_set(True)
-
-        return {'FINISHED'}
-
-#######################################################
-class OBJECT_OT_dff_add_grge(bpy.types.Operator):
-
-    bl_idname = "object.dff_add_grge"
-    bl_label = "Add GRGE Zone"
-    bl_description = "Add GRGE zone to the scene"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    location: bpy.props.FloatVectorProperty(
-        name="Location",
-        description="Location for the newly added object",
-        subtype='XYZ',
-        default=(0, 0, 0)
-    )
-
-    scale: bpy.props.FloatVectorProperty(
-        name="Scale",
-        description="Scale for the newly added object",
-        subtype='XYZ',
-        default=(1, 1, 1)
-    )
-
-    angle: bpy.props.FloatProperty(
-        name="Angle",
-        description="Angle along the Z axis",
-        subtype='ANGLE',
-        min=-math.pi * 2,
-        max=math.pi * 2,
-        step=100,
-        default=0
-    )
-
-    #######################################################
-    def invoke(self, context, event):
-        self.location = context.scene.cursor.location
-        return self.execute(context)
-
-    #######################################################
-    def execute(self, context):
-        obj = grge_importer.create_grge_object(
-            location=self.location,
-            scale=self.scale,
-            flags=0,
-            angle=self.angle
-        )
-        obj.dff.grge.grge_type = 5
         link_object(obj, context.collection)
 
         context.view_layer.objects.active = obj

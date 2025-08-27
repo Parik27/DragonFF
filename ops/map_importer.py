@@ -14,8 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import os 
 import bpy
-import os
+
 from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
 from .ipl.cull_importer import cull_importer
@@ -31,14 +32,34 @@ class map_importer:
     cull_instances = []
     grge_instances = []
     col_files = []
+    enex_instances = []
     collision_collection = None
     object_instances_collection = None
     mesh_collection = None
     cull_collection = None
     grge_collection = None
+    enex_collection = None
+    enex_collection_name = None
     map_section = ""
     settings = None
 
+    #######################################################
+    @staticmethod
+    def fix_id(idblock):
+        if idblock is None:
+            return False
+        try:
+            _ = idblock.name
+            return True
+        except ReferenceError:
+            return False
+
+    #######################################################
+    def assign_map_properties(obj, ipl_data):
+        obj.dff_map.object_id = ipl_data.get("object_id", 0)
+        obj.dff_map.model_name = ipl_data.get("model_name", "")
+        obj.dff_map.interior = ipl_data.get("interior", 0)
+        obj.dff_map.lod = ipl_data.get("lod", 0)
     #######################################################
     @staticmethod
     def import_object_instance(context, inst):
@@ -67,6 +88,16 @@ class map_importer:
                 new_obj.location = obj.location
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.scale = obj.scale
+
+                try:
+                    self.assign_map_properties(new_obj, {
+                        "object_id": int(inst.id),
+                        "model_name": str(model),
+                        "interior": int(getattr(inst, "interior", 0)),
+                        "lod": int(getattr(inst, "lod", -1)),
+                    })
+                except Exception:
+                    pass
 
                 if not self.settings.create_backfaces:
                     modifier = new_obj.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
@@ -129,6 +160,8 @@ class map_importer:
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.rotation_euler = obj.rotation_euler
                 new_obj.scale = obj.scale
+
+                self.assign_map_properties(new_obj, inst)
 
                 if obj.parent:
                     new_obj.parent = new_objects[obj.parent]
@@ -299,6 +332,124 @@ class map_importer:
 
     #######################################################
     @staticmethod
+    def create_enex_cylinder():
+        name = "_ENEX_"
+        me = bpy.data.meshes.get(name)
+        if me:
+            return me
+
+        import bmesh
+        me = bpy.data.meshes.new(name)
+        bm = bmesh.new()
+        bmesh.ops.create_cone(
+            bm,
+            segments    = 24,
+            radius1     = 0.45,
+            radius2     = 0.45,
+            depth       = 1.0,
+            cap_ends    = True,
+            cap_tris    = False
+        )
+        bm.to_mesh(me)
+        bm.free()
+        return me
+    #######################################################
+    @staticmethod
+    def import_enex(context, e):
+        self = map_importer
+
+        if isinstance(e, (list, tuple)):
+            row = list(e)
+            if len(row) < 18:
+                row += [None] * (18 - len(row))
+
+            X1, Y1, Z1 = row[0], row[1], row[2]
+            EnterAngle  = row[3]
+            SizeX, SizeY, SizeZ = row[4], row[5], row[6]
+            X2, Y2, Z2  = row[7], row[8], row[9]
+            ExitAngle   = row[10]
+            TargetInterior = row[11]
+            Flags = row[12]
+            raw_name = row[13]
+            name = None
+            if isinstance(raw_name, str):
+                s = raw_name.strip()
+                if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+                    s = s[1:-1]
+                name = s
+            Sky = row[14]
+            NumPedsToSpawn = row[15]
+            TimeOn = row[16]
+            TimeOff = row[17]
+
+            coll = self.create_enex_collection(context)
+            me = self.create_enex_cylinder()
+
+            label = f"ENEX_{name}" if name else "ENEX"
+            obj = bpy.data.objects.new(label, me)
+
+            try:
+                obj.location = (float(X1 or 0.0), float(Y1 or 0.0), float(Z1 or 0.0))
+            except Exception:
+                obj.location = (0.0, 0.0, 0.0)
+
+            obj.rotation_mode = 'ZXY'
+            try:
+                obj.rotation_euler = (0.0, 0.0, float(EnterAngle or 0.0))
+            except Exception:
+                obj.rotation_euler = (0.0, 0.0, 0.0)
+
+            obj.hide_render = True
+            try:
+                obj.display_type = 'WIRE'
+            except Exception:
+                pass
+
+            mat = bpy.data.materials.get("_ENEX") or bpy.data.materials.new("_ENEX")
+            mat.diffuse_color = (1.0, 0.85, 0.10, 1.0)
+            if not obj.data.materials:
+                obj.data.materials.append(mat)
+            else:
+                obj.data.materials[0] = mat
+
+            # tag section
+            if hasattr(obj, "dff"):
+                obj.dff.type = "ENEX"
+            if hasattr(obj, "dff_map"):
+                obj.dff_map.ipl_section = "enex"
+            else:
+                obj["ipl_section"] = "enex"
+
+            # store all fields so you can round-trip/export later
+            def _setf(k, v):
+                try:
+                    if v is not None: obj[f"enex_{k}"] = float(v)
+                except Exception:
+                    pass
+            def _seti(k, v):
+                try:
+                    if v is not None: obj[f"enex_{k}"] = int(v)
+                except Exception:
+                    pass
+            def _sets(k, v):
+                if v is not None: obj[f"enex_{k}"] = str(v)
+
+            _setf("X1", X1); _setf("Y1", Y1); _setf("Z1", Z1)
+            _setf("EnterAngle", EnterAngle)
+            _setf("SizeX", SizeX); _setf("SizeY", SizeY); _setf("SizeZ", SizeZ)
+            _setf("X2", X2); _setf("Y2", Y2); _setf("Z2", Z2)
+            _setf("ExitAngle", ExitAngle)
+            _seti("TargetInterior", TargetInterior)
+            _seti("Flags", Flags)
+            _sets("Name", name)
+            _seti("Sky", Sky)
+            _seti("NumPedsToSpawn", NumPedsToSpawn)
+            _seti("TimeOn", TimeOn)
+            _seti("TimeOff", TimeOff)
+
+            coll.objects.link(obj)
+    #######################################################
+    @staticmethod
     def create_object_instances_collection(context):
         self = map_importer
 
@@ -334,6 +485,38 @@ class map_importer:
             context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
             context.view_layer.active_layer_collection.hide_viewport = True
 
+        return coll
+
+    #######################################################
+    @staticmethod
+    def create_enex_collection(context):
+        self = map_importer
+        if self.settings is None:
+            self.settings = context.scene.dff
+
+        coll_name = f"{self.settings.game_version_dropdown} ENEX"
+
+        coll = self.enex_collection if map_importer.fix_id(self.enex_collection) else None
+        if coll is None and self.enex_collection_name:
+            coll = bpy.data.collections.get(self.enex_collection_name)
+
+        if coll is None:
+            coll = bpy.data.collections.get(coll_name)
+            if coll is None:
+                coll = bpy.data.collections.new(coll_name)
+
+        if coll.name not in {c.name for c in context.scene.collection.children}:
+            context.scene.collection.children.link(coll)
+
+        # Optional (nice): start hidden
+        try:
+            context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
+            context.view_layer.active_layer_collection.hide_viewport = True
+        except Exception:
+            pass
+
+        self.enex_collection = coll
+        self.enex_collection_name = coll.name
         return coll
 
     #######################################################
@@ -374,6 +557,11 @@ class map_importer:
             self.grge_instances = map_data.grge_instances
         else:
             self.grge_instances = []
+
+        if self.settings.load_enex:
+            self.enex_instances = map_data.enex_instances
+        else:
+            self.enex_instances = []
 
         if self.settings.load_collisions:
 

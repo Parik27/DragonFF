@@ -584,6 +584,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('2DFX', '2DFX', 'Object is a 2D effect'),
             ('CULL', 'CULL', 'Object is a CULL zone'),
             ('GRGE', 'GRGE', 'Object is a GRGE zone'),
+            ('ENEX', 'ENEX', 'Object is an ENEX zone'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
