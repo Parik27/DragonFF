@@ -16,7 +16,7 @@
 
 import bpy
 from bpy.types import Gizmo, GizmoGroup
-from mathutils import Matrix, Vector
+from mathutils import Euler, Matrix, Vector
 
 #######################################################
 class Bounds3DGizmo(Gizmo):
@@ -255,6 +255,40 @@ class VectorPlaneGizmo(Gizmo):
         )
         if not hasattr(self, "custom_shape"):
             self.custom_shape = self.new_custom_shape('TRI_STRIP', shape_verts)
+
+#######################################################
+class EnexGizmo(Gizmo):
+
+    bl_idname = "VIEW3D_GT_enex"
+    bl_target_properties = (
+        {"id": "location", "type": 'FLOAT', "array_length": 3},
+        {"id": "angle", "type": 'FLOAT'},
+    )
+
+    __slots__ = (
+        "custom_shape",
+    )
+
+    #######################################################
+    def draw(self, context):
+        location = self.target_get_value("location")
+        angle = self.target_get_value("angle")[0]
+
+        rotation_matrix = Euler((0, 0, angle)).to_matrix().to_4x4()
+        matrix = Matrix.Translation(location) @ rotation_matrix
+
+        self.draw_custom_shape(self.custom_shape, matrix=matrix)
+
+    #######################################################
+    def setup(self):
+        shape_verts = (
+            (-0.5, 0, 2), (0.5, 0, 2),
+            (0.5, 0, 2), (0, 0, 0),
+            (0, 0, 0), (-0.5, 0, 2),
+            (0, 0, 1), (0, 0.5, 1),
+        )
+        if not hasattr(self, "custom_shape"):
+            self.custom_shape = self.new_custom_shape('LINES', shape_verts)
 
 #######################################################
 class CollisionCollectionGizmoGroup(GizmoGroup):
@@ -506,3 +540,46 @@ class Escalator2DFXGizmoGroup(GizmoGroup):
         else:
             self.bottom_gizmo.color = self.bottom_plane_gizmo.color = 0, 1, 0
             self.end_gizmo.color = self.end_plane_gizmo.color = 1, 0, 0
+
+#######################################################
+class EnexGizmoGroup(GizmoGroup):
+
+    bl_idname = "OBJECT_GGT_ipl_enex"
+    bl_label = "IPL ENEX Widget"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'WINDOW'
+    bl_options = {'3D', 'PERSISTENT'}
+
+    #######################################################
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return (obj and obj.type == 'EMPTY' and obj.dff.type == 'ENEX')
+
+    #######################################################
+    def setup(self, context):
+
+        def get_location():
+            return context.object.matrix_world.to_translation()
+
+        def get_angle():
+            return context.object.matrix_world.to_euler().z
+
+        def get_exit_location():
+            obj = context.object
+            return obj.matrix_world.to_translation() + obj.dff.enex.exit_offset
+
+        def get_exit_angle():
+            return context.object.dff.enex.exit_angle
+
+        gz = self.gizmos.new(EnexGizmo.bl_idname)
+        gz.target_set_handler("location", get=get_location, set=lambda v: None)
+        gz.target_set_handler("angle", get=get_angle, set=lambda v: None)
+        gz.color = 0.0, 1.0, 0.0
+        gz.use_draw_scale = False
+
+        gz = self.gizmos.new(EnexGizmo.bl_idname)
+        gz.target_set_handler("location", get=get_exit_location, set=lambda v: None)
+        gz.target_set_handler("angle", get=get_exit_angle, set=lambda v: None)
+        gz.color = 1.0, 0.0, 0.0
+        gz.use_draw_scale = False

@@ -58,6 +58,7 @@ _classes = [
     gui.OBJECT_OT_dff_add_2dfx_escalator,
     gui.OBJECT_OT_dff_add_cull,
     gui.OBJECT_OT_dff_add_grge,
+    gui.OBJECT_OT_dff_add_enex,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
@@ -67,6 +68,7 @@ _classes = [
     gui.RoadSign2DFXObjectProps,
     gui.CULLObjectProps,
     gui.GRGEObjectProps,
+    gui.ENEXObjectProps,
     gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
@@ -93,10 +95,12 @@ _classes = [
     gui.Bound2DWidthGizmo,
     gui.Bound2DHeightGizmo,
     gui.VectorPlaneGizmo,
+    gui.EnexGizmo,
     gui.CollisionCollectionGizmoGroup,
     gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
-    gui.Escalator2DFXGizmoGroup
+    gui.Escalator2DFXGizmoGroup,
+    gui.EnexGizmoGroup
 ]
 
 #######################################################

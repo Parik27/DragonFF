@@ -19,7 +19,7 @@ import bpy
 from .col_ot import FaceGroupsDrawer
 from .map_ot import SCENE_OT_ipl_select, \
     EXPORT_OT_ipl, EXPORT_OT_ide, \
-    OBJECT_OT_dff_add_cull, OBJECT_OT_dff_add_grge
+    OBJECT_OT_dff_add_cull, OBJECT_OT_dff_add_grge, OBJECT_OT_dff_add_enex
 from ..gtaLib.data import map_data
 
 #######################################################
@@ -235,6 +235,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    load_enex: bpy.props.BoolProperty(
+        name        = "Load Map ENEX",
+        default     = False
+    )
+
     game_root : bpy.props.StringProperty(
         name = 'Game root',
         default = 'C:/Program Files (x86)/Steam/steamapps/common/',
@@ -367,6 +372,7 @@ class MapImportPanel(bpy.types.Panel):
         grid = box.grid_flow(columns=3, even_columns=True, even_rows=True)
         grid.prop(settings, "load_cull", text="CULL")
         grid.prop(settings, "load_grge", text="GRGE")
+        grid.prop(settings, "load_enex", text="ENEX")
 
         layout.separator()
 
@@ -491,3 +497,4 @@ class DFF_MT_AddMapObject(bpy.types.Menu):
     def draw(self, context):
         self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")
         self.layout.operator(OBJECT_OT_dff_add_grge.bl_idname, text="GRGE", icon="HOME")
+        self.layout.operator(OBJECT_OT_dff_add_enex.bl_idname, text="ENEX", icon="OUTLINER_OB_MESH")

@@ -20,6 +20,7 @@ from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
 from .ipl.cull_importer import cull_importer
 from .ipl.grge_importer import grge_importer
+from .ipl.enex_importer import enex_importer
 from .importer_common import hide_object
 
 #######################################################
@@ -30,12 +31,14 @@ class map_importer:
     object_instances = []
     cull_instances = []
     grge_instances = []
+    enex_instances = []
     col_files = []
     collision_collection = None
     object_instances_collection = None
     mesh_collection = None
     cull_collection = None
     grge_collection = None
+    enex_collection = None
     map_section = ""
     settings = None
 
@@ -299,6 +302,17 @@ class map_importer:
 
     #######################################################
     @staticmethod
+    def import_enex(context, enex):
+        self = map_importer
+
+        if not self.enex_collection:
+            self.enex_collection = self.create_entries_collection(context, "ENEX")
+
+        obj = enex_importer.import_enex(enex)
+        self.enex_collection.objects.link(obj)
+
+    #######################################################
+    @staticmethod
     def create_object_instances_collection(context):
         self = map_importer
 
@@ -348,6 +362,7 @@ class map_importer:
         self.collision_collection = None
         self.cull_collection = None
         self.grge_collection = None
+        self.enex_collection = None
         self.settings = settings
 
         if self.settings.use_custom_map_section:
@@ -365,15 +380,9 @@ class map_importer:
         self.object_instances = map_data.object_instances
         self.object_data = map_data.object_data
 
-        if self.settings.load_cull:
-            self.cull_instances = map_data.cull_instances
-        else:
-            self.cull_instances = []
-
-        if self.settings.load_grge:
-            self.grge_instances = map_data.grge_instances
-        else:
-            self.grge_instances = []
+        self.cull_instances = map_data.cull_instances if self.settings.load_cull else []
+        self.grge_instances = map_data.grge_instances if self.settings.load_grge else []
+        self.enex_instances = map_data.enex_instances if self.settings.load_enex else []
 
         if self.settings.load_collisions:
 

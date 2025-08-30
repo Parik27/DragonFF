@@ -30,6 +30,7 @@ class MapData:
     object_data: dict
     cull_instances: list
     grge_instances: list
+    enex_instances: list
 
 #######################################################
 @dataclass
@@ -37,6 +38,7 @@ class TextIPLData:
     object_instances: list
     cull_instances: list
     grge_instances: list
+    enex_instances: list
 
 #######################################################
 @dataclass
@@ -362,6 +364,7 @@ class MapDataUtility:
         object_instances = []
         cull_instances = []
         grge_instances = []
+        enex_instances = []
         object_data = {}
 
         # Get all insts into a flat list (array)
@@ -382,6 +385,11 @@ class MapDataUtility:
             for entry in ipl['grge']:
                 grge_instances.append(entry)
 
+        # Get all EnExes into a flat list (array)
+        if 'enex' in ipl:
+            for entry in ipl['enex']:
+                enex_instances.append(entry)
+
         # Get all objs and tobjs into flat ID keyed dictionaries
         if 'objs' in ide:
             for entry in ide['objs']:
@@ -399,7 +407,8 @@ class MapDataUtility:
             object_instances = object_instances,
             object_data = object_data,
             cull_instances = cull_instances,
-            grge_instances = grge_instances
+            grge_instances = grge_instances,
+            enex_instances = enex_instances
         )
 
     ########################################################################
@@ -431,7 +440,7 @@ class MapDataUtility:
             section_utility.write(file_stream, ipl_data.grge_instances)
 
             section_utility = SectionUtility("enex")
-            section_utility.write(file_stream, [])
+            section_utility.write(file_stream, ipl_data.enex_instances)
 
             section_utility = SectionUtility("pick")
             section_utility.write(file_stream, [])

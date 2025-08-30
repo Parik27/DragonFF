@@ -24,6 +24,7 @@ from bpy_extras.io_utils import ImportHelper, ExportHelper
 from ..ops import map_importer, ide_exporter, ipl_exporter
 from ..ops.ipl.cull_importer import cull_importer
 from ..ops.ipl.grge_importer import grge_importer
+from ..ops.ipl.enex_importer import enex_importer
 from ..ops.importer_common import link_object
 from ..gtaLib.data import map_data
 
@@ -47,6 +48,7 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
     _cull_loaded = True
     _grge_loaded = True
+    _enex_loaded = True
 
     #######################################################
     def modal(self, context, event):
@@ -70,13 +72,22 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
                 self._cull_loaded = True
 
             # Import GRGE if there are any left to load
-            if not self._grge_loaded:
+            elif not self._grge_loaded:
 
                 for grge in importer.grge_instances:
                     importer.import_grge(context, grge)
 
                 self._progress_current += 1
                 self._grge_loaded = True
+
+            # Import ENEX if there are any left to load
+            elif not self._enex_loaded:
+
+                for enex in importer.enex_instances:
+                    importer.import_enex(context, enex)
+
+                self._progress_current += 1
+                self._enex_loaded = True
 
             # Import collision files if there are any left to load
             elif not self._col_loaded:
@@ -161,6 +172,12 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
             self._progress_total += 1
         else:
             self._grge_loaded = True
+
+        if self._importer.enex_instances:
+            self._enex_loaded = False
+            self._progress_total += 1
+        else:
+            self._enex_loaded = True
 
         if self._importer.col_files:
             self._col_index = 0
@@ -263,7 +280,7 @@ class EXPORT_OT_ide(bpy.types.Operator, ExportHelper):
             if not (total_objs_num + total_tobj_num):
                 report = "No objects with IDE data found"
                 self.report({"ERROR"}, report)
-                return {'CANCELLED'}, report
+                return {'CANCELLED'}
 
             self.report({"INFO"}, f"Finished export {total_objs_num} objs and {total_tobj_num} tobj in {time.time() - start:.2f}s")
 
@@ -312,6 +329,12 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
         default         = False
     )
 
+    export_enex         : bpy.props.BoolProperty(
+        name            = "Export ENEX",
+        description     = "Export ENEX entries",
+        default         = False
+    )
+
     #######################################################
     def draw(self, context):
         settings = context.scene.dff
@@ -329,30 +352,35 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
 
         if settings.game_version_dropdown == map_data.game_version.SA:
             grid.prop(self, "export_grge", text="GRGE")
+            grid.prop(self, "export_enex", text="ENEX")
 
     #######################################################
     def execute(self, context):
         settings = context.scene.dff
+        game_id = settings.game_version_dropdown
+
+        export_options = {
+            "file_name"     : self.filepath,
+            "only_selected" : self.only_selected,
+            "game_id"       : game_id,
+            "export_inst"   : self.export_inst,
+            "export_cull"   : self.export_cull,
+        }
+
+        if game_id == map_data.game_version.SA:
+            export_options["export_grge"] = self.export_grge
+            export_options["export_enex"] = self.export_enex
 
         start = time.time()
         try:
-            ipl_exporter.export_ipl(
-                {
-                    "file_name"     : self.filepath,
-                    "only_selected" : self.only_selected,
-                    "game_id"       : settings.game_version_dropdown,
-                    "export_inst"   : self.export_inst,
-                    "export_cull"   : self.export_cull,
-                    "export_grge"   : self.export_grge if settings.game_version_dropdown == map_data.game_version.SA else False,
-                }
-            )
+            ipl_exporter.export_ipl(export_options)
 
             total_objects_num = ipl_exporter.ipl_exporter.total_objects_num
 
             if not total_objects_num:
                 report = "No objects with IPL data found"
                 self.report({"ERROR"}, report)
-                return {'CANCELLED'}, report
+                return {'CANCELLED'}
 
             self.report({"INFO"}, f"Finished export {total_objects_num} objects in {time.time() - start:.2f}s")
 
@@ -461,6 +489,53 @@ class OBJECT_OT_dff_add_grge(bpy.types.Operator):
             angle=self.angle
         )
         obj.dff.grge.grge_type = 5
+        link_object(obj, context.collection)
+
+        context.view_layer.objects.active = obj
+        for o in context.selected_objects:
+            o.select_set(False)
+        obj.select_set(True)
+
+        return {'FINISHED'}
+
+#######################################################
+class OBJECT_OT_dff_add_enex(bpy.types.Operator):
+
+    bl_idname = "object.dff_add_enex"
+    bl_label = "Add ENEX Zone"
+    bl_description = "Add ENEX zone to the scene"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    location: bpy.props.FloatVectorProperty(
+        name="Location",
+        description="Location for the newly added object",
+        subtype='XYZ',
+        default=(0, 0, 0)
+    )
+
+    angle: bpy.props.FloatProperty(
+        name="Angle",
+        description="Angle along the Z axis",
+        subtype='ANGLE',
+        min=-math.pi * 2,
+        max=math.pi * 2,
+        step=100,
+        default=0
+    )
+
+    #######################################################
+    def invoke(self, context, event):
+        self.location = context.scene.cursor.location
+        return self.execute(context)
+
+    #######################################################
+    def execute(self, context):
+        obj = enex_importer.create_enex_object(
+            location=self.location,
+            flags=0,
+            angle=self.angle
+        )
+        obj.dff.enex.peds = 2
         link_object(obj, context.collection)
 
         context.view_layer.objects.active = obj
