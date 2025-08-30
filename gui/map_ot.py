@@ -187,12 +187,6 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
         else:
             self._col_loaded = True
 
-        if self._importer.enex_instances:
-            self._enex_loaded = False
-            self._progress_total += 1
-        else:
-            self._enex_loaded = True
-
         wm = context.window_manager
         wm.progress_begin(0, 100.0)
 

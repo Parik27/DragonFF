@@ -34,7 +34,6 @@ class map_importer:
     grge_instances = []
     enex_instances = []
     col_files = []
-    enex_instances = []
     collision_collection = None
     object_instances_collection = None
     mesh_collection = None
@@ -379,38 +378,6 @@ class map_importer:
             context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
             context.view_layer.active_layer_collection.hide_viewport = True
 
-        return coll
-
-    #######################################################
-    @staticmethod
-    def create_enex_collection(context):
-        self = map_importer
-        if self.settings is None:
-            self.settings = context.scene.dff
-
-        coll_name = f"{self.settings.game_version_dropdown} ENEX"
-
-        coll = self.enex_collection if map_importer.fix_id(self.enex_collection) else None
-        if coll is None and self.enex_collection_name:
-            coll = bpy.data.collections.get(self.enex_collection_name)
-
-        if coll is None:
-            coll = bpy.data.collections.get(coll_name)
-            if coll is None:
-                coll = bpy.data.collections.new(coll_name)
-
-        if coll.name not in {c.name for c in context.scene.collection.children}:
-            context.scene.collection.children.link(coll)
-
-        # Optional (nice): start hidden
-        try:
-            context.view_layer.active_layer_collection = context.view_layer.layer_collection.children[coll_name]
-            context.view_layer.active_layer_collection.hide_viewport = True
-        except Exception:
-            pass
-
-        self.enex_collection = coll
-        self.enex_collection_name = coll.name
         return coll
 
     #######################################################
