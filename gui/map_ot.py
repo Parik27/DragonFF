@@ -18,7 +18,6 @@ import bpy
 import math
 import os
 import time
-import bmesh
 
 from bpy.props import StringProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
@@ -26,6 +25,7 @@ from bpy_extras.io_utils import ImportHelper, ExportHelper
 from ..ops import map_importer, ide_exporter, ipl_exporter
 from ..ops.ipl.cull_importer import cull_importer
 from ..ops.ipl.grge_importer import grge_importer
+from ..ops.ipl.enex_importer import enex_importer
 from ..ops.importer_common import link_object
 from ..gtaLib.data import map_data
 
@@ -81,13 +81,12 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
                 self._progress_current += 1
                 self._grge_loaded = True
 
-            # Import Enex checkpoints if there are any left to load
+            # Import ENEX if there are any left to load
             elif not self._enex_loaded:
-                for e in self._importer.enex_instances:
-                    try:
-                        self._importer.import_enex(context, e)
-                    except Exception as ex:
-                        print("Can't import ENEX... skipping", ex)
+
+                for enex in importer.enex_instances:
+                    importer.import_enex(context, enex)
+
                 self._progress_current += 1
                 self._enex_loaded = True
 
@@ -174,6 +173,12 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
             self._progress_total += 1
         else:
             self._grge_loaded = True
+
+        if self._importer.enex_instances:
+            self._enex_loaded = False
+            self._progress_total += 1
+        else:
+            self._enex_loaded = True
 
         if self._importer.col_files:
             self._col_index = 0
@@ -282,7 +287,7 @@ class EXPORT_OT_ide(bpy.types.Operator, ExportHelper):
             if not (total_objs_num + total_tobj_num):
                 report = "No objects with IDE data found"
                 self.report({"ERROR"}, report)
-                return {'CANCELLED'}, report
+                return {'CANCELLED'}
 
             self.report({"INFO"}, f"Finished export {total_objs_num} objs and {total_tobj_num} tobj in {time.time() - start:.2f}s")
 
@@ -350,6 +355,12 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
         default         = False
     )
 
+    export_enex         : bpy.props.BoolProperty(
+        name            = "Export ENEX",
+        description     = "Export ENEX entries",
+        default         = False
+    )
+
     #######################################################
     def draw(self, context):
         settings = context.scene.dff
@@ -369,33 +380,35 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
 
         if settings.game_version_dropdown == map_data.game_version.SA:
             grid.prop(self, "export_grge", text="GRGE")
-
-        grid.prop(self, "export_enex")
+            grid.prop(self, "export_enex", text="ENEX")
 
     #######################################################
     def execute(self, context):
         settings = context.scene.dff
+        game_id = settings.game_version_dropdown
+
+        export_options = {
+            "file_name"     : self.filepath,
+            "only_selected" : self.only_selected,
+            "game_id"       : game_id,
+            "export_inst"   : self.export_inst,
+            "export_cull"   : self.export_cull,
+        }
+
+        if game_id == map_data.game_version.SA:
+            export_options["export_grge"] = self.export_grge
+            export_options["export_enex"] = self.export_enex
 
         start = time.time()
         try:
-            map_exporter.export_ipl(
-                {
-                    "file_name"     : self.filepath,
-                    "only_selected" : self.only_selected,
-                    "game_id"       : settings.game_version_dropdown,
-                    "export_inst"   : self.export_inst,
-                    "export_cull"   : self.export_cull,
-                    "export_grge"   : self.export_grge if settings.game_version_dropdown == map_data.game_version.SA else False,
-                    "export_enex"   : self.export_enex,
-                }
-            )
+            ipl_exporter.export_ipl(export_options)
 
             total_objects_num = ipl_exporter.ipl_exporter.total_objects_num
 
             if not total_objects_num:
                 report = "No objects with IPL data found"
                 self.report({"ERROR"}, report)
-                return {'CANCELLED'}, report
+                return {'CANCELLED'}
 
             self.report({"INFO"}, f"Finished export {total_objects_num} objects in {time.time() - start:.2f}s")
 
@@ -521,86 +534,43 @@ class OBJECT_OT_dff_add_grge(bpy.types.Operator):
 
 #######################################################
 class OBJECT_OT_dff_add_enex(bpy.types.Operator):
+
     bl_idname = "object.dff_add_enex"
     bl_label = "Add ENEX Zone"
-    bl_description = "Add an ENEX (entry/exit) marker to the scene (wireframe cylinder, size 1.24)"
+    bl_description = "Add ENEX zone to the scene"
     bl_options = {'REGISTER', 'UNDO'}
 
     location: bpy.props.FloatVectorProperty(
         name="Location",
-        description="Location for the newly added ENEX marker",
+        description="Location for the newly added object",
         subtype='XYZ',
-        default=(0.0, 0.0, 0.0)
+        default=(0, 0, 0)
     )
+
     angle: bpy.props.FloatProperty(
         name="Angle",
-        description="Angle around Z (radians)",
+        description="Angle along the Z axis",
         subtype='ANGLE',
-        default=0.0
+        min=-math.pi * 2,
+        max=math.pi * 2,
+        step=100,
+        default=0
     )
-    name_hint: bpy.props.StringProperty(
-        name="Name",
-        description="Optional ENEX name",
-        default="ENEX"
-    )
+
     #######################################################
     def invoke(self, context, event):
         self.location = context.scene.cursor.location
         return self.execute(context)
+
     #######################################################
     def execute(self, context):
-        MapImporter = map_importer.map_importer
-        if getattr(MapImporter, "settings", None) is None:
-            MapImporter.settings = context.scene.dff
-
-        coll = MapImporter.create_enex_collection(context)
-
-        try:
-            me = MapImporter.create_enex_cylinder()
-        except AttributeError:
-            me = bpy.data.meshes.new("_ENEX_")
-            bm = bmesh.new()
-            bmesh.ops.create_cone(
-                bm, segments=24,
-                radius1=1.24, radius2=1.24, depth=1.24,
-                cap_ends=True, cap_tris=False
-            )
-            bm.to_mesh(me); bm.free()
-
-        obj = bpy.data.objects.new(
-            f"ENEX_{self.name_hint}" if self.name_hint else "ENEX", me
+        obj = enex_importer.create_enex_object(
+            location=self.location,
+            flags=0,
+            angle=self.angle
         )
-        obj.location = self.location
-        obj.rotation_mode = 'ZXY'
-        obj.rotation_euler = (0.0, 0.0, float(self.angle))
-
-        obj.hide_render = True
-        try:
-            obj.display_type = 'WIRE'
-        except Exception:
-            pass
-
-        mat = bpy.data.materials.get("_ENEX") or bpy.data.materials.new("_ENEX")
-        mat.diffuse_color = (1.0, 0.85, 0.10, 1.0)
-        if not obj.data.materials:
-            obj.data.materials.append(mat)
-        else:
-            obj.data.materials[0] = mat
-
-        if hasattr(obj, "dff"):
-            obj.dff.type = "ENEX"
-        if hasattr(obj, "dff_map"):
-            obj.dff_map.ipl_section = "enex"
-        else:
-            obj["ipl_section"] = "enex"
-
-        obj["enex_name"] = self.name_hint
-        obj["enex_posX"] = float(obj.location.x)
-        obj["enex_posY"] = float(obj.location.y)
-        obj["enex_posZ"] = float(obj.location.z)
-        obj["enex_rotZ"] = float(self.angle)
-
-        link_object(obj, coll)
+        obj.dff.enex.peds = 2
+        link_object(obj, context.collection)
 
         context.view_layer.objects.active = obj
         for o in context.selected_objects:
@@ -608,6 +578,7 @@ class OBJECT_OT_dff_add_enex(bpy.types.Operator):
         obj.select_set(True)
 
         return {'FINISHED'}
+
 #######################################################
 class SCENE_OT_import_ide(bpy.types.Operator):
     """Import .IDE Files"""

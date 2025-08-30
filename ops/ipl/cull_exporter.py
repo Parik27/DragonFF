@@ -34,16 +34,19 @@ class cull_exporter:
         for fl in settings.flags:
             flags |= int(fl)
 
+        location = obj.matrix_world.to_translation()
+        scale = obj.matrix_world.to_scale()
+
         if game_id in (game_version.III, game_version.VC):
-            center_x, center_y, center_z = obj.location.xyz
+            center_x, center_y, center_z = location
 
-            lower_left_x = center_x - obj.scale.x
-            lower_left_y = center_y - obj.scale.y
-            lower_left_z = center_z - obj.scale.z
+            lower_left_x = center_x - scale.x
+            lower_left_y = center_y - scale.y
+            lower_left_z = center_z - scale.z
 
-            upper_right_x = center_x + obj.scale.x
-            upper_right_y = center_y + obj.scale.y
-            upper_right_z = center_z + obj.scale.z
+            upper_right_x = center_x + scale.x
+            upper_right_y = center_y + scale.y
+            upper_right_z = center_z + scale.z
 
             wanted_level_drop = settings.wanted_level_drop
 
@@ -53,14 +56,14 @@ class cull_exporter:
             cull_line += f", {flags}, {wanted_level_drop}"
 
         else:
-            center_x = obj.location.x
-            center_y = obj.location.y
-            center_z = obj.location.z - obj.scale.z
+            center_x = location.x
+            center_y = location.y
+            center_z = location.z - scale.z
 
-            width_x = obj.scale.x
-            width_y = obj.scale.y
+            width_x = scale.x
+            width_y = scale.y
 
-            top_z = obj.location.z + obj.scale.z
+            top_z = location.z + scale.z
             bottom_z = center_z
 
             angle = obj.matrix_world.to_euler().z

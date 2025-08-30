@@ -561,7 +561,7 @@ class DFF_MT_AddMapObject(bpy.types.Menu):
     def draw(self, context):
         self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")
         self.layout.operator(OBJECT_OT_dff_add_grge.bl_idname, text="GRGE", icon="HOME")
-        self.layout.operator(OBJECT_OT_dff_add_enex.bl_idname, text="ENEX", icon="CYLINDER")
+        self.layout.operator(OBJECT_OT_dff_add_enex.bl_idname, text="ENEX", icon="OUTLINER_OB_MESH")
 
 #######################################################
 class MapExportPanel(bpy.types.Panel):

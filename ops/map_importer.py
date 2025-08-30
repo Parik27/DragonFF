@@ -21,6 +21,7 @@ from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
 from .ipl.cull_importer import cull_importer
 from .ipl.grge_importer import grge_importer
+from .ipl.enex_importer import enex_importer
 from .importer_common import hide_object
 
 #######################################################
@@ -31,6 +32,7 @@ class map_importer:
     object_instances = []
     cull_instances = []
     grge_instances = []
+    enex_instances = []
     col_files = []
     enex_instances = []
     collision_collection = None
@@ -39,7 +41,6 @@ class map_importer:
     cull_collection = None
     grge_collection = None
     enex_collection = None
-    enex_collection_name = None
     map_section = ""
     settings = None
 
@@ -332,122 +333,15 @@ class map_importer:
 
     #######################################################
     @staticmethod
-    def create_enex_cylinder():
-        name = "_ENEX_"
-        me = bpy.data.meshes.get(name)
-        if me:
-            return me
-
-        import bmesh
-        me = bpy.data.meshes.new(name)
-        bm = bmesh.new()
-        bmesh.ops.create_cone(
-            bm,
-            segments    = 24,
-            radius1     = 0.45,
-            radius2     = 0.45,
-            depth       = 1.0,
-            cap_ends    = True,
-            cap_tris    = False
-        )
-        bm.to_mesh(me)
-        bm.free()
-        return me
-    #######################################################
-    @staticmethod
-    def import_enex(context, e):
+    def import_enex(context, enex):
         self = map_importer
 
-        if isinstance(e, (list, tuple)):
-            row = list(e)
-            if len(row) < 18:
-                row += [None] * (18 - len(row))
+        if not self.enex_collection:
+            self.enex_collection = self.create_entries_collection(context, "ENEX")
 
-            X1, Y1, Z1 = row[0], row[1], row[2]
-            EnterAngle  = row[3]
-            SizeX, SizeY, SizeZ = row[4], row[5], row[6]
-            X2, Y2, Z2  = row[7], row[8], row[9]
-            ExitAngle   = row[10]
-            TargetInterior = row[11]
-            Flags = row[12]
-            raw_name = row[13]
-            name = None
-            if isinstance(raw_name, str):
-                s = raw_name.strip()
-                if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
-                    s = s[1:-1]
-                name = s
-            Sky = row[14]
-            NumPedsToSpawn = row[15]
-            TimeOn = row[16]
-            TimeOff = row[17]
+        obj = enex_importer.import_enex(enex)
+        self.enex_collection.objects.link(obj)
 
-            coll = self.create_enex_collection(context)
-            me = self.create_enex_cylinder()
-
-            label = f"ENEX_{name}" if name else "ENEX"
-            obj = bpy.data.objects.new(label, me)
-
-            try:
-                obj.location = (float(X1 or 0.0), float(Y1 or 0.0), float(Z1 or 0.0))
-            except Exception:
-                obj.location = (0.0, 0.0, 0.0)
-
-            obj.rotation_mode = 'ZXY'
-            try:
-                obj.rotation_euler = (0.0, 0.0, float(EnterAngle or 0.0))
-            except Exception:
-                obj.rotation_euler = (0.0, 0.0, 0.0)
-
-            obj.hide_render = True
-            try:
-                obj.display_type = 'WIRE'
-            except Exception:
-                pass
-
-            mat = bpy.data.materials.get("_ENEX") or bpy.data.materials.new("_ENEX")
-            mat.diffuse_color = (1.0, 0.85, 0.10, 1.0)
-            if not obj.data.materials:
-                obj.data.materials.append(mat)
-            else:
-                obj.data.materials[0] = mat
-
-            # tag section
-            if hasattr(obj, "dff"):
-                obj.dff.type = "ENEX"
-            if hasattr(obj, "dff_map"):
-                obj.dff_map.ipl_section = "enex"
-            else:
-                obj["ipl_section"] = "enex"
-
-            # store all fields so you can round-trip/export later
-            def _setf(k, v):
-                try:
-                    if v is not None: obj[f"enex_{k}"] = float(v)
-                except Exception:
-                    pass
-            def _seti(k, v):
-                try:
-                    if v is not None: obj[f"enex_{k}"] = int(v)
-                except Exception:
-                    pass
-            def _sets(k, v):
-                if v is not None: obj[f"enex_{k}"] = str(v)
-
-            _setf("X1", X1); _setf("Y1", Y1); _setf("Z1", Z1)
-            _setf("EnterAngle", EnterAngle)
-            _setf("SizeX", SizeX); _setf("SizeY", SizeY); _setf("SizeZ", SizeZ)
-            _setf("X2", X2); _setf("Y2", Y2); _setf("Z2", Z2)
-            _setf("ExitAngle", ExitAngle)
-            _seti("TargetInterior", TargetInterior)
-            _seti("Flags", Flags)
-            _sets("Name", name)
-            _seti("Sky", Sky)
-            _seti("NumPedsToSpawn", NumPedsToSpawn)
-            _seti("TimeOn", TimeOn)
-            _seti("TimeOff", TimeOff)
-
-            coll.objects.link(obj)
     #######################################################
     @staticmethod
     def create_object_instances_collection(context):
@@ -531,6 +425,7 @@ class map_importer:
         self.collision_collection = None
         self.cull_collection = None
         self.grge_collection = None
+        self.enex_collection = None
         self.settings = settings
 
         if self.settings.use_custom_map_section:
@@ -548,20 +443,9 @@ class map_importer:
         self.object_instances = map_data.object_instances
         self.object_data = map_data.object_data
 
-        if self.settings.load_cull:
-            self.cull_instances = map_data.cull_instances
-        else:
-            self.cull_instances = []
-
-        if self.settings.load_grge:
-            self.grge_instances = map_data.grge_instances
-        else:
-            self.grge_instances = []
-
-        if self.settings.load_enex:
-            self.enex_instances = map_data.enex_instances
-        else:
-            self.enex_instances = []
+        self.cull_instances = map_data.cull_instances if self.settings.load_cull else []
+        self.grge_instances = map_data.grge_instances if self.settings.load_grge else []
+        self.enex_instances = map_data.enex_instances if self.settings.load_enex else []
 
         if self.settings.load_collisions:
 

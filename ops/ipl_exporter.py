@@ -20,6 +20,7 @@ from ..gtaLib.data.map_data import game_version
 from ..gtaLib.map import TextIPLData, MapDataUtility
 from ..ops.ipl.cull_exporter import cull_exporter
 from ..ops.ipl.grge_exporter import grge_exporter
+from ..ops.ipl.enex_exporter import enex_exporter
 
 #######################################################
 class ipl_exporter:
@@ -29,10 +30,12 @@ class ipl_exporter:
     export_inst = True
     export_cull = False
     export_grge = False
+    export_enex = False
 
     inst_objects = []
     cull_objects = []
     grge_objects = []
+    enex_objects = []
     total_objects_num = 0
 
     #######################################################
@@ -45,6 +48,7 @@ class ipl_exporter:
         self.inst_objects = []
         self.cull_objects = []
         self.grge_objects = []
+        self.enex_objects = []
         self.total_objects_num = 0
 
         for obj in context.scene.objects:
@@ -62,6 +66,10 @@ class ipl_exporter:
 
             if self.export_grge and obj.dff.type == 'GRGE':
                 self.grge_objects.append(obj)
+                self.total_objects_num += 1
+
+            if self.export_enex and obj.dff.type == 'ENEX':
+                self.enex_objects.append(obj)
                 self.total_objects_num += 1
 
     #######################################################
@@ -118,11 +126,13 @@ class ipl_exporter:
         object_instances = [self.format_inst_line(obj) for obj in self.inst_objects]
         cull_instacnes = cull_exporter.export_objects(self.cull_objects, self.game_id)
         grge_instacnes = grge_exporter.export_objects(self.grge_objects)
+        enex_instacnes = enex_exporter.export_objects(self.enex_objects)
 
         ipl_data = TextIPLData(
             object_instances,
             cull_instacnes,
             grge_instacnes,
+            enex_instacnes,
         )
 
         MapDataUtility.write_ipl_data(filename, self.game_id, ipl_data)
@@ -133,8 +143,9 @@ def export_ipl(options):
 
     ipl_exporter.only_selected = options['only_selected']
     ipl_exporter.game_id       = options['game_id']
-    ipl_exporter.export_inst   = options['export_inst']
-    ipl_exporter.export_cull   = options['export_cull']
-    ipl_exporter.export_grge   = options['export_grge']
+    ipl_exporter.export_inst   = options.get('export_inst', False)
+    ipl_exporter.export_cull   = options.get('export_cull', False)
+    ipl_exporter.export_grge   = options.get('export_grge', False)
+    ipl_exporter.export_enex   = options.get('export_enex', False)
 
     ipl_exporter.export_ipl(options['file_name'])

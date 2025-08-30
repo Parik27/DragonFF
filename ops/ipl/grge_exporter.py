@@ -33,8 +33,8 @@ class grge_exporter:
         dir_x = -cos(angle)
         dir_y = sin(angle)
 
-        center_x, center_y, center_z = obj.location.x, obj.location.y, obj.location.z
-        scale_x, scale_y, scale_z = obj.scale.x, obj.scale.y, obj.scale.z
+        center_x, center_y, center_z = obj.matrix_world.to_translation()
+        scale_x, scale_y, scale_z = obj.matrix_world.to_scale()
 
         start_pos_x = center_x + scale_y * dir_y + scale_x * dir_x
         start_pos_y = center_y + scale_y * dir_x - scale_x * dir_y

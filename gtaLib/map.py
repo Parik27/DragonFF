@@ -385,6 +385,7 @@ class MapDataUtility:
             for entry in ipl['grge']:
                 grge_instances.append(entry)
 
+        # Get all EnExes into a flat list (array)
         if 'enex' in ipl:
             for entry in ipl['enex']:
                 enex_instances.append(entry)
@@ -439,7 +440,7 @@ class MapDataUtility:
             section_utility.write(file_stream, ipl_data.grge_instances)
 
             section_utility = SectionUtility("enex")
-            section_utility.write(file_stream, ipl_data.enex_instances or [])
+            section_utility.write(file_stream, ipl_data.enex_instances)
 
             section_utility = SectionUtility("pick")
             section_utility.write(file_stream, [])

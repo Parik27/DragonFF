@@ -70,6 +70,7 @@ _classes = [
     gui.RoadSign2DFXObjectProps,
     gui.CULLObjectProps,
     gui.GRGEObjectProps,
+    gui.ENEXObjectProps,
     gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
@@ -96,10 +97,12 @@ _classes = [
     gui.Bound2DWidthGizmo,
     gui.Bound2DHeightGizmo,
     gui.VectorPlaneGizmo,
+    gui.EnexGizmo,
     gui.CollisionCollectionGizmoGroup,
     gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
-    gui.Escalator2DFXGizmoGroup
+    gui.Escalator2DFXGizmoGroup,
+    gui.EnexGizmoGroup
 ]
 
 #######################################################

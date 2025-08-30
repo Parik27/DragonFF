@@ -29,6 +29,7 @@ class grge_importer:
     def create_grge_object(location, scale, flags, angle=0):
         obj = bpy.data.objects.new("grge", None)
         obj.empty_display_type = 'CUBE'
+        obj.show_axis = True
         obj.location = location
         obj.rotation_euler = (0, 0, angle)
         obj.scale = scale

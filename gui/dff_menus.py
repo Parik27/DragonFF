@@ -10,6 +10,7 @@ from .col_ot import EXPORT_OT_col, \
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 from .ipl.cull_menus import CULLObjectProps, CULLMenus
 from .ipl.grge_menus import GRGEObjectProps, GRGEMenus
+from .ipl.enex_menus import ENEXObjectProps, ENEXMenus
 from ..gtaLib.data import presets
 
 texture_filters_items = (
@@ -403,6 +404,10 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         GRGEMenus.draw_menu(self.layout, context)
 
     #######################################################
+    def draw_enex_menu(self, context):
+        ENEXMenus.draw_menu(self.layout, context)
+
+    #######################################################
     def draw_obj_menu(self, context):
 
         layout = self.layout
@@ -435,6 +440,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         elif settings.type == 'GRGE':
             self.draw_grge_menu(context)
+
+        elif settings.type == 'ENEX':
+            self.draw_enex_menu(context)
 
     #######################################################
     def draw(self, context):
@@ -584,7 +592,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('2DFX', '2DFX', 'Object is a 2D effect'),
             ('CULL', 'CULL', 'Object is a CULL zone'),
             ('GRGE', 'GRGE', 'Object is a GRGE zone'),
-            ('ENEX', 'ENEX', 'Object is an ENEX zone'),
+            ('ENEX', 'ENEX', 'Object is a ENEX marker'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
@@ -731,6 +739,9 @@ compatibiility with DFF Viewers"
 
     # GRGE properties
     grge: bpy.props.PointerProperty(type=GRGEObjectProps)
+
+    # ENEX properties
+    enex: bpy.props.PointerProperty(type=ENEXObjectProps)
 
     # Miscellaneous properties
     is_frame_locked : bpy.props.BoolProperty()
