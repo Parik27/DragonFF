@@ -59,7 +59,7 @@ class txd_importer:
     def import_textures():
         self = txd_importer
 
-        txd_name = os.path.basename(self.file_name)
+        txd_name = os.path.basename(self.file_name).lower()
 
         # Import native textures
         for tex in self.txd.native_textures:

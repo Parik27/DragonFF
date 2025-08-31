@@ -260,33 +260,46 @@ class EXPORT_OT_ide(bpy.types.Operator, ExportHelper):
 
     #######################################################
     def draw(self, context):
+        settings = context.scene.dff
+
         layout = self.layout
 
         layout.prop(self, "only_selected")
+        layout.prop(settings, "game_version_dropdown", text="Game")
 
     #######################################################
     def execute(self, context):
+        settings = context.scene.dff
+        game_id = settings.game_version_dropdown
+
         start = time.time()
         try:
             ide_exporter.export_ide(
                 {
                     "file_name"     : self.filepath,
                     "only_selected" : self.only_selected,
+                    "game_id"       : game_id,
                 }
             )
 
             total_objs_num = len(ide_exporter.ide_exporter.objs_objects)
             total_tobj_num = len(ide_exporter.ide_exporter.tobj_objects)
+            total_anim_num = len(ide_exporter.ide_exporter.anim_objects)
 
-            if not (total_objs_num + total_tobj_num):
+            if not (total_objs_num + total_tobj_num + total_anim_num):
                 report = "No objects with IDE data found"
                 self.report({"ERROR"}, report)
                 return {'CANCELLED'}
 
-            self.report({"INFO"}, f"Finished export {total_objs_num} objs and {total_tobj_num} tobj in {time.time() - start:.2f}s")
+            self.report(
+                {"INFO"},
+                f"Finished export {total_objs_num} objs, {total_tobj_num} tobj, {total_anim_num} anim "
+                f"in {time.time() - start:.2f}s"
+            )
 
         except Exception as e:
             self.report({"ERROR"}, str(e))
+            return {'CANCELLED'}
 
         return {'FINISHED'}
 

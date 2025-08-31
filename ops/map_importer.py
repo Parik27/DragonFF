@@ -150,6 +150,9 @@ class map_importer:
                         obj.ide.obj_type = 'tobj'  # Mark as time object
                         obj.ide.time_on = ide_data.timeOn
                         obj.ide.time_off = ide_data.timeOff
+                    elif hasattr(ide_data, 'animName'):
+                        obj.ide.obj_type = 'anim'  # Mark as animation object
+                        obj.ide.ifp_name = ide_data.animName
 
             cached_2dfx = [obj for obj in model_cache if obj.dff.type == "2DFX"]
             for obj in cached_2dfx:
@@ -254,6 +257,9 @@ class map_importer:
                     obj.ide.obj_type = 'tobj'  # Mark as time object
                     obj.ide.time_on = ide_data.timeOn
                     obj.ide.time_off = ide_data.timeOff
+                elif hasattr(ide_data, 'animName'):
+                    obj.ide.obj_type = 'anim'  # Mark as animation object
+                    obj.ide.ifp_name = ide_data.animName
 
             # Set root object as 2DFX parent
             if root_objects:

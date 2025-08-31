@@ -157,8 +157,8 @@ SA_IDE_aliases['tobj'] = ('tobj_1', 'tobj_2', 'tobj_3', 'tobj_4')
 # ANIM
 # Defines animated objects. The section functions similarly to objs but has one
 # additional parameter indicating an IFP or WAD animation file to assign an
-# animation to the object. 
-SA_structures['anim'] = namedtuple("IDE_ANIM_SA", "id modelName textureName animName drawDist flags filename")
+# animation to the object.
+SA_structures['anim'] = namedtuple("IDE_ANIM_SA", "id modelName txdName animName drawDist flags filename")
 
 # PEDS
 # Defines pedestrian objects (random NPC's)

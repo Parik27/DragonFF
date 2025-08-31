@@ -693,7 +693,8 @@ class Frame:
             data += self.user_data.to_mem()
 
         if self.name is not None and self.name != "unknown":
-            data += Sections.write_chunk(Sections.pad_string(self.name),
+            frame_name = self.name.encode("utf-8")
+            data += Sections.write_chunk(frame_name,
                                          types["Frame"])
 
         return Sections.write_chunk(data, types["Extension"])

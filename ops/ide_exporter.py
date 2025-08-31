@@ -16,15 +16,18 @@
 
 import bpy
 
+from ..gtaLib.data import map_data
 from ..gtaLib.map import TextIDEData, MapDataUtility
 
 #######################################################
 class ide_exporter:
 
     only_selected = False
+    game_id = None
 
     objs_objects = []
     tobj_objects = []
+    anim_objects = []
 
     #######################################################
     @staticmethod
@@ -35,6 +38,7 @@ class ide_exporter:
 
         self.objs_objects = []
         self.tobj_objects = []
+        self.anim_objects = []
 
         ide_objects = {}  # Group by ID to avoid duplicates
 
@@ -52,8 +56,11 @@ class ide_exporter:
 
         # Separate objects by type
         for obj in ide_objects.values():
-            if obj.ide.obj_type == 'tobj':
+            obj_type = obj.ide.obj_type
+            if obj_type == 'tobj':
                 self.tobj_objects.append(obj)
+            elif obj_type == 'anim' and self.game_id == map_data.game_version.SA:
+                self.anim_objects.append(obj)
             else:
                 self.objs_objects.append(obj)
 
@@ -151,29 +158,50 @@ class ide_exporter:
 
     #######################################################
     @staticmethod
+    def format_anim_line(obj):
+        """Format an object as an anim line"""
+
+        self = ide_exporter
+
+        obj_id = obj.ide.obj_id
+        model_name = obj.ide.model_name or obj.name
+        txd_name = obj.ide.txd_name or model_name
+        flags = obj.ide.flags or '0'
+        ifp_name = obj.ide.ifp_name or model_name
+
+        distances = self.get_draw_distances(obj)
+        return f"{obj_id}, {model_name}, {txd_name}, {ifp_name}, {distances[0]}, {flags}"
+
+    #######################################################
+    @staticmethod
     def export_ide(filename):
         self = ide_exporter
 
         self.collect_objects(bpy.context)
 
-        total_objects_num = len(self.objs_objects) + len(self.tobj_objects)
+        total_objects_num = len(self.objs_objects)
+        total_objects_num += len(self.tobj_objects)
+        total_objects_num += len(self.anim_objects)
         if not total_objects_num:
             return
 
         objs_instances = [self.format_objs_line(obj) for obj in self.objs_objects]
         tobj_instances = [self.format_tobj_line(obj) for obj in self.tobj_objects]
+        anim_instances = [self.format_anim_line(obj) for obj in self.anim_objects]
 
         ide_data = TextIDEData(
             objs_instances,
             tobj_instances,
+            anim_instances,
         )
 
-        MapDataUtility.write_ide_data(filename, ide_data)
+        MapDataUtility.write_ide_data(filename, self.game_id, ide_data)
 
 #######################################################
 def export_ide(options):
     """Main export function"""
 
     ide_exporter.only_selected = options['only_selected']
+    ide_exporter.game_id       = options['game_id']
 
     ide_exporter.export_ide(options['file_name'])

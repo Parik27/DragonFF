@@ -1,5 +1,5 @@
 import bpy
-from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
+from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, EXPORT_OT_txd, \
     OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
@@ -244,6 +244,8 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
         op.use_active_collection = False
+        self.layout.operator(EXPORT_OT_txd.bl_idname,
+                             text="DragonFF TXD (.txd)")
 
 #######################################################
 def import_dff_func(self, context):

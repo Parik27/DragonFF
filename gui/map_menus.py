@@ -34,13 +34,13 @@ class IDEObjectProps(bpy.types.PropertyGroup):
 
     model_name: bpy.props.StringProperty(
         name="Model Name",
-        description="Model name (should match DFF filename)",
+        description="Model name without extension (should match DFF filename)",
         default=""
     )
 
     txd_name: bpy.props.StringProperty(
         name="TXD Name",
-        description="Texture dictionary name",
+        description="Texture dictionary name without extension",
         default=""
     )
 
@@ -78,8 +78,9 @@ class IDEObjectProps(bpy.types.PropertyGroup):
         name="Object Type",
         description="IDE object type",
         items=[
-            ('objs', 'Regular Object', 'Standard object'),
-            ('tobj', 'Time Object', 'Time-based object')
+            ('objs', 'Regular Object', 'Standard object (OBJ)'),
+            ('tobj', 'Time Object', 'Time-based object (TOBJ)'),
+            ('anim', 'Animation Object', 'Animation object (ANIM)'),
         ],
         default='objs'
     )
@@ -94,6 +95,12 @@ class IDEObjectProps(bpy.types.PropertyGroup):
         name="Time Off",
         description="Hour when object disappears (0-23)",
         default="24"
+    )
+
+    ifp_name: bpy.props.StringProperty(
+        name="IFP Name",
+        description="Animation file name without extension",
+        default=""
     )
 
 #######################################################
@@ -553,6 +560,12 @@ class MapObjectPanel(bpy.types.Panel):
             row = col.row()
             row.prop(obj.ide, "time_on")
             row.prop(obj.ide, "time_off")
+
+        # Animation Object Properties
+        if obj.ide.obj_type == 'anim':
+            col.separator()
+            col.label(text="Animation Object Properties:")
+            col.prop(obj.ide, "ifp_name")
 
 #######################################################
 class DFF_MT_AddMapObject(bpy.types.Menu):

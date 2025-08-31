@@ -34,6 +34,7 @@ bl_info = {
 _classes = [
     gui.IMPORT_OT_dff,
     gui.EXPORT_OT_dff,
+    gui.EXPORT_OT_txd,
     gui.EXPORT_OT_col,
     gui.EXPORT_OT_ipl,
     gui.EXPORT_OT_ide,
