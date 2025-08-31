@@ -45,6 +45,7 @@ class TextIPLData:
 class TextIDEData:
     objs_instances: list
     tobj_instances: list
+    anim_instances: list
 
 # Base for all IPL / IDE section reader / writer classes
 #######################################################
@@ -390,7 +391,7 @@ class MapDataUtility:
             for entry in ipl['enex']:
                 enex_instances.append(entry)
 
-        # Get all objs and tobjs into flat ID keyed dictionaries
+        # Get all IDE objs into flat ID keyed dictionaries
         if 'objs' in ide:
             for entry in ide['objs']:
                 if entry.id in object_data:
@@ -401,6 +402,12 @@ class MapDataUtility:
             for entry in ide['tobj']:
                 if entry.id in object_data:
                     print('TOBJ ERROR!! a duplicate ID!!')
+                object_data[entry.id] = entry
+
+        if 'anim' in ide:
+            for entry in ide['anim']:
+                if entry.id in object_data:
+                    print('ANIM ERROR!! a duplicate ID!!')
                 object_data[entry.id] = entry
 
         return MapData(
@@ -462,7 +469,7 @@ class MapDataUtility:
 
     ########################################################################
     @staticmethod
-    def write_text_ide_to_stream(file_stream, ide_data:TextIDEData):
+    def write_text_ide_to_stream(file_stream, game_id, ide_data:TextIDEData):
         file_stream.write("# IDE generated with DragonFF\n")
 
         section_utility = SectionUtility("objs")
@@ -470,6 +477,16 @@ class MapDataUtility:
 
         section_utility = SectionUtility("tobj")
         section_utility.write(file_stream, ide_data.tobj_instances)
+
+        if game_id == map_data.game_version.III:
+            pass
+
+        elif game_id == map_data.game_version.VC:
+            pass
+
+        elif game_id == map_data.game_version.SA:
+            section_utility = SectionUtility("anim")
+            section_utility.write(file_stream, ide_data.anim_instances)
 
     ########################################################################
     @staticmethod
@@ -481,8 +498,8 @@ class MapDataUtility:
 
     ########################################################################
     @staticmethod
-    def write_ide_data(filename, ide_data:TextIDEData):
+    def write_ide_data(filename, game_id, ide_data:TextIDEData):
         self = MapDataUtility
 
         with open(filename, 'w') as file_stream:
-            self.write_text_ide_to_stream(file_stream, ide_data)
+            self.write_text_ide_to_stream(file_stream, game_id, ide_data)
