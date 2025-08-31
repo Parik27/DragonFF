@@ -14,8 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import os 
 import bpy
-import os
+
 from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
 from .ipl.cull_importer import cull_importer
@@ -44,6 +45,23 @@ class map_importer:
 
     #######################################################
     @staticmethod
+    def fix_id(idblock):
+        if idblock is None:
+            return False
+        try:
+            _ = idblock.name
+            return True
+        except ReferenceError:
+            return False
+
+    #######################################################
+    def assign_map_properties(obj, ipl_data):
+        obj.dff_map.object_id = ipl_data.get("object_id", 0)
+        obj.dff_map.model_name = ipl_data.get("model_name", "")
+        obj.dff_map.interior = ipl_data.get("interior", 0)
+        obj.dff_map.lod = ipl_data.get("lod", 0)
+    #######################################################
+    @staticmethod
     def import_object_instance(context, inst):
         self = map_importer
 
@@ -70,6 +88,16 @@ class map_importer:
                 new_obj.location = obj.location
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.scale = obj.scale
+
+                try:
+                    self.assign_map_properties(new_obj, {
+                        "object_id": int(inst.id),
+                        "model_name": str(model),
+                        "interior": int(getattr(inst, "interior", 0)),
+                        "lod": int(getattr(inst, "lod", -1)),
+                    })
+                except Exception:
+                    pass
 
                 if not self.settings.create_backfaces:
                     modifier = new_obj.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
@@ -135,6 +163,8 @@ class map_importer:
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.rotation_euler = obj.rotation_euler
                 new_obj.scale = obj.scale
+
+                self.assign_map_properties(new_obj, inst)
 
                 if obj.parent:
                     new_obj.parent = new_objects[obj.parent]

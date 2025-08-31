@@ -19,6 +19,7 @@ import math
 import os
 import time
 
+from bpy.props import StringProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
 from ..ops import map_importer, ide_exporter, ipl_exporter
@@ -310,13 +311,32 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
     bl_label            = "DragonFF IPL (.ipl)"
     filename_ext        = ".ipl"
 
-    filepath            : bpy.props.StringProperty(name="File path",
-                                              maxlen=1024,
-                                              default="",
-                                              subtype='FILE_PATH')
+    stream_distance: bpy.props.FloatProperty(
+        name="Stream Distance",
+        default=300.0,
+        description="Stream distance for dynamic objects"
+    )
+    draw_distance: bpy.props.FloatProperty(
+        name="Draw Distance",
+        default=300.0,
+        description="Draw distance for objects"
+    )
+    x_offset: bpy.props.FloatProperty(
+        name="X Offset",
+        default=0.0,
+        description="Offset for the x coordinate of the objects"
+    )
+    y_offset: bpy.props.FloatProperty(
+        name="Y Offset",
+        default=0.0,
+        description="Offset for the y coordinate of the objects"
+    )
 
-    filter_glob         : bpy.props.StringProperty(default="*.ipl",
-                                              options={'HIDDEN'})
+    z_offset: bpy.props.FloatProperty(
+        name="Z Offset",
+        default=0.0,
+        description="Offset for the z coordinate of the objects"
+    )
 
     only_selected       : bpy.props.BoolProperty(
         name            = "Only Selected",
@@ -353,8 +373,10 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
         settings = context.scene.dff
 
         layout = self.layout
-
         layout.prop(self, "only_selected")
+        layout.prop(self, "x_offset")
+        layout.prop(self, "y_offset")
+        layout.prop(self, "z_offset")
         layout.prop(settings, "game_version_dropdown", text="Game")
 
         box = layout.box()
@@ -403,6 +425,11 @@ class EXPORT_OT_ipl(bpy.types.Operator, ExportHelper):
 
         return {'FINISHED'}
 
+    #######################################################
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+    
 #######################################################
 class OBJECT_OT_dff_add_cull(bpy.types.Operator):
 
@@ -558,3 +585,328 @@ class OBJECT_OT_dff_add_enex(bpy.types.Operator):
         obj.select_set(True)
 
         return {'FINISHED'}
+
+#######################################################
+class SCENE_OT_import_ide(bpy.types.Operator):
+    """Import .IDE Files"""
+    bl_idname = "scene.ide_import"
+    bl_label = "Import IDE"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    files: CollectionProperty(type=bpy.types.PropertyGroup)
+    directory: StringProperty(subtype="DIR_PATH")
+
+    filter_glob: StringProperty(default="*.ide", options={'HIDDEN'})
+
+    IDE_TO_SAMP_DL_IDS = {i: 0 + i for i in range(50000)}
+
+    #######################################################
+    def assign_ide_map_properties(self, obj, ide_data):
+        obj.dff_map.ide_object_id = ide_data.get("object_id", 0)
+        obj.dff_map.ide_model_name = ide_data.get("model_name", "")
+        obj.dff_map.ide_object_type = ide_data.get("object_type", "")
+        obj.dff_map.ide_txd_name = ide_data.get("txd_name", "")
+        obj.dff_map.ide_flags = ide_data.get("flags", 0)
+        obj.dff_map.ide_draw_distances = ide_data.get("draw_distances", "")
+        obj.dff_map.ide_draw_distance1 = ide_data.get("draw_distance1", 0.0)
+        obj.dff_map.ide_draw_distance2 = ide_data.get("draw_distance2", 0.0)
+    #######################################################
+    def import_ide(self, filepaths, context):
+        for filepath in filepaths:
+            if not os.path.isfile(filepath):
+                print(f"File not found: {filepath}")
+                continue
+
+            try:
+                with open(filepath, 'r', encoding='utf-8') as file:
+                    lines = file.readlines()
+            except UnicodeDecodeError:
+                print(f"UTF-8 decoding failed for {filepath}, attempting ASCII decoding.")
+                try:
+                    with open(filepath, 'r', encoding='ascii', errors='replace') as file:
+                        lines = file.readlines()
+                except UnicodeDecodeError:
+                    print(f"Error decoding file: {filepath}")
+                    continue
+
+            obj_data = {}
+            current = None  # objs / tobj / anim / None
+
+            def try_float(s):
+                try: return float(s)
+                except: return None
+
+            for raw in lines:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+
+                low = line.lower()
+                if low.startswith("objs"):
+                    current = "objs";  continue
+                if low.startswith("tobj"):
+                    current = "tobj";  continue
+                if low.startswith("anim"):
+                    current = "anim";  continue
+                if low.startswith("end"):
+                    current = None;    continue
+                if not current:
+                    continue
+
+                parts = [p.strip() for p in line.split(",") if p.strip() != ""]
+                if len(parts) < 4:
+                    print("Skipping short IDE line:", line)
+                    continue
+
+                try:
+                    obj_id   = int(parts[0])
+                except:
+                    print("Bad id on line:", line);  continue
+                model    = parts[1]
+                txd_name = parts[2]
+
+                rec = {
+                    "section": current,
+                    "object_id": obj_id,
+                    "model_name": model,
+                    "txd_name": txd_name,
+                    "mesh_count": None,
+                    "draw_distances": [],
+                    "flags": 0,
+                    "time_on": None,
+                    "time_off": None,
+                    "anim_name": None,
+                }
+
+                if current == "objs":
+                    if len(parts) == 6:
+                        rec["mesh_count"] = int(parts[3])
+                        rec["draw_distances"] = [try_float(parts[4]) or 0.0]
+                        rec["flags"] = int(parts[5])
+                    elif len(parts) == 7:
+                        rec["mesh_count"] = int(parts[3])
+                        rec["draw_distances"] = [try_float(parts[4]) or 0.0,
+                                                 try_float(parts[5]) or 0.0]
+                        rec["flags"] = int(parts[6])
+                    elif len(parts) == 8:
+                        rec["mesh_count"] = int(parts[3])
+                        rec["draw_distances"] = [try_float(parts[4]) or 0.0,
+                                                 try_float(parts[5]) or 0.0,
+                                                 try_float(parts[6]) or 0.0]
+                        rec["flags"] = int(parts[7])
+                    elif len(parts) == 5:
+                        rec["mesh_count"] = None
+                        rec["draw_distances"] = [try_float(parts[3]) or 0.0]
+                        rec["flags"] = int(parts[4])
+                    else:
+                        print("Unknown OBJS line format:", line)
+                        continue
+
+                elif current == "tobj":
+                    # SA VC: Id,Model,TXD,Draw,TimeOn,TimeOff,Flags
+                    if len(parts) != 7:
+                        print("Unknown TOBJ line format:", line)
+                        continue
+                    rec["mesh_count"] = None
+                    rec["draw_distances"] = [try_float(parts[3]) or 0.0]
+                    rec["time_on"]  = int(parts[4])
+                    rec["time_off"] = int(parts[5])
+                    rec["flags"]    = int(parts[6])
+
+                elif current == "anim":
+                    anim_name = parts[-1]
+                    core = parts[:-1]
+                    if len(core) == 6:
+                        rec["mesh_count"] = int(core[3])
+                        rec["draw_distances"] = [try_float(core[4]) or 0.0]
+                        rec["flags"] = int(core[5])
+                    elif len(core) == 7:
+                        rec["mesh_count"] = int(core[3])
+                        rec["draw_distances"] = [try_float(core[4]) or 0.0,
+                                                 try_float(core[5]) or 0.0]
+                        rec["flags"] = int(core[6])
+                    elif len(core) == 8:
+                        rec["mesh_count"] = int(core[3])
+                        rec["draw_distances"] = [try_float(core[4]) or 0.0,
+                                                 try_float(core[5]) or 0.0,
+                                                 try_float(core[6]) or 0.0]
+                        rec["flags"] = int(core[7])
+                    elif len(core) == 5:
+                        rec["mesh_count"] = None
+                        rec["draw_distances"] = [try_float(core[3]) or 0.0]
+                        rec["flags"] = int(core[4])
+                    else:
+                        print("Unknown ANIM line format:", line)
+                        continue
+                    rec["anim_name"] = anim_name
+
+                obj_data[model] = rec
+
+        for obj in context.scene.objects:
+            base_name = obj.name.split('.')[0]
+            data = obj_data.get(base_name)
+            if not data or not hasattr(obj, "dff_map"):
+                continue
+
+            props = obj.dff_map
+
+            # IDE section
+            props.ide_section     = data["section"]
+            props.ide_object_id   = data["object_id"]
+            props.ide_model_name  = data["model_name"]
+            props.ide_txd_name    = data["txd_name"]
+            props.ide_flags       = data["flags"]
+
+            # Mesh count + draw distances
+            if data["mesh_count"] is not None:
+                props.ide_meshes = int(data["mesh_count"])
+            dds = data["draw_distances"]
+            props.ide_draw1 = float(dds[0]) if len(dds) > 0 else 0.0
+            props.ide_draw2 = float(dds[1]) if len(dds) > 1 else 0.0
+            props.ide_draw3 = float(dds[2]) if len(dds) > 2 else 0.0
+
+            if data["section"] == "tobj":
+                props.ide_time_on  = int(data["time_on"] or 0)
+                props.ide_time_off = int(data["time_off"] or 24)
+            elif data["section"] == "anim":
+                props.ide_anim = data["anim_name"] or ""
+
+            props.object_id  = data["object_id"]
+            props.model_name = data["model_name"]
+
+            # Take Pawn Data from IDE unless already set
+            if not props.pawn_model_name:
+                props.pawn_model_name = data["model_name"]
+            if not props.pawn_txd_name:
+                props.pawn_txd_name   = data["txd_name"]
+
+            print(f"Assigned IDE properties to {obj.name}")
+    #######################################################
+    def execute(self, context):
+        filepaths = [os.path.join(self.directory, f.name) for f in self.files]
+        self.import_ide(filepaths, context)
+        return {'FINISHED'}
+    #######################################################
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+#######################################################
+class EXPORT_OT_ide(bpy.types.Operator, ExportHelper):
+    bl_idname = "scene.ide_export"
+    bl_label = "DragonFF IDE Export"
+    bl_description = "Export a GTA IDE file (objs/tobj/anim)"
+    filename_ext = ".ide"
+
+    export_objs: bpy.props.BoolProperty(name="objs", default=True)
+    export_tobj: bpy.props.BoolProperty(name="tobj", default=False)
+    export_anim: bpy.props.BoolProperty(name="anim", default=False)
+    only_selected: bpy.props.BoolProperty(name="Only Selected", default=False)
+
+    filter_glob: bpy.props.StringProperty(default="*.ide", options={'HIDDEN'})
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column(align=True)
+        col.prop(self, "export_objs")
+        col.prop(self, "export_tobj")
+        col.prop(self, "export_anim")
+        col.prop(self, "only_selected")
+        layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
+    #######################################################
+    def execute(self, context):
+        try:
+            map_exporter.export_ide({
+                "file_name"    : self.filepath,
+                "only_selected": self.only_selected,
+                "game_id"      : context.scene.dff.game_version_dropdown,
+                "export_objs"  : self.export_objs,
+                "export_tobj"  : self.export_tobj,
+                "export_anim"  : self.export_anim,
+            })
+
+            if not map_exporter.ide_exporter.total_definitions_num:
+                self.report({"ERROR"}, "No objects with IDE data found")
+                return {'CANCELLED'}
+
+            return {'FINISHED'}
+
+        except Exception as e:
+            self.report({"ERROR"}, str(e))
+            return {'CANCELLED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+#######################################################
+class EXPORT_OT_pawn(bpy.types.Operator, ExportHelper):
+    bl_idname = "scene.pwn_export"
+    bl_label = "DragonFF Pawn Export"
+    bl_description = "Export Pawn for current scene"
+    filename_ext = ".pwn"
+
+    only_selected: bpy.props.BoolProperty(
+        name="Only Selected",
+        default=False
+    )
+    stream_distance: bpy.props.FloatProperty(
+        name="Stream Distance",
+        default=300.0
+    )
+    draw_distance: bpy.props.FloatProperty(
+        name="Draw Distance",
+        default=300.0
+    )
+    x_offset: bpy.props.FloatProperty(
+        name="X Offset",
+        default=0.0
+    )
+    y_offset: bpy.props.FloatProperty(
+        name="Y Offset",
+        default=0.0
+    )
+
+    z_offset: bpy.props.FloatProperty(
+        name="Z Offset",
+        default=0.0,
+        description="Offset for the z coordinate of the objects"
+    )
+
+    filter_glob : bpy.props.StringProperty(default="*.pwn;*.inc", options={'HIDDEN'})
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "only_selected")
+        layout.prop(self, "stream_distance")
+        layout.prop(self, "draw_distance")
+        layout.prop(self, "x_offset")
+        layout.prop(self, "y_offset")
+        layout.prop(self, "z_offset")
+        layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
+    #######################################################
+    def execute(self, context):
+        try:
+            map_exporter.export_pawn({
+                "file_name"      : self.filepath,
+                "only_selected"  : self.only_selected,
+                "game_id"        : context.scene.dff.game_version_dropdown,
+                "stream_distance": self.stream_distance,
+                "draw_distance"  : self.draw_distance,
+                "x_offset"       : self.x_offset,
+                "y_offset"       : self.y_offset,
+                "z_offset"       : self.z_offset,
+            })
+
+            if not map_exporter.pwn_exporter.total_objects_num:
+                self.report({"ERROR"}, "No exportable meshes found")
+                return {'CANCELLED'}
+            return {'FINISHED'}
+
+        except Exception as e:
+            self.report({"ERROR"}, str(e))
+            return {'CANCELLED'}
+    #######################################################
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+#######################################################
