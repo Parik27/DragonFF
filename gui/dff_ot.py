@@ -668,3 +668,78 @@ class OBJECT_OT_dff_clear_parent_bone(bpy.types.Operator):
             obj.parent_bone = ""
 
         return {'FINISHED'}
+
+#######################################################
+class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
+
+    bl_idname           = "scene.dragonff_txd_export"
+    bl_description      = "Export a Renderware TXD File"
+    bl_label            = "DragonFF TXD (.txd)"
+    filename_ext        = ".txd"
+
+    filepath            : bpy.props.StringProperty(name="File path",
+                                              maxlen=1024,
+                                              default="",
+                                              subtype='FILE_PATH')
+
+    filter_glob         : bpy.props.StringProperty(default="*.txd",
+                                              options={'HIDDEN'})
+
+    directory           : bpy.props.StringProperty(maxlen=1024,
+                                              default="",
+                                              subtype='DIR_PATH')
+
+    mass_export         : bpy.props.BoolProperty(
+        name            = "Mass Export",
+        default         = False
+    )
+
+    only_used_textures  : bpy.props.BoolProperty(
+        name            = "Only Used Textures",
+        description     = "Export only textures that are used in the scene materials",
+        default         = True
+    )
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "mass_export")
+        layout.prop(self, "only_used_textures")
+
+        return None
+
+    #######################################################
+    def execute(self, context):
+        start = time.time()
+        try:
+            from ..ops import txd_exporter
+            txd_exporter.export_txd(
+                {
+                    "file_name"          : self.filepath,
+                    "directory"          : self.directory,
+                    "mass_export"        : self.mass_export,
+                    "only_used_textures" : self.only_used_textures,
+                    "version"            : 0x36003, # TODO: more versions support
+                }
+            )
+            end = time.time()
+            self.report({"INFO"}, f"Finished export in {end - start:.2f}s")
+            print("Exported TXD successfully in %.4f seconds" % (end - start))
+
+        except Exception as e:
+            self.report({"ERROR"}, "Export failed: {}".format(str(e)))
+            return {'FINISHED'}
+
+        return {'FINISHED'}
+
+    #######################################################
+    def invoke(self, context, event):
+        if not self.filepath:
+            if context.blend_data.filepath:
+                self.filepath = context.blend_data.filepath
+            else:
+                self.filepath = "untitled"
+
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}

@@ -17,7 +17,7 @@ class State(metaclass=_StateMeta):
             if ob.parent and ob.parent not in frame_objects_set:
                 append_frame_object(ob.parent)
             frame_objects_set.add(ob)
-            ordered_frame_objcets.append(ob)
+            ordered_frame_objects.append(ob)
 
         def update_frame_status(ob):
             is_frame, is_frame_locked = ob.dff.is_frame, False
@@ -51,11 +51,11 @@ class State(metaclass=_StateMeta):
         frame_objects.sort(key=lambda ob: ob.dff.frame_index)
         atomic_objects.sort(key=lambda ob: ob.dff.atomic_index)
 
-        ordered_frame_objcets, frame_objects_set = [], set()
+        ordered_frame_objects, frame_objects_set = [], set()
         for ob in frame_objects:
             if ob not in frame_objects_set:
                 append_frame_object(ob)
-        frame_objects = ordered_frame_objcets
+        frame_objects = ordered_frame_objects
 
         scene.dff.frames.clear()
         for i, ob in enumerate(frame_objects):
