@@ -507,14 +507,21 @@ class dff_importer:
     #######################################################
     def construct_bone_dict():
         self = dff_importer
-        
+
+        bone_indices = {
+            bone.id
+            for frame in self.dff.frame_list
+            if frame.bone_data
+            for bone in frame.bone_data.bones
+        }
+
         for index, frame in enumerate(self.dff.frame_list):
             if frame.bone_data:
                 bone_id = frame.bone_data.header.id
-                if bone_id != -1:
+                if bone_id in bone_indices:
                     self.bones[bone_id] = {'frame': frame,
                                               'index': index}
-                        
+
     #######################################################
     def align_roll( vec, vecz, tarz ):
 
