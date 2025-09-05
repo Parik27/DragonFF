@@ -125,6 +125,7 @@ types = {
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
     "Native Data PLG"         : 1296,
+    "SkyGFX"                  : 60909,
     "Pipeline Set"            : 39056115,
     "Specular Material"       : 39056118,
     "2d Effect"               : 39056120,
@@ -692,7 +693,8 @@ class Frame:
             data += self.user_data.to_mem()
 
         if self.name is not None and self.name != "unknown":
-            data += Sections.write_chunk(Sections.pad_string(self.name),
+            frame_name = self.name.encode("utf-8")
+            data += Sections.write_chunk(frame_name,
                                          types["Frame"])
 
         return Sections.write_chunk(data, types["Extension"])
@@ -1021,7 +1023,13 @@ class SkinPLG:
             native_chunk = unpack_from("<3I", data)
             platform = unpack_from("<I", data, 12)[0]
 
-            if platform == NativePlatformType.PS2:
+            if platform == NativePlatformType.OGL:
+                # Use the already created SkinPLG from NativeDataPLG
+                self = geometry.extensions.get("skin") or self
+
+                from .native_wdgl import NativeOGLSkin
+                NativeOGLSkin.unpack(self, data[16:])
+            elif platform == NativePlatformType.PS2:
                 from .native_ps2 import NativePS2Skin
                 NativePS2Skin.unpack(self, data[16:], geometry)
             elif platform == NativePlatformType.XBOX:
@@ -1033,6 +1041,8 @@ class SkinPLG:
             elif platform == NativePlatformType.PSP:
                 from .native_psp import NativePSPSkin
                 NativePSPSkin.unpack(self, data[16:], geometry)
+            else:
+                print("Unsupported native platform %d" % (platform))
 
         return self
 
@@ -2152,6 +2162,9 @@ class Clump:
         calculated_size = 12 + header.mesh_count * 8 + (header.total_indices * 2)
         opengl = calculated_size >= parent_chunk.size
 
+        # Native geometry usually doesn't store triangles in this section
+        has_indices = parent_chunk.size > 12 + header.mesh_count * 8
+
         geometry.split_headers = []
 
         is_tri_strip = header.flags == 1
@@ -2165,7 +2178,9 @@ class Clump:
             geometry.split_headers.append(split_header)
 
             if geometry.flags & rpGEOMETRYNATIVE != 0:
-                continue
+                # War Drum OpenGL stores indices here instead of other native geometry
+                if not has_indices:
+                    continue
 
             unpack_format = "<H" if opengl else "<H2x"
             total_iterations = split_header.indices_count
@@ -2236,26 +2251,35 @@ class Clump:
     #######################################################
     def read_native_data_plg(self, parent_chunk, geometry):
         native_chunk = self.read_chunk() # wrong size
-        chunk_size = parent_chunk.size - 16
 
-        platform = unpack_from("<I", self.data, self._read(4))[0]
+        if native_chunk.type == types["Struct"]:
+            chunk_size = parent_chunk.size - 16
 
-        if platform == NativePlatformType.PS2:
-            from .native_ps2 import NativePS2Geometry
-            NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.XBOX:
-            from .native_xbox import NativeXboxGeometry
-            NativeXboxGeometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.GC:
-            from .native_gc import NativeGCGeometry
-            NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.PSP:
-            from .native_psp import NativePSPGeometry
-            NativePSPGeometry.unpack(geometry, self.raw(chunk_size))
+            platform = unpack_from("<I", self.data, self._read(4))[0]
+
+            if platform == NativePlatformType.PS2:
+                from .native_ps2 import NativePS2Geometry
+                NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.XBOX:
+                from .native_xbox import NativeXboxGeometry
+                NativeXboxGeometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.GC:
+                from .native_gc import NativeGCGeometry
+                NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.PSP:
+                from .native_psp import NativePSPGeometry
+                NativePSPGeometry.unpack(geometry, self.raw(chunk_size))
+            else:
+                print("Unsupported native platform %d" % (platform))
+
+            geometry.native_platform_type = platform
+
         else:
-            print("Unsupported native platform %d" % (platform))
+            chunk_size = parent_chunk.size
+            self.pos -= 12
 
-        geometry.native_platform_type = platform
+            from .native_wdgl import NativeWDGLGeometry
+            NativeWDGLGeometry.unpack(geometry, self.data[self.pos:])
 
         self._read(chunk_size)
 
@@ -2650,6 +2674,11 @@ class Clump:
 
                         self._read(chunk.size)
 
+                    elif chunk.type == types["SkyGFX"]:
+                        if chunk.size > 0:
+                            sky_gfx = unpack_from("<B", self.data, self._read(chunk.size))[0]
+                            atomic.extensions["sky_gfx"] = sky_gfx
+
                     else:
                         self._read(chunk.size)
 
@@ -2665,10 +2694,16 @@ class Clump:
     def read_clump(self, root_chunk):
         chunk = self.read_chunk()
 
+        data_len = len(self.data)
+
         if root_chunk.size > 0:
             root_end = self.pos + root_chunk.size
+
+            # Check the actual clump size
+            if root_end > data_len:
+                root_end = data_len
         else:
-            root_end = len(self.data)
+            root_end = data_len
 
         # STRUCT
         if chunk.type == types["Struct"]:  
@@ -2770,6 +2805,13 @@ class Clump:
             ext_data += Sections.write_chunk(
                 pack("<I", pipeline),
                 types["Pipeline Set"]
+            )
+
+        sky_gfx = atomic.extensions.get("sky_gfx")
+        if sky_gfx is not None:
+            ext_data += Sections.write_chunk(
+                pack("<B", sky_gfx),
+                types["SkyGFX"]
             )
 
         data += Sections.write_chunk(ext_data, types["Extension"])

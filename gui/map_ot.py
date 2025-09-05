@@ -179,7 +179,7 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
         options={'HIDDEN'})
 
     def invoke(self, context, event):
-        self.filepath = context.scene.dff.game_root + "/DATA/MAPS/"
+        self.filepath = context.scene.dff.game_root + "/data/maps/"
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
@@ -187,7 +187,7 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
         if os.path.splitext(self.filepath)[-1].lower() == self.filename_ext:
             filepath = os.path.normpath(self.filepath)
             # Try to find if the file is within the game directory structure
-            sep_pos = filepath.upper().find(f"DATA{os.sep}MAPS")
+            sep_pos = filepath.upper().find(f"data{os.sep}maps")
 
             if sep_pos != -1:
                 # File is within game directory, use relative path

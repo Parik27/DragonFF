@@ -13,14 +13,14 @@ The following is a list of supported features by the addon
 #### File Types
 
 - [X] Model files
-- [ ] Texture Files
-  - [X] Import *(Partial, experimental)*
-  - [ ] Export
+- [X] Texture Files
+  - [X] Import
+  - [X] Export *(partial, experimental)*
 - [X] Collision files (including the ones packed in dff)
   - [X] Import
   - [X] Export
 - [ ] Map files (.ipl, .ide)
-  - [X] Import *(Partial, experimental)*
+  - [X] Import *(partial, experimental)*
   - [ ] Export
 - [ ] Animation files
 
@@ -66,9 +66,9 @@ The python scripts have been designed with reusability in mind. As of now, the d
 #### Standalone Modules
 
 * [X] - DFF - `dff.py`
-* [X] - TXD - `txd.py` (partial, experimental)
+* [X] - TXD - `txd.py`
 * [X] - COL - `col.py`
-* [X] - IPL/IDE - `map.py` (partial, experimental)
+* [X] - IPL/IDE - `map.py` *(partial, experimental)*
 * [ ] - IFP - `ifp.py`
 
 #### Contributors

@@ -1,6 +1,5 @@
 import bpy
-from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, \
-    IMPORT_OT_txd, \
+from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, EXPORT_OT_txd, \
     OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
@@ -11,6 +10,7 @@ from .col_ot import EXPORT_OT_col, \
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 from .map_ot import EXPORT_OT_ipl_cull
 from .cull_menus import CULLObjectProps, CULLMenus
+from ..gtaLib.data import presets
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -117,6 +117,8 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box.row().prop(settings, "export_reflection")
 
         if settings.export_reflection:
+            box.prop(settings, "preset_reflection_scales", text="Scale Preset", icon="PRESET", icon_only=True)
+
             self.draw_labelled_prop(
                 box.row(), settings, ["reflection_scale_x", "reflection_scale_y"],
                 "Scale"
@@ -125,9 +127,10 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
                 box.row(), settings, ["reflection_offset_x", "reflection_offset_y"],
                 "Offset"
             )
-            self.draw_labelled_prop(
-                box.row(), settings, ["reflection_intensity"], "Intensity"
-            )
+
+            row = box.row()
+            row.prop(settings, "reflection_intensity", text="Intensity")
+            row.prop(settings, "preset_reflection_intensities", text="", icon="PRESET", icon_only=True)
 
     #######################################################
     def draw_specl_box(self, context, box):
@@ -136,11 +139,12 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box.row().prop(settings, "export_specular")
 
         if settings.export_specular:
-            self.draw_labelled_prop(
-                box.row(), settings, ["specular_level"], "Level"
-            )
+            row = box.row()
+            row.prop(settings, "specular_level", text="Level")
+            row.prop(settings, "preset_specular_levels", text="", icon="PRESET", icon_only=True)
+
             box.row().prop(settings, "specular_texture", text="Texture")
-        
+
     #######################################################
     def draw_mesh_menu(self, context):
 
@@ -197,7 +201,25 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
         except Exception as e:
             print(e)
-        
+
+    #######################################################
+    # Callback function from preset_reflection_intensities enum
+    def set_preset_reflection_intensity(self, context):
+        self.reflection_intensity = float(self.preset_reflection_intensities)
+
+    #######################################################
+    # Callback function from preset_reflection_scales enum
+    def set_preset_reflection_scale(self, context):
+        val = float(self.preset_reflection_scales)
+        self.reflection_scale_x = val
+        self.reflection_scale_y = val
+        self.reflection_offset_x = val
+
+    #######################################################
+    # Callback function from preset_specular_levels enum
+    def set_preset_specular_level(self, context):
+        self.specular_level = float(self.preset_specular_levels)
+
     #######################################################
     def draw(self, context):
 
@@ -221,13 +243,15 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op = self.layout.operator(EXPORT_OT_col.bl_idname,
                              text="DragonFF Collision (.col)")
         op.use_active_collection = False
+        self.layout.operator(EXPORT_OT_txd.bl_idname,
+                             text="DragonFF TXD (.txd)")
         self.layout.operator(EXPORT_OT_ipl_cull.bl_idname,
                              text="DragonFF CULL (.ipl)")
 
 
 #######################################################
 def import_dff_func(self, context):
-    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff, col)")
+    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff, .txd, .col)")
 
 #######################################################
 def export_dff_func(self, context):
@@ -351,6 +375,7 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
             col.prop(settings, "custom_pipeline", icon=icon, text="Custom Pipeline")
 
         box.prop(settings, "right_to_render", text="Right To Render")
+        box.prop(settings, "sky_gfx", text="SkyGFX")
 
     #######################################################
     def draw_col_menu(self, context):
@@ -495,11 +520,38 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     reflection_offset_x  : bpy.props.FloatProperty ()
     reflection_offset_y  : bpy.props.FloatProperty ()
     reflection_intensity : bpy.props.FloatProperty ()
-    
+
+    # Pre-set Reflection Intensity
+    preset_reflection_intensities : bpy.props.EnumProperty(
+        items = ((str(key), name, desc)
+                 for key, (name, desc) in presets.material_reflection_intensities.items()),
+        name = "Preset Reflection Intensity",
+        description = "Preset reflection intensity levels (0-50)",
+        update = MATERIAL_PT_dffMaterials.set_preset_reflection_intensity
+    )
+
+    # Pre-set Reflection Scale & Offset
+    preset_reflection_scales : bpy.props.EnumProperty(
+        items = ((str(key), name, desc)
+                 for key, (name, desc) in presets.material_reflection_scales.items()),
+        name = "Preset Reflection Scales",
+        description = "Preset reflection offsets and scales",
+        update = MATERIAL_PT_dffMaterials.set_preset_reflection_scale
+    )
+
     # Specularity
     export_specular  : bpy.props.BoolProperty(name="Specular Material")
     specular_level   : bpy.props.FloatProperty  ()
     specular_texture : bpy.props.StringProperty ()
+
+    # Pre-set Specular Level
+    preset_specular_levels : bpy.props.EnumProperty(
+        items = ((str(key), name, desc)
+                 for key, (name, desc) in presets.material_specular_levels.items()),
+        name = "Preset Specular Levels",
+        description = "Preset specular levels",
+        update = MATERIAL_PT_dffMaterials.set_preset_specular_level
+    )
 
     # Collision Data
     col_flags       : bpy.props.IntProperty(min=0, max=255)
@@ -514,33 +566,10 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
 
     # Pre-set Material Colours
     preset_mat_cols : bpy.props.EnumProperty(
-        items =
-        (
-            ("[255, 60, 0, 255]", "Right Tail Light", ""),
-            ("[185, 255, 0, 255]", "Left Tail Light", ""),
-            ("[0, 255, 200, 255]", "Right Headlight", ""),
-            ("[255, 175, 0, 255]", "Left Headlight", ""),
-            ("[0, 255, 255, 255]", "4 Colors Paintjob", ""),
-            ("[255, 0, 255, 255]", "Fourth Color", ""),
-            ("[0, 255, 255, 255]", "Third Color", ""),
-            ("[255, 0, 175, 255]", "Secondary Color", ""),
-            ("[60, 255, 0, 255]", "Primary Color", ""),
-            ("[184, 255, 0, 255]", "ImVehFT - Breaklight L", ""),
-            ("[255, 59, 0, 255]", "ImVehFT - Breaklight R", ""),
-            ("[255, 173, 0, 255]", "ImVehFT - Revlight L", ""),
-            ("[0, 255, 198, 255]", "ImVehFT - Revlight R", ""),
-            ("[255, 174, 0, 255]", "ImVehFT - Foglight L", ""),
-            ("[0, 255, 199, 255]", "ImVehFT - Foglight R", ""),
-            ("[183, 255, 0, 255]", "ImVehFT - Indicator LF", ""),
-            ("[255, 58, 0, 255]", "ImVehFT - Indicator RF", ""),
-            ("[182, 255, 0, 255]", "ImVehFT - Indicator LM", ""),
-            ("[255, 57, 0, 255]", "ImVehFT - Indicator RM", ""),
-            ("[181, 255, 0, 255]", "ImVehFT - Indicator LR", ""),
-            ("[255, 56, 0, 255]", "ImVehFT - Indicator RR", ""),
-            ("[0, 16, 255, 255]", "ImVehFT - Light Night", ""),
-            ("[0, 17, 255, 255]", "ImVehFT - Light All-day", ""),
-            ("[0, 18, 255, 255]", "ImVehFT - Default Day", "")
-        ),
+        items = ((str(key), name, desc)
+                 for key, (name, desc) in presets.material_colours.items()),
+        name = "Preset Material Colours",
+        description = "Preset material colours",
         update = MATERIAL_PT_dffMaterials.set_preset_color
     )
         
@@ -655,8 +684,9 @@ compatibiility with DFF Viewers"
         items = (
             ('NONE', 'None', 'Export without setting a pipeline'),
             ('0x53F20098', 'Buildings', 'Refl. Building Pipleine (0x53F20098)'),
+            ('0x53F2009A', 'Vehicles', 'Vehicles (0x53F2009A)'),
             (
-                '0x53F2009A',
+                '0x53F2009C',
                 'Night Vertex Colors',
                 'Night Vertex Colors (0x53F2009C)'
             ),
@@ -671,6 +701,11 @@ compatibiility with DFF Viewers"
         default = 1,
         min = 0,
         description = "Right To Render value (only for skinned object)"
+    )
+
+    sky_gfx : bpy.props.BoolProperty(
+        default = False,
+        description = "Enable SkyGFX (Wind Shader)"
     )
 
     frame_index : bpy.props.IntProperty(
@@ -720,21 +755,6 @@ class DFFCollectionProps(bpy.types.PropertyGroup):
 
     bounds_min: bpy.props.FloatVectorProperty()
     bounds_max: bpy.props.FloatVectorProperty()
-
-#######################################################
-class TXDImportPanel(bpy.types.Panel):
-
-    bl_label       = "DragonFF - TXD Import"
-    bl_idname      = "SCENE_PT_txdImport"
-    bl_space_type  = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context     = "scene"
-    bl_options     = {'DEFAULT_CLOSED'}
-
-    #######################################################
-    def draw(self, context):
-        layout = self.layout
-        layout.operator(IMPORT_OT_txd.bl_idname)
 
 #######################################################
 class DFF_UL_FrameItems(bpy.types.UIList):

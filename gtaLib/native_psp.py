@@ -17,6 +17,7 @@
 from struct import unpack_from, calcsize
 
 from .dff import RGBA, TexCoords, Triangle, Vector
+from .txd import TextureNative, PaletteType
 
 # geometry flags
 rpGEOMETRYTRISTRIP              = 0x00000001
@@ -328,3 +329,109 @@ class NativePSPGeometry:
                     )
 
                 geometry.triangles.append(triangle)
+
+#######################################################
+class NativePSPTexture(TextureNative):
+
+    #######################################################
+    def to_rgba(self, level=0):
+        width  = self.get_width(level)
+        height = self.get_height(level)
+        pixels = self.pixels[level]
+        palette = self.palette
+
+        if palette and self.get_raster_palette_type() == PaletteType.PALETTE_4:
+            return NativePSPTexture.decode_pal4(pixels, palette, width, height)
+
+        return super().to_rgba(level)
+
+    #######################################################
+    @staticmethod
+    def from_mem(data):
+        self = NativePSPTexture()
+        self.pos = 0
+        self.data = data
+
+        (
+            self.raster_format_flags, self.width, self.height, self.depth,
+            self.num_levels, texture_format, bit_flag, unk_flag
+        ) = unpack_from("<I2H3BbI", self.data, self._read(16))
+
+        self.pos += 76
+        unk1, unk2 = unpack_from("<II", self.data, self._read(8))
+
+        (
+            self.platform_id, self.filter_mode, self.uv_addressing
+        ) = unpack_from("<IHH", self.data, self._read(8))
+
+        self.name = self._read_raw(64)
+        self.name = self.name.decode("utf-8").replace('\0', '')
+
+        palette_format = self.get_raster_palette_type()
+
+        if palette_format == PaletteType.PALETTE_8:
+            self.palette = self._read_raw(1024)
+        elif palette_format == PaletteType.PALETTE_4:
+            self.palette = self._read_raw(64)
+
+        for i in range(self.num_levels):
+            width, height = self.get_width(i), self.get_height(i)
+            data_len = width * height * self.depth // 8
+
+            pixels = self._read_raw(data_len)
+            pixels = NativePSPTexture.unswizzle(pixels, width, height, self.depth)
+
+            self.pixels.append(pixels)
+
+        return self
+
+    #######################################################
+    @staticmethod
+    def unswizzle(data, width, height, depth):
+        width = (width * depth) >> 3
+        res = bytearray(width * height)
+
+        row_blocks = width // 16
+        block_size = 16 * 8
+
+        for y in range(height):
+            block_y = y // 8
+            y_in_block = y % 8
+
+            for x in range(width):
+                block_x = x // 16
+                x_in_block = x % 16
+
+                block_idx = block_x + (block_y * row_blocks)
+                src_off = (block_idx * block_size) + x_in_block + y_in_block * 16
+                dst_off = y * width + x
+
+                res[dst_off] = data[src_off]
+
+        return res
+
+    #######################################################
+    @staticmethod
+    def decode_pal4(data, palette, width, height):
+        pos = 0
+        ret = bytearray(4 * width * height)
+
+        for i in data:
+            idx1, idx2 = i & 0xf, (i >> 4) & 0xf
+            ret[pos+0:pos+4] = palette[idx1*4:idx1*4+4]
+            ret[pos+4:pos+8] = palette[idx2*4:idx2*4+4]
+            pos += 8
+
+        return bytes(ret)
+
+    #######################################################
+    def _read(self, size):
+        current_pos = self.pos
+        self.pos += size
+
+        return current_pos
+
+    #######################################################
+    def _read_raw(self, size):
+        offset = self._read(size)
+        return self.data[offset:offset+size]

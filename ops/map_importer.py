@@ -17,7 +17,7 @@
 import bpy
 import os
 from ..gtaLib import map as map_utilites
-from ..ops import dff_importer, col_importer
+from ..ops import dff_importer, col_importer, txd_importer
 from .cull_importer import cull_importer
 from .importer_common import hide_object
 
@@ -65,10 +65,11 @@ class map_importer:
                 new_obj.rotation_quaternion = obj.rotation_quaternion
                 new_obj.scale = obj.scale
 
-                modifier = new_obj.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
-                # When added to some objects (empties?), returned modifier is None
-                if modifier is not None:
-                    modifier.use_edge_angle = False
+                if not self.settings.create_backfaces:
+                    modifier = new_obj.modifiers.new("EdgeSplit", 'EDGE_SPLIT')
+                    # When added to some objects (empties?), returned modifier is None
+                    if modifier is not None:
+                        modifier.use_edge_angle = False
 
                 if '{}.dff'.format(model) in bpy.data.collections:
                     bpy.data.collections['{}.dff'.format(model)].objects.link(
@@ -117,22 +118,41 @@ class map_importer:
             print(str(inst.id), 'loaded from cache')
         else:
 
+            dff_filename = "%s.dff" % model
+            txd_filename = "%s.txd" % txd
+
+            dff_filepath = map_utilites.MapDataUtility.find_path_case_insensitive(self.settings.dff_folder, dff_filename)
+            txd_filepath = map_utilites.MapDataUtility.find_path_case_insensitive(self.settings.dff_folder, txd_filename)
+
             # Import dff from a file if file exists
-            if not os.path.isfile("%s/%s.dff" % (self.settings.dff_folder, model)):
+            if not dff_filepath:
+                print("DFF not found:", os.path.join(self.settings.dff_folder, dff_filename))
                 return
+
+            txd_images = {}
+            if self.settings.load_txd:
+                if txd_filepath:
+                    txd_images = txd_importer.import_txd(
+                        {
+                            'file_name'      : txd_filepath,
+                            'skip_mipmaps'   : True,
+                            'pack'           : self.settings.txd_pack,
+                        }
+                    ).images
+                else:
+                    print("TXD not found:", os.path.join(self.settings.dff_folder, txd_filename))
+
             importer = dff_importer.import_dff(
                 {
                     'file_name'      : "%s/%s.dff" % (
                         self.settings.dff_folder, model
                     ),
-                    'load_txd'         : self.settings.load_txd,
-                    'txd_filename'     : "%s.txd" % txd,
-                    'skip_mipmaps'     : True,
-                    'txd_pack'         : False,
+                    'txd_images'       : txd_images,
                     'image_ext'        : 'PNG',
                     'connect_bones'    : False,
                     'use_mat_split'    : self.settings.read_mat_split,
-                    'remove_doubles'   : True,
+                    'remove_doubles'   : not self.settings.create_backfaces,
+                    'create_backfaces' : self.settings.create_backfaces,
                     'group_materials'  : True,
                     'import_normals'   : True,
                     'materials_naming' : "DEF",
@@ -302,7 +322,7 @@ class map_importer:
             # Get a list of the .col files available
             col_files_all = set()
             for filename in os.listdir(self.settings.dff_folder):
-                if filename.endswith(".col"):
+                if filename.lower().endswith(".col"):
                     col_files_all.add(filename)
 
             # Run through all instances and determine which .col files to load

@@ -17,6 +17,9 @@
 import bpy
 import bmesh
 
+from ..gtaLib.dff import strlen
+from ..gtaLib.data import presets
+
 #######################################################
 def set_object_mode(obj, mode):
     bpy.context.view_layer.objects.active = obj
@@ -48,6 +51,13 @@ def create_bmesh_for_mesh(mesh, obj_mode):
     return bm
 
 #######################################################
+def invert_matrix_safe(matrix):
+    if abs(matrix.determinant()) > 1e-8:
+        matrix.invert()
+    else:
+        matrix.identity()
+
+#######################################################
 def redraw_viewport():
     for area in bpy.context.window.screen.areas:
         if area.type == 'VIEW_3D':
@@ -69,10 +79,16 @@ class material_helper:
             node.default_value[3] = color[3] / 255
 
             self.material.diffuse_color = [i / 255 for i in color]
-            
+
         else:
             self.material.diffuse_color = [i / 255 for i in color[:3]]
             self.material.alpha = color[3] / 255
+
+        # Set preset material colours
+        color_key = tuple(color)
+        if color_key in presets.material_colours:
+            colours = list(presets.material_colours)
+            self.material.dff["preset_mat_cols"] = colours.index(color_key)
 
     #######################################################
     def set_texture(self, image, label="", filters=0, uv_addressing=0):
@@ -151,10 +167,16 @@ class material_helper:
 
     #######################################################
     def set_specular_material(self, plugin):
-        
+
         self.material.dff.export_specular = True
         self.material.dff.specular_level = plugin.level
-        self.material.dff.specular_texture = plugin.texture.decode('ascii')
+        self.material.dff.specular_texture = plugin.texture[:strlen(plugin.texture)].decode('ascii')
+
+        # Set preset specular level
+        level_key = round(plugin.level, 2)
+        if level_key in presets.material_specular_levels:
+            levels = list(presets.material_specular_levels)
+            self.material.dff["preset_specular_levels"] = levels.index(level_key)
 
     #######################################################
     def set_reflection_material(self, plugin):
@@ -168,7 +190,19 @@ class material_helper:
         self.material.dff.reflection_offset_x = plugin.o_x
 
         self.material.dff.reflection_intensity = plugin.intensity
-        
+
+        # Set preset reflection intensities
+        intensity_key = round(plugin.intensity, 2)
+        if intensity_key in presets.material_reflection_intensities:
+            intensities = list(presets.material_reflection_intensities)
+            self.material.dff["preset_reflection_intensities"] = intensities.index(intensity_key)
+
+        # Set preset reflection scales
+        scale_key = round(plugin.s_x, 2)
+        if scale_key in presets.material_reflection_scales:
+            scales = list(presets.material_reflection_scales)
+            self.material.dff["preset_reflection_scales"] = scales.index(scale_key)
+
     #######################################################
     def set_uv_animation(self, uv_anim):
 

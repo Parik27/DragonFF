@@ -18,13 +18,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                                               maxlen=1024,
                                               default="",
                                               subtype='FILE_PATH')
-    
+
     filter_glob         : bpy.props.StringProperty(default="*.dff;*.col",
                                               options={'HIDDEN'})
-    
+
     directory           : bpy.props.StringProperty(maxlen=1024,
                                               default="",
-                                              subtype='FILE_PATH')
+                                              subtype='DIR_PATH')
 
     mass_export         : bpy.props.BoolProperty(
         name            = "Mass Export",
@@ -181,6 +181,11 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                 self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
                 return {'FINISHED'}
 
+        if self.from_outliner or self.mass_export:
+            preserve_positions, preserve_rotations = self.preserve_positions, self.preserve_rotations
+        else:
+            preserve_positions, preserve_rotations = True, True
+
         start = time.time ()
         try:
             dff_exporter.export_dff(
@@ -189,8 +194,8 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "directory"          : self.directory,
                     "selected"           : self.only_selected,
                     "mass_export"        : False if self.from_outliner else self.mass_export,
-                    "preserve_positions" : self.preserve_positions,
-                    "preserve_rotations" : self.preserve_rotations,
+                    "preserve_positions" : preserve_positions,
+                    "preserve_rotations" : preserve_rotations,
                     "dm_to_clumps"       : self.dm_to_clumps,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
@@ -245,17 +250,17 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
 class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     
     bl_idname      = "import_scene.dff"
-    bl_description = 'Import a Renderware DFF or COL File'
-    bl_label       = "DragonFF DFF (.dff, .col)"
+    bl_description = 'Import a Renderware DFF, TXD or COL File'
+    bl_label       = "DragonFF DFF (.dff, .txd, .col)"
 
-    filter_glob   : bpy.props.StringProperty(default="*.dff;*.col",
+    filter_glob   : bpy.props.StringProperty(default="*.dff;*.txd;*.col",
                                               options={'HIDDEN'})
-    
+
     directory     : bpy.props.StringProperty(maxlen=1024,
                                               default="",
-                                              subtype='FILE_PATH',
-                                              options={'HIDDEN'})
-    
+                                              subtype='DIR_PATH',
+                                              options={'HIDDEN'},)
+
     # Stores all the file names to read (not just the firsst)
     files : bpy.props.CollectionProperty(
         type    = bpy.types.OperatorFileListElement,
@@ -268,22 +273,11 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
          description = "Filepath used for importing the DFF/COL file",
          maxlen      = 1024,
          default     = "",
-         options     = {'HIDDEN'}
+         options     = {'HIDDEN'},
+         subtype     = 'FILE_PATH'
      )
 
-    load_txd :  bpy.props.BoolProperty(
-        name        = "Load TXD file",
-        default     = False
-    )
-
-    txd_filename :  bpy.props.StringProperty(
-        name        = "Custom TXD File Name",
-        description = "File name used for importing the TXD file. Leave blank if TXD name is same as DFF name",
-        maxlen      = 256,
-        default     = "",
-    )
-
-    skip_mipmaps :  bpy.props.BoolProperty(
+    txd_skip_mipmaps :  bpy.props.BoolProperty(
         name        = "Skip Mipmaps",
         default     = True
     )
@@ -291,6 +285,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     txd_pack : bpy.props.BoolProperty(
         name        = "Pack Images",
         description = "Pack images as embedded data into the .blend file",
+        default     = True
+    )
+
+    txd_apply_to_objects : bpy.props.BoolProperty(
+        name        = "Apply To Objects",
+        description = "Apply to objects with missing textures in the scene",
         default     = True
     )
 
@@ -315,6 +315,13 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         name        = "Use Edge Split",
         default     = True
     )
+
+    create_backfaces  :  bpy.props.BoolProperty(
+        name        = "Create Backfaces",
+        description = "Create backfaces by duplicating existing faces. Incompatible with Use Edge Split",
+        default     = False
+    )
+
     group_materials :  bpy.props.BoolProperty(
         name        = "Group Similar Materials",
         default     = True
@@ -361,32 +368,70 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     def draw(self, context):
         layout = self.layout
 
-        box = layout.box()
-        box.prop(self, "load_txd")
-        if self.load_txd:
-            box.prop(self, "skip_mipmaps")
-            box.prop(self, "txd_pack")
-            box.prop(self, "txd_filename", text="File name")
+        box_txd = layout.box()
+        box_txd.label(text="TXD")
+        box_txd.prop(self, "txd_skip_mipmaps")
+        box_txd.prop(self, "txd_pack")
+        box_txd.prop(self, "txd_apply_to_objects")
 
-        layout.prop(self, "connect_bones")
-        
-        box = layout.box()
+        box_dff = layout.box()
+        box_dff.label(text="DFF")
+        box_dff.prop(self, "connect_bones")
+
+        box = box_dff.box()
         box.prop(self, "load_images")
         if self.load_images:
             box.prop(self, "image_ext")
-        
-        layout.prop(self, "read_mat_split")
-        layout.prop(self, "remove_doubles")
-        layout.prop(self, "import_normals")
-        layout.prop(self, "group_materials")
-        layout.prop(self, "materials_naming")
-        layout.prop(self, "clumps_to_dm")
-        
+
+        box_dff.prop(self, "read_mat_split")
+        box_dff.prop(self, "remove_doubles")
+        box_dff.prop(self, "create_backfaces")
+        box_dff.prop(self, "import_normals")
+        box_dff.prop(self, "group_materials")
+        box_dff.prop(self, "materials_naming")
+        box_dff.prop(self, "clumps_to_dm")
+
     #######################################################
     def execute(self, context):
-        
-        for file in [os.path.join(self.directory,file.name) for file in self.files] if self.files else [self.filepath]:
-            if file.endswith(".col"):
+
+        file_paths = [os.path.join(self.directory, file.name) for file in self.files] if self.files else [self.filepath]
+        txd_images = {}
+
+        # Import TXD images
+        for file in file_paths:
+            if file.lower().endswith(".txd"):
+                txd = txd_importer.import_txd(
+                    {
+                        'file_name'      : file,
+                        'skip_mipmaps'   : self.txd_skip_mipmaps,
+                        'pack'           : self.txd_pack,
+                    }
+                )
+                txd_images.update(txd.images)
+
+        # Apply TXD images to scene objects
+        if self.txd_apply_to_objects:
+            for obj in context.scene.objects:
+                for mat_slot in obj.material_slots:
+                    mat = mat_slot.material
+                    if not mat:
+                        continue
+
+                    node_tree = mat.node_tree
+                    if not node_tree:
+                        continue
+
+                    for node in node_tree.nodes:
+                        if node.type != 'TEX_IMAGE':
+                            continue
+
+                        txd_img = txd_images.get(node.label)
+                        if txd_img and (not node.image or not node.image.pixels):
+                            node.image = txd_img[0]
+
+        # Import DFF and COL objects
+        for file in file_paths:
+            if file.lower().endswith(".col"):
                 col_list = col_importer.import_col_file(file, os.path.basename(file))
                 # Move all collisions to a top collection named for the file they came from
                 collection = bpy.data.collections.new(os.path.basename(file))
@@ -395,23 +440,21 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     context.scene.collection.children.unlink(c)
                     collection.children.link(c)
 
-            else:
+            elif file.lower().endswith(".dff"):
                 # Set image_ext to none if scan images is disabled
                 image_ext = self.image_ext
                 if not self.load_images:
                     image_ext = None
-                    
+
                 importer = dff_importer.import_dff(
                     {
                         'file_name'        : file,
-                        'load_txd'         : self.load_txd,
-                        'txd_filename'     : self.txd_filename,
-                        'skip_mipmaps'     : self.skip_mipmaps,
-                        'txd_pack'         : self.txd_pack,
+                        'txd_images'       : txd_images,
                         'image_ext'        : image_ext,
                         'connect_bones'    : self.connect_bones,
                         'use_mat_split'    : self.read_mat_split,
                         'remove_doubles'   : self.remove_doubles,
+                        'create_backfaces' : self.create_backfaces,
                         'group_materials'  : self.group_materials,
                         'import_normals'   : self.import_normals,
                         'materials_naming' : self.materials_naming,
@@ -432,101 +475,6 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     context.scene['dragonff_custom_version'] = "{}.{}.{}.{}".format(
                         *(version[i] for i in [2,3,4,6])
                     ) #convert hex to x.x.x.x format
-
-        return {'FINISHED'}
-
-    #######################################################
-    def invoke(self, context, event):
-
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-#######################################################
-class IMPORT_OT_txd(bpy.types.Operator, ImportHelper):
-
-    bl_idname      = "import_scene.txd"
-    bl_description = 'Import a Renderware TXD File'
-    bl_label       = "Import TXD (.txd)"
-
-    filter_glob   : bpy.props.StringProperty(default="*.txd",
-                                              options={'HIDDEN'})
-
-    directory     : bpy.props.StringProperty(maxlen=1024,
-                                              default="",
-                                              subtype='FILE_PATH',
-                                              options={'HIDDEN'})
-
-    # Stores all the file names to read (not just the firsst)
-    files : bpy.props.CollectionProperty(
-        type    = bpy.types.OperatorFileListElement,
-        options = {'HIDDEN'}
-    )
-
-    # Stores a single file path
-    filepath : bpy.props.StringProperty(
-         name        = "File Path",
-         description = "Filepath used for importing the TXD file",
-         maxlen      = 1024,
-         default     = "",
-         options     = {'HIDDEN'}
-     )
-
-    skip_mipmaps :  bpy.props.BoolProperty(
-        name        = "Skip Mipmaps",
-        default     = True
-    )
-
-    pack : bpy.props.BoolProperty(
-        name        = "Pack Images",
-        description = "Pack images as embedded data into the .blend file",
-        default     = True
-    )
-
-    apply_to_objects : bpy.props.BoolProperty(
-        name        = "Apply To Objects",
-        description = "Apply to objects with missing textures in the scene",
-        default     = True
-    )
-
-    #######################################################
-    def draw(self, context):
-        layout = self.layout
-
-        layout.prop(self, "skip_mipmaps")
-        layout.prop(self, "pack")
-        layout.prop(self, "apply_to_objects")
-
-    #######################################################
-    def execute(self, context):
-
-        for file in [os.path.join(self.directory, file.name) for file in self.files] if self.files else [self.filepath]:
-
-            txd_images = txd_importer.import_txd(
-                {
-                    'file_name'      : file,
-                    'skip_mipmaps'   : self.skip_mipmaps,
-                    'pack'           : self.pack
-                }
-            ).images
-
-            if self.apply_to_objects:
-                for obj in context.scene.objects:
-                    for mat_slot in obj.material_slots:
-                        mat = mat_slot.material
-                        if not mat:
-                            continue
-
-                        node_tree = mat.node_tree
-                        if not node_tree:
-                            continue
-
-                        for node in node_tree.nodes:
-                            if node.type != 'TEX_IMAGE':
-                                continue
-
-                            txd_img = txd_images.get(node.label)
-                            if txd_img and (not node.image or not node.image.pixels):
-                                node.image = txd_img[0]
 
         return {'FINISHED'}
 
@@ -736,3 +684,78 @@ class OBJECT_OT_dff_clear_parent_bone(bpy.types.Operator):
             obj.parent_bone = ""
 
         return {'FINISHED'}
+
+#######################################################
+class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
+
+    bl_idname           = "scene.dragonff_txd_export"
+    bl_description      = "Export a Renderware TXD File"
+    bl_label            = "DragonFF TXD (.txd)"
+    filename_ext        = ".txd"
+
+    filepath            : bpy.props.StringProperty(name="File path",
+                                              maxlen=1024,
+                                              default="",
+                                              subtype='FILE_PATH')
+
+    filter_glob         : bpy.props.StringProperty(default="*.txd",
+                                              options={'HIDDEN'})
+
+    directory           : bpy.props.StringProperty(maxlen=1024,
+                                              default="",
+                                              subtype='DIR_PATH')
+
+    mass_export         : bpy.props.BoolProperty(
+        name            = "Mass Export",
+        default         = False
+    )
+
+    only_used_textures  : bpy.props.BoolProperty(
+        name            = "Only Used Textures",
+        description     = "Export only textures that are used in the scene materials",
+        default         = True
+    )
+
+    #######################################################
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "mass_export")
+        layout.prop(self, "only_used_textures")
+
+        return None
+
+    #######################################################
+    def execute(self, context):
+        start = time.time()
+        try:
+            from ..ops import txd_exporter
+            txd_exporter.export_txd(
+                {
+                    "file_name"          : self.filepath,
+                    "directory"          : self.directory,
+                    "mass_export"        : self.mass_export,
+                    "only_used_textures" : self.only_used_textures,
+                    "version"            : 0x36003, # TODO: more versions support
+                }
+            )
+            end = time.time()
+            self.report({"INFO"}, f"Finished export in {end - start:.2f}s")
+            print("Exported TXD successfully in %.4f seconds" % (end - start))
+
+        except Exception as e:
+            self.report({"ERROR"}, "Export failed: {}".format(str(e)))
+            return {'FINISHED'}
+
+        return {'FINISHED'}
+
+    #######################################################
+    def invoke(self, context, event):
+        if not self.filepath:
+            if context.blend_data.filepath:
+                self.filepath = context.blend_data.filepath
+            else:
+                self.filepath = "untitled"
+
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
