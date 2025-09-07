@@ -416,16 +416,17 @@ class dff_exporter:
     @staticmethod
     def create_frame(obj, append=True, set_parent=True, matrix_local=None):
         self = dff_exporter
-        
+
         frame       = dff.Frame()
         frame_index = len(self.dff.frame_list)
-        
-        # Get rid of everything before the last period
-        if self.export_frame_names:
-            frame.name = clear_extension(obj.name)
 
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
+
+        # Get rid of everything before the last period
+        if self.export_frame_names:
+            if is_bone or obj.dff.export_frame_name:
+                frame.name = clear_extension(obj.name)
 
         matrix = matrix_local or obj.matrix_local
         if is_bone and obj.parent is not None:

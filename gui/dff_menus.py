@@ -338,10 +338,14 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "light", text="Enable Lighting")
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
 
+        box = layout.box()
         row = box.row()
         if settings.is_frame_locked:
             row.enabled = False
         row.prop(settings, "is_frame", text="Export As Frame")
+
+        if settings.is_frame:
+            box.prop(settings, "export_frame_name", text="Export Frame Name")
 
         properties = [
             ["day_cols", "Day Vertex Colours"],
@@ -378,6 +382,15 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "sky_gfx", text="SkyGFX")
 
     #######################################################
+    def draw_empty_menu(self, context):
+
+        layout = self.layout
+        settings = context.object.dff
+
+        box = layout.box()
+        box.prop(settings, "export_frame_name", text="Export Frame Name")
+
+    #######################################################
     def draw_col_menu(self, context):
         layout = self.layout
         settings = context.object.dff
@@ -408,17 +421,20 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         layout = self.layout
         settings = context.object.dff
+        object_type = context.object.type
 
         layout.prop(settings, "type", text="Type")
 
         if settings.type == 'OBJ':
-            if context.object.type == 'MESH':
+            if object_type == 'MESH':
                 self.draw_mesh_menu(context)
+            elif object_type == 'EMPTY':
+                self.draw_empty_menu(context)
 
         elif settings.type == 'COL':
-            if context.object.type == 'EMPTY':
+            if object_type == 'EMPTY':
                 self.draw_col_menu(context)
-            if context.object.type == 'MESH':
+            elif object_type == 'MESH':
                 settings = context.scene.dff
                 box = layout.box()
                 box.prop(settings, "draw_facegroups", text="Display Face Groups")
@@ -585,11 +601,6 @@ class DFFObjectProps(bpy.types.PropertyGroup):
         )
     )
 
-    is_frame : bpy.props.BoolProperty(
-        default     = False,
-        description = "Object will be exported as a frame"
-    )
-
     # Mesh properties
     export_normals : bpy.props.BoolProperty(
         default=True,
@@ -717,6 +728,17 @@ compatibiility with DFF Viewers"
         min = 0,
         max = 2**31-1,
         options = {'SKIP_SAVE', 'HIDDEN'}
+    )
+
+    # Frame properties
+    is_frame : bpy.props.BoolProperty(
+        default     = False,
+        description = "Object will be exported as a frame"
+    )
+
+    export_frame_name : bpy.props.BoolProperty(
+        default     = True,
+        description = "Whether Frame name will be exported"
     )
 
     # 2DFX properties

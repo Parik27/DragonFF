@@ -795,6 +795,7 @@ class dff_importer:
 
                 obj.rotation_mode = 'QUATERNION'
                 obj.matrix_local  = matrix.copy()
+                obj.dff.export_frame_name = frame.name != 'unnamed'
 
             # Link mesh to frame
             for mesh in meshes:
