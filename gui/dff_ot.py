@@ -69,13 +69,13 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     preserve_positions  : bpy.props.BoolProperty(
         name            = "Preserve Positions",
         description     = "Don't set object positions to (0,0,0)",
-        default         = True
+        default         = False
     )
 
     preserve_rotations  : bpy.props.BoolProperty(
         name            = "Preserve Rotations",
         description     = "Don't set object rotations to (0,0,0)",
-        default         = True
+        default         = False
     )
 
     export_version      : bpy.props.EnumProperty(
@@ -221,8 +221,6 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             self.only_selected = False
             self.export_coll = False
             self.apply_coll_trans = False
-            self.preserve_positions = False
-            self.preserve_rotations = False
 
         if 'dragonff_imported_version' in context.scene:
             self.export_version = context.scene['dragonff_imported_version']
