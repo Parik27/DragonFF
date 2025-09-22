@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "dragonff"
-version = "1.0.3"
+version = "1.1.0"
 name = "DragonFF"
 tagline = "Add-on to edit RenderWare Formats (.dff, .txd, .col)"
 maintainer = "Parik27"
