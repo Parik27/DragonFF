@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from struct import unpack_from, calcsize, pack
 from enum import Enum, IntEnum
 
@@ -125,6 +125,7 @@ types = {
     "UV Animation PLG"        : 309,
     "Bin Mesh PLG"            : 1294,
     "Native Data PLG"         : 1296,
+    "SkyGFX"                  : 60909,
     "Pipeline Set"            : 39056115,
     "Specular Material"       : 39056118,
     "2d Effect"               : 39056120,
@@ -216,7 +217,7 @@ class Sections:
         
     #######################################################
     def write(type, data, chunk_type=None):
-        _data = b''
+        _data = bytearray()
         
         if type in Sections.formats:
             packer = Sections.formats[type]
@@ -299,7 +300,7 @@ class Texture:
     #######################################################
     def to_mem(self):
 
-        data = b''
+        data = bytearray()
         data += pack("<2B2x", self.filters, self.uv_addressing)
 
         data  = Sections.write_chunk(data, types["Struct"])
@@ -307,7 +308,7 @@ class Texture:
                                      types["String"])
         data += Sections.write_chunk(Sections.pad_string(self.mask),
                                      types["String"])
-        data += Sections.write_chunk(b'', types["Extension"])
+        data += Sections.write_chunk(bytearray(), types["Extension"])
 
         return Sections.write_chunk(data, types["Texture"])
 
@@ -376,7 +377,7 @@ class Material:
     #######################################################
     def bumpfx_to_mem(self):
 
-        data = b''
+        data = bytearray()
         bump_map = self.plugins['bump_map'][0]
         
         data += pack("<IfI", 1, bump_map.intensity, bump_map.bump_map is not None)
@@ -440,7 +441,7 @@ class Material:
     
     #######################################################
     def matfx_to_mem(self):
-        data = b''
+        data = bytearray()
 
         effectType = 0
         if 'bump_map' in self.plugins:
@@ -468,7 +469,7 @@ class Material:
 
         if effectType == 0:
             self._hasMatFX = False
-            return b''
+            return bytearray()
             
         if effectType != 3 or effectType != 6: #Both effects are set
             data += pack("<I", 0)
@@ -544,7 +545,7 @@ class Atomic:
     #######################################################
     def to_mem(self):
 
-        data = b''
+        data = bytearray()
         data += pack("<4I", self.frame, self.geometry, self.flags, self.unk)
         return data
 
@@ -601,7 +602,7 @@ class UserData:
 
     #######################################################
     def to_mem (self):
-        data = b''
+        data = bytearray()
 
         data += pack("<I", len(self.sections))
         for section in self.sections:
@@ -674,7 +675,7 @@ class Frame:
     #######################################################
     def header_to_mem(self):
 
-        data = b''
+        data = bytearray()
         data += Sections.write(Matrix, self.rotation_matrix)
         data += Sections.write(Vector, self.position)
         data += pack("<iI", self.parent, self.creation_flags)
@@ -683,18 +684,19 @@ class Frame:
     #######################################################
     def extensions_to_mem(self):
 
-        data = b''
-
-        if self.name is not None and self.name != "unknown":
-            data += Sections.write_chunk(Sections.pad_string(self.name),
-                                         types["Frame"])
+        data = bytearray()
 
         if self.bone_data is not None:
             data += self.bone_data.to_mem()
 
         if self.user_data is not None:
             data += self.user_data.to_mem()
-        
+
+        if self.name is not None and self.name != "unknown":
+            frame_name = self.name.encode("utf-8")
+            data += Sections.write_chunk(frame_name,
+                                         types["Frame"])
+
         return Sections.write_chunk(data, types["Extension"])
 
     ##################################################################
@@ -732,7 +734,7 @@ class HAnimPLG:
     #######################################################
     def to_mem(self):
 
-        data = b''
+        data = bytearray()
 
         data += Sections.write(HAnimHeader, self.header)
         if len(self.bones) > 0:
@@ -879,7 +881,7 @@ class SkinPLG:
             self.max_weights_per_vertex = 0
             self.bones_used = []
 
-        data = b''
+        data = bytearray()
         data += pack("<3Bx", self.num_bones, len(self.bones_used),
                      self.max_weights_per_vertex)
 
@@ -1021,7 +1023,13 @@ class SkinPLG:
             native_chunk = unpack_from("<3I", data)
             platform = unpack_from("<I", data, 12)[0]
 
-            if platform == NativePlatformType.PS2:
+            if platform == NativePlatformType.OGL:
+                # Use the already created SkinPLG from NativeDataPLG
+                self = geometry.extensions.get("skin") or self
+
+                from .native_wdgl import NativeOGLSkin
+                NativeOGLSkin.unpack(self, data[16:])
+            elif platform == NativePlatformType.PS2:
                 from .native_ps2 import NativePS2Skin
                 NativePS2Skin.unpack(self, data[16:], geometry)
             elif platform == NativePlatformType.XBOX:
@@ -1033,6 +1041,8 @@ class SkinPLG:
             elif platform == NativePlatformType.PSP:
                 from .native_psp import NativePSPSkin
                 NativePSPSkin.unpack(self, data[16:], geometry)
+            else:
+                print("Unsupported native platform %d" % (platform))
 
         return self
 
@@ -1212,7 +1222,7 @@ class PedAttractor2dfx:
     #######################################################
     # See: https://gtamods.com/wiki/2d_Effect_(RW_Section)
     #######################################################
-    class Types(Enum):
+    class Types(IntEnum):
 
         PED_ATM_ATTRACTOR = 0
         PED_SEAT_ATTRACTOR = 1
@@ -1229,12 +1239,15 @@ class PedAttractor2dfx:
     def __init__(self, loc):
 
         self.effect_id = 3
-        
+
         self.loc = loc
         self.type = 0
-        self.rotation_matrix = None
-        self.external_script = ""
+        self.queue_direction = [0, 0, 0]
+        self.use_direction = [0, 0, 0]
+        self.forward_direction = [0, 0, 0]
+        self.external_script = "none"
         self.ped_existing_probability = 0
+        self.unk = 0
 
     #######################################################
     @staticmethod
@@ -1242,19 +1255,23 @@ class PedAttractor2dfx:
         self = PedAttractor2dfx(loc)
 
         self.type = unpack_from("<I", data, offset)[0]
-        self.rotation_matrix = Sections.read(Matrix, data, offset + 4)
-        self.external_script = data[offset + 40: strlen(data, offset + 40)]
-        self.ped_existing_probabiliy = unpack_from("<I", data, offset + 48)[0]
+        self.queue_direction = Sections.read(Vector, data, offset + 4)
+        self.use_direction = Sections.read(Vector, data, offset + 16)
+        self.forward_direction = Sections.read(Vector, data, offset + 28)
+        external_script = data[offset + 40:offset + 48]
+        self.ped_existing_probability, self.unk = unpack_from("<II", data, offset + 48)
 
-        self.external_script = self.external_script.decode('ascii')
-        
+        self.external_script = external_script[:strlen(external_script)].decode('ascii')
+
         return self
 
     #######################################################
     def to_mem(self):
         data = pack("<I", self.type)
-        data += Sections.write(Matrix, self.rotation_matrix)
-        data += pack("<8sI", self.external_script, self.ped_existing_probability)
+        data += Sections.write(Vector, self.queue_direction)
+        data += Sections.write(Vector, self.use_direction)
+        data += Sections.write(Vector, self.forward_direction)
+        data += pack("<8sII", self.external_script.encode(), self.ped_existing_probability, self.unk)
 
         return data
 
@@ -1273,7 +1290,7 @@ class SunGlare2dfx:
 
     #######################################################
     def to_mem(self):
-        return b''
+        return bytearray()
 
 #######################################################
 class EnterExit2dfx:
@@ -1547,7 +1564,7 @@ class Extension2dfx:
 
         # Write only if there are entries
         if self.is_empty():
-            return b''
+            return bytearray()
 
         # Entries length
         data = pack("<I", len(self.entries))
@@ -1619,7 +1636,7 @@ class DeltaMorph:
             if s > 0:
                 data += pack("<B", s)
 
-        data = b''
+        data = bytearray()
         n, li = 0, -1
         for i in self.indices:
             if i != li + 1:
@@ -1743,7 +1760,7 @@ class DeltaMorphPLG:
     def to_mem(self):
 
         if not self.entries:
-            return b''
+            return bytearray()
 
         data = pack("<I", len(self.entries))
         for entry in self.entries:
@@ -1903,7 +1920,7 @@ class Geometry:
     def material_list_to_mem(self):
         # TODO: Support instance materials
 
-        data = b''
+        data = bytearray()
         
         data += pack("<I", len(self.materials))
         for i in range(len(self.materials)):
@@ -1920,17 +1937,13 @@ class Geometry:
     #######################################################
     def write_bin_split(self):
 
-        data = b''
+        data = bytearray()
 
-        meshes = {}
+        meshes = defaultdict(list)
         is_tri_strip = self.export_flags["triangle_strip"]
 
         if is_tri_strip:
             for triangle in self.triangles:
-
-                if triangle.material not in meshes:
-                    meshes[triangle.material] = []
-
                 meshes[triangle.material].append([triangle.a, triangle.b, triangle.c])
 
             for mesh in meshes:
@@ -1938,16 +1951,12 @@ class Geometry:
 
         else:
             for triangle in self.triangles:
-
-                if triangle.material not in meshes:
-                    meshes[triangle.material] = []
-
-                meshes[triangle.material] += [triangle.a, triangle.b, triangle.c]
+                meshes[triangle.material].extend([triangle.a, triangle.b, triangle.c])
 
         total_indices = sum(len(triangles) for triangles in meshes.values())
         data += pack("<III", int(is_tri_strip), len(meshes), total_indices)
 
-        for mesh in sorted(meshes):
+        for mesh in meshes:
             data += pack("<II", len(meshes[mesh]), mesh)
             data += pack("<%dI" % (len(meshes[mesh])), *meshes[mesh])
 
@@ -1956,7 +1965,7 @@ class Geometry:
     #######################################################
     def extensions_to_mem(self, extra_extensions = []):
 
-        data = b''
+        data = bytearray()
 
         # Write Bin Mesh PLG
         if self.export_flags['write_mesh_plg'] or self.export_flags['exclude_geo_faces']:
@@ -1993,7 +2002,7 @@ class Geometry:
 
         flags |= (len(self.uv_layers) & 0xff) << 16
 
-        data = b''
+        data = bytearray()
         data += pack("<IIII",
                      flags,
                      len(self.triangles) if not self.export_flags["exclude_geo_faces"] else 0,
@@ -2143,6 +2152,9 @@ class dff:
         calculated_size = 12 + header.mesh_count * 8 + (header.total_indices * 2)
         opengl = calculated_size >= parent_chunk.size
 
+        # Native geometry usually doesn't store triangles in this section
+        has_indices = parent_chunk.size > 12 + header.mesh_count * 8
+
         geometry.split_headers = []
 
         is_tri_strip = header.flags == 1
@@ -2156,7 +2168,9 @@ class dff:
             geometry.split_headers.append(split_header)
 
             if geometry.flags & rpGEOMETRYNATIVE != 0:
-                continue
+                # War Drum OpenGL stores indices here instead of other native geometry
+                if not has_indices:
+                    continue
 
             unpack_format = "<H" if opengl else "<H2x"
             total_iterations = split_header.indices_count
@@ -2227,26 +2241,35 @@ class dff:
     #######################################################
     def read_native_data_plg(self, parent_chunk, geometry):
         native_chunk = self.read_chunk() # wrong size
-        chunk_size = parent_chunk.size - 16
 
-        platform = unpack_from("<I", self.data, self._read(4))[0]
+        if native_chunk.type == types["Struct"]:
+            chunk_size = parent_chunk.size - 16
 
-        if platform == NativePlatformType.PS2:
-            from .native_ps2 import NativePS2Geometry
-            NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.XBOX:
-            from .native_xbox import NativeXboxGeometry
-            NativeXboxGeometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.GC:
-            from .native_gc import NativeGCGeometry
-            NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
-        elif platform == NativePlatformType.PSP:
-            from .native_psp import NativePSPGeometry
-            NativePSPGeometry.unpack(geometry, self.raw(chunk_size))
+            platform = unpack_from("<I", self.data, self._read(4))[0]
+
+            if platform == NativePlatformType.PS2:
+                from .native_ps2 import NativePS2Geometry
+                NativePS2Geometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.XBOX:
+                from .native_xbox import NativeXboxGeometry
+                NativeXboxGeometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.GC:
+                from .native_gc import NativeGCGeometry
+                NativeGCGeometry.unpack(geometry, self.raw(chunk_size))
+            elif platform == NativePlatformType.PSP:
+                from .native_psp import NativePSPGeometry
+                NativePSPGeometry.unpack(geometry, self.raw(chunk_size))
+            else:
+                print("Unsupported native platform %d" % (platform))
+
+            geometry.native_platform_type = platform
+
         else:
-            print("Unsupported native platform %d" % (platform))
+            chunk_size = parent_chunk.size
+            self.pos -= 12
 
-        geometry.native_platform_type = platform
+            from .native_wdgl import NativeWDGLGeometry
+            NativeWDGLGeometry.unpack(geometry, self.data[self.pos:])
 
         self._read(chunk_size)
 
@@ -2641,6 +2664,11 @@ class dff:
 
                         self._read(chunk.size)
 
+                    elif chunk.type == types["SkyGFX"]:
+                        if chunk.size > 0:
+                            sky_gfx = unpack_from("<B", self.data, self._read(chunk.size))[0]
+                            atomic.extensions["sky_gfx"] = sky_gfx
+
                     else:
                         self._read(chunk.size)
 
@@ -2656,10 +2684,16 @@ class dff:
     def read_clump(self, root_chunk):
         chunk = self.read_chunk()
 
+        data_len = len(self.data)
+
         if root_chunk.size > 0:
             root_end = self.pos + root_chunk.size
+
+            # Check the actual clump size
+            if root_end > data_len:
+                root_end = data_len
         else:
-            root_end = len(self.data)
+            root_end = data_len
 
         # STRUCT
         if chunk.type == types["Struct"]:  
@@ -2757,7 +2791,7 @@ class dff:
     #######################################################
     def write_frame_list(self):
 
-        data = b''
+        data = bytearray()
 
         data += pack("<I", len(self.frame_list)) # length
 
@@ -2773,7 +2807,7 @@ class dff:
 
     #######################################################
     def write_geometry_list(self):
-        data = b''
+        data = bytearray()
         data += pack("<I", len(self.geometry_list))
 
         data = Sections.write_chunk(data, types["Struct"])
@@ -2796,7 +2830,7 @@ class dff:
         data = Sections.write_chunk(data, types["Struct"])
         geometry = self.geometry_list[atomic.geometry]
 
-        ext_data = b''
+        ext_data = bytearray()
         if "skin" in geometry.extensions:
             right_to_render = atomic.extensions.get("right_to_render")
             if not right_to_render:
@@ -2819,6 +2853,13 @@ class dff:
                 types["Pipeline Set"]
             )
 
+        sky_gfx = atomic.extensions.get("sky_gfx")
+        if sky_gfx is not None:
+            ext_data += Sections.write_chunk(
+                pack("<B", sky_gfx),
+                types["SkyGFX"]
+            )
+
         data += Sections.write_chunk(ext_data, types["Extension"])
         return Sections.write_chunk(data, types["Atomic"])
 
@@ -2826,7 +2867,7 @@ class dff:
     def write_uv_dict(self):
 
         if len(self.uvanim_dict) < 1:
-            return b''
+            return bytearray()
         
         data = pack("<I", len(self.uvanim_dict))
         data = Sections.write_chunk(data, types["Struct"])
@@ -2857,14 +2898,14 @@ class dff:
             _data = Sections.write_chunk(coll.data, coll.ext_type)
             data += Sections.write_chunk(_data, types["Extension"])
             
-        data += Sections.write_chunk(b'', types["Extension"])
+        data += Sections.write_chunk(bytearray(), types["Extension"])
             
         return Sections.write_chunk(data, types["Clump"])
     
     #######################################################
     def write_memory(self, version):
 
-        data = b''
+        data = bytearray()
         Sections.set_library_id(version, 0xFFFF)
 
         data += self.write_uv_dict()

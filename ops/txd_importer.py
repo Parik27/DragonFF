@@ -47,7 +47,7 @@ class txd_importer:
             offset = h * width * 4
             pixels += list(map(lambda b: b / 0xff, rgba[offset:offset+width*4]))
 
-        image = bpy.data.images.new(name, width, height)
+        image = bpy.data.images.new(name, width, height, alpha=True)
         image.pixels = pixels
 
         if pack:
@@ -59,7 +59,7 @@ class txd_importer:
     def import_textures():
         self = txd_importer
 
-        txd_name = os.path.basename(self.file_name)
+        txd_name = os.path.basename(self.file_name).lower()
 
         # Import native textures
         for tex in self.txd.native_textures:

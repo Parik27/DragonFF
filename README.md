@@ -13,14 +13,14 @@ The following is a list of supported features by the addon
 #### File Types
 
 - [X] Model files
-- [ ] Texture Files
-  - [X] Import *(Partial, experimental)*
-  - [ ] Export
+- [X] Texture Files
+  - [X] Import
+  - [X] Export *(partial, experimental)*
 - [X] Collision files (including the ones packed in dff)
   - [X] Import
   - [X] Export
 - [ ] Map files (.ipl, .ide)
-  - [X] Import *(Partial, experimental)*
+  - [X] Import *(partial, experimental)*
   - [ ] Export
 - [ ] Animation files
 
@@ -34,9 +34,25 @@ The following is a list of supported features by the addon
   - [ ] Dual Textures
   - [X] UV Animation
 - [X] Rockstar Specular and Reflection Extensions
-- [X] 2D Effects *(Partial)*
+- [X] 2D Effects
 
 ## Installation
+
+There are two ways to install DragonFF.
+
+### From Blender Extentensions
+
+In Blender 4.2 and above, you can install DragonFF directly from within Blender.
+
+![image](https://github.com/user-attachments/assets/02868d1c-273b-47a2-927d-083aa5d45605)
+
+1. Go to Blender Preferences.
+2. In the Get Extensions Tab, search for DragonFF
+3. Click Install
+
+## Manually
+
+In older versions of Blender or to get the newest changes (that may be unstable), use the following instructions to install Blender from GitHub.
 
 1. [Download](https://github.com/Parik27/DragonFF/archive/refs/heads/master.zip) the addon zip file from the latest master branch
 2. Import the downloaded .zip file by selecting it from *(User) Preferences/Addons/Install from File*
@@ -50,9 +66,9 @@ The python scripts have been designed with reusability in mind. As of now, the d
 #### Standalone Modules
 
 * [X] - DFF - `dff.py`
-* [X] - TXD - `txd.py` (partial, experimental)
+* [X] - TXD - `txd.py`
 * [X] - COL - `col.py`
-* [X] - IPL/IDE - `map.py` (partial, experimental)
+* [X] - IPL/IDE - `map.py` *(partial, experimental)*
 * [ ] - IFP - `ifp.py`
 
 #### Contributors

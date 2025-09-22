@@ -1,11 +1,24 @@
+# GTA DragonFF - Blender scripts to edit basic GTA formats
+# Copyright (C) 2019  Parik
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import bpy
-import gpu
-import os
-import random
-from bpy_extras.io_utils import ImportHelper
-from gpu_extras.batch import batch_for_shader
-from ..data import map_data
-from ..ops.importer_common import game_version
+
+from .col_ot import FaceGroupsDrawer
+from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull
+from ..gtaLib.data import map_data
 
 #######################################################
 class DFFFrameProps(bpy.types.PropertyGroup):
@@ -63,11 +76,11 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     game_version_dropdown : bpy.props.EnumProperty(
         name = 'Game',
         items = (
-            (game_version.III, 'GTA III', 'GTA III map segments'),
-            (game_version.VC, 'GTA VC', 'GTA VC map segments'),
-            (game_version.SA, 'GTA SA', 'GTA SA map segments'),
-            (game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
-            (game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
+            (map_data.game_version.III, 'GTA III', 'GTA III map segments'),
+            (map_data.game_version.VC, 'GTA VC', 'GTA VC map segments'),
+            (map_data.game_version.SA, 'GTA SA', 'GTA SA map segments'),
+            (map_data.game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
+            (map_data.game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
         )
     )
 
@@ -79,7 +92,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     custom_ipl_path : bpy.props.StringProperty(
         name        = "IPL path",
         default     = '',
-        description = "Custom IPL path"
+        description = "Custom IPL path (supports both relative paths from game root and absolute paths)"
     )
 
     use_custom_map_section : bpy.props.BoolProperty(
@@ -97,14 +110,31 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    txd_pack : bpy.props.BoolProperty(
+        name        = "Pack Images",
+        description = "Pack images as embedded data into the .blend file",
+        default     = False
+    )
+
     read_mat_split  :  bpy.props.BoolProperty(
         name        = "Read Material Split",
         description = "Whether to read material split for loading triangles",
         default     = False
     )
 
+    create_backfaces:  bpy.props.BoolProperty(
+        name        = "Create Backfaces",
+        description = "Create backfaces by duplicating existing faces. Incompatible with Use Edge Split",
+        default     = False
+    )
+
     load_collisions: bpy.props.BoolProperty(
         name        = "Load Map Collisions",
+        default     = False
+    )
+
+    load_cull: bpy.props.BoolProperty(
+        name        = "Load Map CULL",
         default     = False
     )
 
@@ -122,18 +152,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         subtype = 'DIR_PATH'
     )
 
-    # txd_folder = bpy.props.StringProperty \
-    #     (
-    #     name = 'Txd folder',
-    #     default = 'C:/Users/blaha/Documents/GitHub/DragonFF/tests/txd',
-    #     description = "Define a folder where all of the txd models are stored.",
-    #     subtype = 'DIR_PATH'
-    #     )
-
     draw_facegroups : bpy.props.BoolProperty(
         name="Draw Face Groups",
         description="Display the Face Groups of the active object (if they exist) in the viewport",
-        default=False
+        default=False,
+        get=FaceGroupsDrawer.get_draw_enabled,
+        set=FaceGroupsDrawer.set_draw_enabled
     )
 
     draw_bounds: bpy.props.BoolProperty(
@@ -201,32 +225,6 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     )
 
 #######################################################
-class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
-
-    bl_idname = "scene.select_ipl"
-    bl_label = "Select IPL File"
-
-    filename_ext = ".ipl"
-
-    filter_glob : bpy.props.StringProperty(
-        default="*.ipl",
-        options={'HIDDEN'})
-
-    def invoke(self, context, event):
-        self.filepath = context.scene.dff.game_root + "/DATA/MAPS/"
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def execute(self, context):
-        if os.path.splitext(self.filepath)[-1].lower() == self.filename_ext:
-            filepath = os.path.normpath(self.filepath)
-            sep_pos = filepath.upper().find(f"DATA{os.sep}MAPS")
-            game_root = filepath[:sep_pos]
-            context.scene.dff.game_root = game_root
-            context.scene.dff.custom_ipl_path = os.path.relpath(filepath, game_root)
-        return {'FINISHED'}
-
-#######################################################
 class MapImportPanel(bpy.types.Panel):
     """Creates a Panel in the scene context of the properties editor"""
     bl_label = "DragonFF - Map Import"
@@ -247,19 +245,26 @@ class MapImportPanel(bpy.types.Panel):
                                 align=True)
 
         col = flow.column()
-        col.prop(settings, "game_version_dropdown", text="Game")
+        col.prop(settings, "game_version_dropdown")
         if settings.use_custom_map_section:
             row = col.row(align=True)
             row.prop(settings, "custom_ipl_path")
             row.operator(SCENE_OT_ipl_select.bl_idname, text="", icon='FILEBROWSER')
         else:
-            col.prop(settings, "map_sections", text="Map segment")
-        col.prop(settings, "use_custom_map_section", text="Use custom map segment")
+            col.prop(settings, "map_sections")
+        col.prop(settings, "use_custom_map_section")
         col.separator()
-        col.prop(settings, "skip_lod", text="Skip LOD objects")
-        col.prop(settings, "load_txd", text="Load TXD files")
-        col.prop(settings, "read_mat_split", text="Read Material Split")
-        col.prop(settings, "load_collisions", text="Load Map Collisions")
+
+        box = col.box()
+        box.prop(settings, "load_txd")
+        if settings.load_txd:
+            box.prop(settings, "txd_pack")
+
+        col.prop(settings, "skip_lod")
+        col.prop(settings, "read_mat_split")
+        col.prop(settings, "create_backfaces")
+        col.prop(settings, "load_collisions")
+        col.prop(settings, "load_cull")
 
         layout.separator()
 
@@ -268,3 +273,10 @@ class MapImportPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("scene.dragonff_map_import")
+
+#######################################################@
+class DFF_MT_AddMapObject(bpy.types.Menu):
+    bl_label = "Map"
+
+    def draw(self, context):
+        self.layout.operator(OBJECT_OT_dff_add_cull.bl_idname, text="CULL", icon="CUBE")

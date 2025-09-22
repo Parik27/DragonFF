@@ -16,7 +16,6 @@
 
 import bpy
 from .gui import gui
-from .ops import map_importer
 
 from bpy.utils import register_class, unregister_class
 
@@ -34,17 +33,30 @@ bl_info = {
 # Class list to register
 _classes = [
     gui.IMPORT_OT_dff,
-    gui.IMPORT_OT_txd,
     gui.EXPORT_OT_dff,
+    gui.EXPORT_OT_txd,
     gui.EXPORT_OT_col,
+    gui.EXPORT_OT_ipl_cull,
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
+    gui.SCENE_OT_dff_import_map,
     gui.SCENE_OT_ipl_select,
     gui.OBJECT_OT_dff_generate_bone_props,
     gui.OBJECT_OT_dff_set_parent_bone,
     gui.OBJECT_OT_dff_clear_parent_bone,
     gui.OBJECT_OT_facegoups_col,
+    gui.OBJECT_OT_dff_add_collision_box,
+    gui.OBJECT_OT_dff_add_collision_sphere,
+    gui.OBJECT_OT_dff_add_2dfx_light,
+    gui.OBJECT_OT_dff_add_2dfx_particle,
+    gui.OBJECT_OT_dff_add_2dfx_ped_attractor,
+    gui.OBJECT_OT_dff_add_2dfx_sun_glare,
+    gui.OBJECT_OT_dff_add_2dfx_road_sign,
+    gui.OBJECT_OT_dff_add_2dfx_trigger_point,
+    gui.OBJECT_OT_dff_add_2dfx_cover_point,
+    gui.OBJECT_OT_dff_add_2dfx_escalator,
+    gui.OBJECT_OT_dff_add_cull,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
@@ -52,18 +64,22 @@ _classes = [
     gui.EXT2DFXObjectProps,
     gui.Light2DFXObjectProps,
     gui.RoadSign2DFXObjectProps,
+    gui.CULLObjectProps,
     gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
     gui.DFFObjectProps,
     gui.DFFCollectionProps,
     gui.MapImportPanel,
-    gui.TXDImportPanel,
     gui.DFFFrameProps,
     gui.DFFAtomicProps,
     gui.DFFSceneProps,
     gui.DFF_MT_ExportChoice,
     gui.DFF_MT_EditArmature,
     gui.DFF_MT_Pose,
+    gui.DFF_MT_AddCollisionObject,
+    gui.DFF_MT_Add2DFXObject,
+    gui.DFF_MT_AddMapObject,
+    gui.DFF_MT_AddObject,
     gui.DFF_UL_FrameItems,
     gui.DFF_UL_AtomicItems,
     gui.SCENE_PT_dffFrames,
@@ -73,9 +89,9 @@ _classes = [
     gui.Bound2DHeightGizmo,
     gui.VectorPlaneGizmo,
     gui.CollisionCollectionGizmoGroup,
+    gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
-    gui.Escalator2DFXGizmoGroup,
-    map_importer.Map_Import_Operator
+    gui.Escalator2DFXGizmoGroup
 ]
 
 #######################################################
@@ -98,6 +114,7 @@ def register():
     bpy.types.OUTLINER_MT_object.append(gui.export_dff_outliner)
     bpy.types.VIEW3D_MT_edit_armature.append(gui.edit_armature_dff_func)
     bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
+    bpy.types.VIEW3D_MT_add.append(gui.add_object_dff_func)
 
     gui.State.hook_events()
 
@@ -117,7 +134,9 @@ def unregister():
     bpy.types.OUTLINER_MT_object.remove(gui.export_dff_outliner)
     bpy.types.VIEW3D_MT_edit_armature.remove(gui.edit_armature_dff_func)
     bpy.types.VIEW3D_MT_pose.remove(gui.pose_dff_func)
+    bpy.types.VIEW3D_MT_add.remove(gui.add_object_dff_func)
 
+    gui.FaceGroupsDrawer.disable_draw()
     gui.State.unhook_events()
 
     # Unregister all the classes

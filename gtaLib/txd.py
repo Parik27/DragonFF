@@ -16,7 +16,7 @@
 
 from enum import IntEnum
 from math import ceil
-from struct import unpack_from
+from struct import unpack_from, pack
 from collections import namedtuple
 
 from .dff import Sections, NativePlatformType
@@ -78,6 +78,26 @@ class DeviceType(IntEnum):
     DEVICE_GC   = 3 # probably
     DEVICE_PS2  = 6
     DEVICE_XBOX = 8
+    DEVICE_PSP  = 9
+
+#######################################################
+class ImageEncoder:
+    
+    @staticmethod
+    def rgba_to_bgra8888(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b, a = rgba_data[i:i+4]
+            ret.extend([b, g, r, a])
+        return bytes(ret)
+    
+    @staticmethod
+    def rgba_to_bgra888(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b = rgba_data[i:i+3]
+            ret.extend([b, g, r])
+        return bytes(ret)
 
 #######################################################
 class ImageDecoder:
@@ -223,12 +243,22 @@ class ImageDecoder:
 
         for y in range(0, height, 4):
             for x in range(0, width, 4):
-                alpha0, alpha1, alpha2, alpha3, alpha4, color0, color1, bits = unpack_from("<2B3H2HI", data, pos)
-                pos += 16
+                alpha0 = data[pos]
+                alpha1 = data[pos + 1]
+                alpha_bits = unpack_from("<6B", data, pos + 2)
+                pos += 8
+
+                # Combine alpha bits into 48-bit integer
+                alpha_indices = (alpha_bits[0] | (alpha_bits[1] << 8) | (alpha_bits[2] << 16) |
+                                (alpha_bits[3] << 24) | (alpha_bits[4] << 32) | (alpha_bits[5] << 40))
+
+                color0, color1, bits = unpack_from("<2HI", data, pos)
+                pos += 8
 
                 r0, g0, b0 = ImageDecoder._decode565(color0)
                 r1, g1, b1 = ImageDecoder._decode565(color1)
 
+                # Calculate alpha values
                 if alpha0 > alpha1:
                     alphas = (
                         alpha0,
@@ -252,8 +282,6 @@ class ImageDecoder:
                         255
                     )
 
-                alpha_indices = (alpha4, alpha3, alpha2)
-
                 # Decode this block into 4x4 pixels
                 for j in range(4):
                     for i in range(4):
@@ -271,19 +299,13 @@ class ImageDecoder:
                                 r, g, b = ImageDecoder._c2b(r0, r1), ImageDecoder._c2b(g0, g1), ImageDecoder._c2b(b0, b1)
                         elif control == 3:
                             if color0 > color1:
-                                r, g, b = ImageDecoder._c3(r0, r1),ImageDecoder. _c3(g0, g1), ImageDecoder._c3(b0, b1)
+                                r, g, b = ImageDecoder._c3(r0, r1), ImageDecoder._c3(g0, g1), ImageDecoder._c3(b0, b1)
                             else:
                                 r, g, b = 0, 0, 0
 
-                        # Get alpha index
-                        shift = 3 * (15 - ((3 - i) + (j * 4)))
-                        shift_s = shift % 16
-                        row_s = shift // 16
-                        row_e = (shift + 2) // 16
-                        alpha_index = (alpha_indices[2 - row_s] >> shift_s) & 7
-                        if row_s != row_e:
-                            shift_e = 16 - shift_s
-                            alpha_index += (alpha_indices[2 - row_e] & ((2 ** (3 - shift_e)) - 1)) << shift_e
+                        # Get alpha index (3 bits per pixel)
+                        pixel_idx = j * 4 + i
+                        alpha_index = (alpha_indices >> (3 * pixel_idx)) & 0x7
                         a = alphas[alpha_index]
 
                         idx = 4 * ((y + j) * width + (x + i))
@@ -622,22 +644,40 @@ class TextureNative:
                                       prop & 0b1000 != 0)
 
     #######################################################
+    def write_platform_properties(self):
+        platform_properties = self.platform_properties
+        prop = 0
+
+        if self.platform_id == NativePlatformType.D3D8:
+            if hasattr(platform_properties, 'dxt_type'):
+                prop = platform_properties.dxt_type
+
+        else:
+            if hasattr(platform_properties, 'alpha') and platform_properties.alpha:
+                prop |= 0b0001
+            if hasattr(platform_properties, 'cube_texture') and platform_properties.cube_texture:
+                prop |= 0b0010
+            if hasattr(platform_properties, 'auto_mipmaps') and platform_properties.auto_mipmaps:
+                prop |= 0b0100
+            if hasattr(platform_properties, 'compressed') and platform_properties.compressed:
+                prop |= 0b1000
+
+        return pack('<B', prop)
+
+    #######################################################
     def from_mem(data):
 
         self = TextureNative()
 
         pos = 0
         (
-            self.platform_id, self.filter_mode, self.uv_addressing, self.name,
+            self.platform_id, self.filter_mode, self.uv_addressing, unk, self.name,
             self.mask
-        ) = unpack_from("<IHH32s32s", data, pos)
+        ) = unpack_from("<I2BH32s32s", data, pos)
         pos += 72
 
-        self.name = self.name.decode("utf-8").replace('\0', '')
-        try:
-            self.mask = self.mask.decode("utf-8").replace('\0', '')
-        except UnicodeDecodeError:
-            self.mask = ''
+        self.name = self.name[:strlen(self.name)].decode("utf-8")
+        self.mask = self.mask[:strlen(self.mask)].decode("utf-8")
 
         (
             self.raster_format_flags, self.d3d_format, self.width, self.height,
@@ -658,6 +698,47 @@ class TextureNative:
             pos += 4 + len(pixels)
 
         return self
+
+    #######################################################
+    def to_mem(self):
+
+        data = bytearray()
+
+        # Header: platform_id, filter_mode, uv_addressing, name(32), mask(32) = 72 bytes
+        name_bytes = self.name.encode('utf-8')[:31].ljust(32, b'\0')
+        mask_bytes = self.mask.encode('utf-8')[:31].ljust(32, b'\0')
+
+        data.extend(pack('<I2B2x',
+            self.platform_id,
+            self.filter_mode,
+            self.uv_addressing
+        ))
+        data.extend(name_bytes)
+        data.extend(mask_bytes)
+
+        # Raster info: format_flags, d3d_format, width, height, depth, num_levels, raster_type = 15 bytes
+        data.extend(pack('<IIHHBBB',
+            self.raster_format_flags,
+            self.d3d_format,
+            self.width,
+            self.height,
+            self.depth,
+            self.num_levels,
+            self.raster_type
+        ))
+
+        # Platform properties: 1 byte
+        data.extend(self.write_platform_properties())
+
+        # Palette data (if any)
+        data.extend(self.palette)
+
+        # Pixel data for each mipmap level
+        for pixels in self.pixels:
+            data.extend(pack('<I', len(pixels)))
+            data.extend(pixels)
+
+        return data
 
 #######################################################
 class Image:
@@ -754,7 +835,10 @@ class txd:
                         from .native_ps2 import NativePS2Texture
                         texture = NativePS2Texture.from_mem(self.data[self.pos:])
                         self._read(texture.pos - chunk.size)
-
+                    elif platform_id == NativePlatformType.XBOX:
+                        from .native_xbox import NativeXboxTexture
+                        texture = NativeXboxTexture.from_mem(self.data[self.pos:])
+                        self._read(texture.pos - chunk.size)
                     elif (platform_id >> 24) == NativePlatformType.GC:
                         from .native_gc import NativeGCTexture
                         texture = NativeGCTexture.from_mem(self.data[self.pos:], self.rw_version)
@@ -773,6 +857,11 @@ class txd:
                 elif self.device_id == DeviceType.DEVICE_GC:
                     from .native_gc import NativeGCTexture
                     texture = NativeGCTexture.from_mem(self.data[self.pos:], self.rw_version)
+                    self._read(texture.pos - chunk.size)
+
+                elif self.device_id == DeviceType.DEVICE_PSP:
+                    from .native_psp import NativePSPTexture
+                    texture = NativePSPTexture.from_mem(self.data[self.pos:])
                     self._read(texture.pos - chunk.size)
 
                 if texture:
@@ -925,6 +1014,43 @@ class txd:
         with open(filename, mode='rb') as file:
             content = file.read()
             self.load_memory(content)
+
+    #######################################################
+    def write_native_texture(self, texture):
+
+        data = Sections.write_chunk(texture.to_mem(), types["Struct"])
+        data += Sections.write_chunk(bytearray(), types["Extension"])
+
+        return Sections.write_chunk(data, types["Texture Native"])
+
+    #######################################################
+    def write_texture_dictionary(self):
+
+        data = Sections.write(TexDict, (len(self.native_textures), self.device_id), types["Struct"])
+
+        for texture in self.native_textures:
+            data += self.write_native_texture(texture)
+
+        data += Sections.write_chunk(bytearray(), types["Extension"])
+
+        return Sections.write_chunk(data, types["Texture Dictionary"])
+
+    #######################################################
+    def write_memory(self, version):
+
+        data = bytearray()
+        Sections.set_library_id(version, 0xFFFF)
+
+        data += self.write_texture_dictionary()
+
+        return data
+
+    #######################################################
+    def write_file(self, filename, version):
+
+        with open(filename, mode='wb') as file:
+            content = self.write_memory(version)
+            file.write(content)
 
     #######################################################
     def __init__(self):
