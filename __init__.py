@@ -91,13 +91,14 @@ _classes = [
     gui.CollisionCollectionGizmoGroup,
     gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
-    gui.Escalator2DFXGizmoGroup
+    gui.Escalator2DFXGizmoGroup,
 ]
 
 #######################################################
 def register():
 
     # Register all the classes
+    gui.DFFMapPropertiesGenerator.generate_and_register_all ()
     for cls in _classes:
         register_class(cls)
 
@@ -141,5 +142,6 @@ def unregister():
     gui.State.unhook_events()
 
     # Unregister all the classes
+    gui.DFFMapPropertiesGenerator.unregister_all ()
     for cls in _classes:
         unregister_class(cls)

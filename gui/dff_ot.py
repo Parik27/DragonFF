@@ -2,6 +2,9 @@ import bpy
 import os
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 import time
+from ..gtaLib.map import MapFileText
+
+from ..ops.map_importer import MapFileImporter
 
 from ..ops import dff_exporter, dff_importer, col_importer, txd_importer
 from ..ops.state import State
@@ -241,9 +244,9 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     
     bl_idname      = "import_scene.dff"
     bl_description = 'Import a Renderware DFF, TXD or COL File'
-    bl_label       = "DragonFF DFF (.dff, .txd, .col)"
+    bl_label       = "DragonFF DFF (.dff, .txd, .col, .ide, .ipl)"
 
-    filter_glob   : bpy.props.StringProperty(default="*.dff;*.txd;*.col",
+    filter_glob   : bpy.props.StringProperty(default="*.dff;*.txd;*.col;*.ide;*.ipl",
                                               options={'HIDDEN'})
 
     directory     : bpy.props.StringProperty(maxlen=1024,
@@ -422,6 +425,16 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                 for c in col_list:
                     context.scene.collection.children.unlink(c)
                     collection.children.link(c)
+
+            elif file.lower().endswith(".ide") or file.lower().endswith(".ipl"):
+                map_file = MapFileText ()
+                map_file.load_file (file)
+
+                importer = MapFileImporter (map_file.entries)
+                importer.perform_import ({
+                    'collection_name': os.path.basename(file)
+                })
+
 
             elif file.lower().endswith(".dff"):
                 # Set image_ext to none if scan images is disabled

@@ -14,11 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from dataclasses import MISSING, Field, fields
+from typing import get_args, get_origin
 import bpy
 
 from .col_ot import FaceGroupsDrawer
 from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull
 from ..gtaLib.data import map_data
+from ..gtaLib.map import MAP_SECTION_TYPES
 
 #######################################################
 class DFFFrameProps(bpy.types.PropertyGroup):
@@ -29,6 +32,133 @@ class DFFFrameProps(bpy.types.PropertyGroup):
 class DFFAtomicProps(bpy.types.PropertyGroup):
     obj       : bpy.props.PointerProperty(type=bpy.types.Object)
     frame_obj : bpy.props.PointerProperty(type=bpy.types.Object)
+
+def get_valid_map_sections (_, context):
+    return ((section_type.get_name(), section_type.get_name(), "")
+            for section_type in MAP_SECTION_TYPES)
+
+def get_valid_map_formats (props, context):
+    for secion_type in MAP_SECTION_TYPES:
+        if secion_type.get_name() == props.section:
+            return ((format_name, format_name, "") for format_name, _, _ in secion_type.formats)
+
+    return []
+
+class DFFMapPropsBase (bpy.types.PropertyGroup):
+
+    section : bpy.props.EnumProperty(items=get_valid_map_sections)
+    current_format : bpy.props.EnumProperty(items=get_valid_map_formats)
+
+#######################################################
+class DFFMapPropertiesMenu:
+    @staticmethod
+    def draw_section_specific_menu (layout, context, settings, section):
+        section_prop_name = section.lower() + '_data'
+        section_prop = getattr(settings, section_prop_name, None)
+        if section_prop is None:
+            return
+
+        box = layout.box()
+        box.label(text=f"{section} Properties", icon='SETTINGS')
+        for field_name, field_value in section_prop.__annotations__.items():
+            box.prop(section_prop, field_name)
+
+    @staticmethod
+    def draw_menu (layout, context):
+        box = layout.box ()
+        settings = context.object.dff.map_props
+        box.prop(settings, "section", text="Section")
+        box.prop(settings, "current_format", text="Format")
+
+        DFFMapPropertiesMenu.draw_section_specific_menu (layout, context, settings, settings.section)
+
+#######################################################
+class DFFMapPropertiesGenerator():
+    DFFMapProps = None
+    generated_classes = []
+
+    @staticmethod
+    def generate_bpy_prop_from_section_field (section_field: Field):
+        field_type = section_field.type
+
+        type_mapping = {
+            int: bpy.props.IntProperty,
+            float: bpy.props.FloatProperty,
+            str: bpy.props.StringProperty,
+            bool: bpy.props.BoolProperty,
+            tuple: bpy.props.FloatVectorProperty
+        }
+
+        if field_type in type_mapping or get_origin(field_type) in type_mapping:
+            prop_type = type_mapping.get(field_type, type_mapping.get(get_origin(field_type), None))
+            prop_kwargs = {
+                'name': section_field.name
+            }
+
+            if section_field.default is not MISSING:
+                prop_kwargs['default'] = section_field.default
+
+            if get_origin(field_type) == tuple:
+                prop_kwargs['size'] = len(get_args(section_field.type))
+
+            print(prop_kwargs)
+
+            return prop_type(**prop_kwargs)
+
+    @staticmethod
+    def generate_section_properties (section_name, section_type):
+        DFFSectionProps = type(f'DFF{section_name.capitalize()}Props', (bpy.types.PropertyGroup,), {})
+        print(section_type)
+        for field in fields(section_type):
+            bpy_prop = DFFMapPropertiesGenerator.generate_bpy_prop_from_section_field(field)
+            DFFSectionProps.__annotations__[field.name] = bpy_prop
+        return DFFSectionProps
+
+    @staticmethod
+    def generate_main_properties_group ():
+        if DFFMapPropertiesGenerator.DFFMapProps is not None:
+            return DFFMapPropertiesGenerator.DFFMapProps, DFFMapPropertiesGenerator.generated_classes
+
+        generated_classes = []
+        DFFMapProps = type('DFFMapProps', (DFFMapPropsBase,), {})
+        for section_type in MAP_SECTION_TYPES:
+            section_name = section_type.get_name()
+            prop_name = section_type.get_name().lower() + '_data'
+            DFFSectionProps = DFFMapPropertiesGenerator.generate_section_properties(section_name, section_type)
+            DFFMapProps.__annotations__[prop_name] = bpy.props.PointerProperty(
+                type=DFFSectionProps
+            )
+            generated_classes.append(DFFSectionProps)
+
+        generated_classes.append(DFFMapProps)
+        DFFMapPropertiesGenerator.DFFMapProps = DFFMapProps
+        DFFMapPropertiesGenerator.generated_classes = generated_classes
+
+        return DFFMapProps, generated_classes
+
+    @staticmethod
+    def get_main_properties_class ():
+        if DFFMapPropertiesGenerator.DFFMapProps is None:
+            DFFMapPropertiesGenerator.generate_main_properties_group()
+
+        return DFFMapPropertiesGenerator.DFFMapProps
+
+    @staticmethod
+    def generate_and_register_all ():
+        DFFMapProps, generated_classes = DFFMapPropertiesGenerator.generate_main_properties_group()
+
+        for cls in generated_classes:
+            bpy.utils.register_class(cls)
+
+        return DFFMapProps, generated_classes
+
+    @staticmethod
+    def unregister_all ():
+        for cls in DFFMapPropertiesGenerator.generated_classes:
+            bpy.utils.unregister_class(cls)
+
+        DFFMapPropertiesGenerator.DFFMapProps = None
+        DFFMapPropertiesGenerator.generated_classes = []
 
 #######################################################
 class DFFSceneProps(bpy.types.PropertyGroup):
