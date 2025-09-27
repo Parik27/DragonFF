@@ -57,6 +57,10 @@ class MapFileText:
                         self.entries.append (data)
                         break
 
+    def write_file (self, filename):
+        with open(filename, 'w') as f:
+            f.write(self.write_memory ())
+
     def write_memory (self):
         f = StringIO()
 

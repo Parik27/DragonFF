@@ -162,3 +162,21 @@ class MapSection:
 
     def get_scale (self):
         return getattr (self, "scale", (1.0, 1.0, 1.0))
+
+    def set_location (self, location):
+        if hasattr (self, "location"):
+            self.location = location
+
+    def set_rotation (self, rotation):
+        if hasattr (self, "rotation"):
+            self.rotation = rotation
+
+    def set_scale (self, scale):
+        if hasattr (self, "scale"):
+            self.scale = scale
+
+    def get_linked_entries (self) -> list[str]:
+        return []
+
+    def get_collection_name (self) -> str | None:
+        return None

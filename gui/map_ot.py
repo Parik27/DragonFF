@@ -20,8 +20,10 @@ import os
 import time
 
 from bpy_extras.io_utils import ImportHelper, ExportHelper
+from ..gtaLib.map import MapFileText
+from ..ops.map_exporter import MapFileExporter
 
-from ..ops import map_importer, ipl_exporter
+from ..ops import map_importer
 from ..ops.cull_importer import cull_importer
 from ..ops.importer_common import link_object
 
@@ -200,12 +202,21 @@ class SCENE_OT_ipl_select(bpy.types.Operator, ImportHelper):
                 context.scene.dff.custom_ipl_path = filepath
         return {'FINISHED'}
 
+def collect_objects_for_export (only_selected = False):
+    collections = [c for c in bpy.data.collections if c.dff.type != 'NON'] + [bpy.context.scene.collection]
+    objects = []
+    for collection in collections:
+        for obj in collection.objects:
+            if not only_selected or obj.select_get ():
+                objects.append(obj)
+    return objects
+
 #######################################################
-class EXPORT_OT_ipl_cull(bpy.types.Operator, ExportHelper):
+class EXPORT_OT_map (bpy.types.Operator, ExportHelper):
 
     bl_idname           = "export_scene.dff_ipl_cull"
-    bl_description      = "Export a GTA CULL IPL File"
-    bl_label            = "DragonFF CULL (.ipl)"
+    bl_description      = "Export a Map File"
+    bl_label            = "DragonFF Map (.ide/.ipl)"
     filename_ext        = ".ipl"
 
     filepath            : bpy.props.StringProperty(name="File path",
@@ -233,20 +244,13 @@ class EXPORT_OT_ipl_cull(bpy.types.Operator, ExportHelper):
 
         start = time.time()
         try:
-            ipl_exporter.export_ipl(
-                {
-                    "file_name"     : self.filepath,
-                    "only_selected" : self.only_selected,
-                    "game_id"       : context.scene.dff.game_version_dropdown,
-                    "export_inst"   : False,
-                    "export_cull"   : True,
-                }
-            )
+            objects = collect_objects_for_export (only_selected=self.only_selected)
+            exporter = MapFileExporter(objects)
+            entries = exporter.perform_export ()
 
-            if not ipl_exporter.ipl_exporter.total_objects_num:
-                report = "No objects with IPL data found"
-                self.report({"ERROR"}, report)
-                return {'CANCELLED'}, report
+            map_file = MapFileText ()
+            map_file.entries.extend (entries)
+            map_file.write_file (self.filepath)
 
             self.report({"INFO"}, f"Finished export in {time.time() - start:.2f}s")
 

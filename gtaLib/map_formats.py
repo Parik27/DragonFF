@@ -2,6 +2,26 @@ from .map_format_types import MapPlaceholderTextSectionFormat, MapTextSectionFor
 from dataclasses import dataclass, KW_ONLY
 
 #######################################################
+# Defines simple objects. They can be placed into the world through the inst section of the item placement files.
+@dataclass
+@add_format("IDE - SA - Type 4", "SA", MapTextSectionFormat("objs", ['ide_id', 'model_name', 'txd_name', 'draw_distance', 'flags']))
+class MapObjDefSection (MapSection):
+    ide_id : int
+    model_name : str
+    txd_name : str
+    mesh_count : int = 1
+    draw_distance : float = 255.0
+    flags : int = 0
+    time_on : int = 0
+    time_off : int = 0
+
+    def get_collection_name (self):
+        return f"ide_{self.ide_id}"
+
+    def get_linked_entries (self):
+        return [f"{self.model_name}.dff"]
+
+#######################################################
 @dataclass
 @add_format("IPL - III", "III", MapTextSectionFormat("inst", ['ide', 'model_name', 'interior', 'location', 'location', 'location', 'rotation', 'rotation', 'rotation', 'rotation', 'lod']))
 @add_format("IPL - VC", "VC", MapTextSectionFormat("inst", ['ide', 'model_name', 'interior', 'location', 'location', 'location', 'scale', 'scale', 'scale', 'rotation', 'rotation', 'rotation', 'rotation']))
@@ -17,6 +37,9 @@ class MapInstSection(MapSection):
     model_name : str = "dummy"
     interior : int = -1
     lod : int = 0
+
+    def get_linked_entries (self):
+        return [f"ide_{self.ide}"]
 
 #######################################################
 @dataclass
@@ -42,6 +65,7 @@ class MapPlaceholderSection(MapSection):
 
 
 MAP_SECTION_TYPES = [
+    MapObjDefSection,
     MapInstSection,
     MapCarsSection,
     MapPlaceholderSection

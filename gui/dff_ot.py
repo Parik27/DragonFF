@@ -1,10 +1,10 @@
 import bpy
 import os
-from bpy_extras.io_utils import ImportHelper, ExportHelper
+from bpy_extras.io_utils import ImportHelper, ExportHelper, poll_file_object_drop
 import time
 from ..gtaLib.map import MapFileText
 
-from ..ops.map_importer import MapFileImporter
+from ..ops.map_importer import MapFileImporter, import_map_file
 
 from ..ops import dff_exporter, dff_importer, col_importer, txd_importer
 from ..ops.state import State
@@ -28,6 +28,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     directory           : bpy.props.StringProperty(maxlen=1024,
                                               default="",
                                               subtype='DIR_PATH')
+
+    collection          : bpy.props.StringProperty(
+        name="Source Collection",
+        description="Export only objects from this collection (and its children)",
+        default="",
+    )
 
     mass_export         : bpy.props.BoolProperty(
         name            = "Mass Export",
@@ -377,6 +383,11 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         box_dff.prop(self, "group_materials")
         box_dff.prop(self, "materials_naming")
 
+        box_dff = layout.box()
+        box_dff.label(text="Map")
+        box_dff.prop(context.scene.dff, "dff_folder")
+
+
     #######################################################
     def execute(self, context):
 
@@ -427,13 +438,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     collection.children.link(c)
 
             elif file.lower().endswith(".ide") or file.lower().endswith(".ipl"):
-                map_file = MapFileText ()
-                map_file.load_file (file)
-
-                importer = MapFileImporter (map_file.entries)
-                importer.perform_import ({
-                    'collection_name': os.path.basename(file)
-                })
+                import_map_file (file, txd_images, context.scene.dff.dff_folder)
 
 
             elif file.lower().endswith(".dff"):
@@ -478,6 +483,17 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
 
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+class IO_FH_dff(bpy.types.FileHandler):
+    bl_idname = "IO_FH_dff"
+    bl_label = "DFF"
+    bl_import_operator = "import_scene.dff"
+    bl_export_operator = "export_dff.scene"
+    bl_file_extensions = ".dff"
+
+    @classmethod
+    def poll_drop(cls, context):
+        return poll_file_object_drop(context)
 
 #######################################################
 class SCENE_OT_dff_frame_move(bpy.types.Operator):
