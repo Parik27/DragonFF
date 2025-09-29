@@ -34,8 +34,9 @@ class MapTextSectionFormat(MapSectionFormat):
     def read (self, data_class, data):
         _ = data[0]
         line = data[1]
+        line = line.replace(",", " ")
+        line = line.split()
 
-        line = [x.strip() for x in line.split(",")]
         fields_target_indices = self.__get_fields_target_indices ()
         cls_kwargs = {}
 
