@@ -386,6 +386,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         box_dff = layout.box()
         box_dff.label(text="Map")
         box_dff.prop(context.scene.dff, "dff_folder")
+        box_dff.prop(context.scene.dff, "game_version_dropdown")
 
 
     #######################################################
@@ -438,7 +439,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     collection.children.link(c)
 
             elif file.lower().endswith(".ide") or file.lower().endswith(".ipl"):
-                import_map_file (file, txd_images, context.scene.dff.dff_folder)
+                import_map_file (
+                    file,
+                    context.scene.dff.game_version_dropdown,
+                    txd_images,
+                    context.scene.dff.dff_folder
+                )
 
 
             elif file.lower().endswith(".dff"):

@@ -25,7 +25,8 @@ from .map_formats import (
 #######################################################
 # Map files are ide/ipl type files
 class MapFileText:
-    def __init__(self):
+    def __init__(self, game):
+        self.game = game
         self.entries = []
 
     def load_file (self, filename):
@@ -52,7 +53,7 @@ class MapFileText:
 
             else:
                 for map_section_type in MAP_SECTION_TYPES:
-                    data = map_section_type.read (MapTextSectionFormat, "SA", (current_section, line))
+                    data = map_section_type.read (MapTextSectionFormat, self.game, (current_section, line))
                     if data:
                         self.entries.append (data)
                         break
@@ -125,8 +126,8 @@ class MapFileBinary:
         f.write(struct.pack("<4sI12xI4xI4x24xI12x",
             b"bnry",
             num_instances,
-            instances_offset,
             num_cars,
+            instances_offset,
             cars_offset
         ))
 

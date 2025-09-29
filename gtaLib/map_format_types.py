@@ -100,13 +100,14 @@ class MapBinarySectionFormat(MapSectionFormat):
         data = struct.unpack (self.struct_format, data)
 
         current_idx = 0
-        for field in enumerate(self.fields_order):
+        for field in self.fields_order:
             field_metadata = data_class.__dataclass_fields__[field]
             if len(get_args(field_metadata.type)) > 1:
                 cls_kwargs[field] = field_metadata.type(data[current_idx:current_idx + len(get_args(field_metadata.type))])
-                current_idx += len(get_args(field_metadata.type)) - 1
+                current_idx += len(get_args(field_metadata.type))
             else:
                 cls_kwargs[field] = field_metadata.type(data[current_idx])
+                current_idx += 1
 
         return data_class(**cls_kwargs)
 
@@ -120,17 +121,16 @@ class MapBinarySectionFormat(MapSectionFormat):
             else:
                 data.append(value)
 
-        print(data)
         return struct.pack (self.struct_format, *data)
 
 
 #######################################################
-def add_format (format_name, game, format_obj):
+def add_format (format_name, games, format_obj):
     def _add_format(cls):
         if not hasattr(cls, "formats"):
             cls.formats = []
 
-        cls.formats.append((format_name, game, format_obj))
+        cls.formats.append((format_name, games, format_obj))
         return cls
     return _add_format
 
@@ -142,8 +142,8 @@ class MapSection:
 
     @classmethod
     def read (cls, format_type, game, data):
-        for format_name, format_game, format_obj in cls.formats:
-            if format_game == game and isinstance(format_obj, format_type) and format_obj.can_parse (data):
+        for format_name, format_games, format_obj in cls.formats:
+            if game in format_games and isinstance(format_obj, format_type) and format_obj.can_parse (data):
                 section_obj = format_obj.read (cls, data)
                 return (format_name, section_obj)
         return None

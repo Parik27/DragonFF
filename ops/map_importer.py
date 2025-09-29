@@ -101,8 +101,8 @@ class MapFileImporter:
             self.import_entry (entry)
 
 #######################################################
-def import_map_file (file, txd_images, dff_search_path):
-    map_file = MapFileText ()
+def import_map_file (file, game, txd_images, dff_search_path):
+    map_file = MapFileText (game)
     map_file.load_file (file)
 
     importer = MapFileImporter (map_file.entries)
