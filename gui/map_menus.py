@@ -66,11 +66,19 @@ class DFFMapPropsBase (bpy.types.PropertyGroup):
             return section_type.get_format_by_name (self.current_format)
         return None
 
-    def get_section_props (self):
-        section_prop_name = self.section.lower() + '_data'
+    def get_section_props (self, section_name = None):
+        if section_name is None:
+            section_name = self.section
+
+        section_prop_name = section_name.lower() + '_data'
         return getattr(self, section_prop_name, None)
 
-    def to_section_object (self) -> MapSection:
+    def read_from_section_object (self, section_obj : MapSection):
+        section_props = self.get_section_props (section_obj.get_name ())
+        for field in fields(section_obj):
+            setattr(section_props, field.name, getattr(section_obj, field.name))
+
+    def to_section_object (self) -> MapSection | None:
         section_type = self.get_section_type ()
         section_props = self.get_section_props ()
 

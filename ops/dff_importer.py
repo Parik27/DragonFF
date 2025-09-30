@@ -816,7 +816,8 @@ class DffFileImporter:
     def perform_import (self):
         # Create a new group/collection
         self.current_collection = create_collection(
-            self.collection_name
+            self.collection_name,
+            False
         )
 
         # Create a placeholder frame if there are no frames in the file
@@ -892,5 +893,7 @@ def import_dff(options):
                                image_search_dir=os.path.dirname(file_path),
                                **options)
 
-    importer.perform_import ()
+    collection = importer.perform_import ()
+    bpy.context.scene.collection.children.link (collection)
+
     return importer

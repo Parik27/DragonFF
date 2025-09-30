@@ -443,9 +443,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     file,
                     context.scene.dff.game_version_dropdown,
                     txd_images,
-                    context.scene.dff.dff_folder
+                    [
+                        context.scene.dff.dff_folder,
+                        f"{context.scene.dff.game_root}/models/gta3.img",
+                        f"{context.scene.dff.game_root}/models/gta_int.img",
+                     ]
                 )
-
 
             elif file.lower().endswith(".dff"):
                 # Set image_ext to none if scan images is disabled

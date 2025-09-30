@@ -67,7 +67,7 @@ class MapCarsSection(MapSection):
 
 #######################################################
 @dataclass(kw_only=True)
-@add_format("IPL/IDE", ["SA"], MapPlaceholderTextSectionFormat ())
+@add_format("IPL/IDE", ["III", "VC", "SA"], MapPlaceholderTextSectionFormat ())
 class MapPlaceholderSection(MapSection):
     text_section : str = ""
     text_data : str = ""

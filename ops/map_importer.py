@@ -18,6 +18,9 @@ from dataclasses import fields
 import bpy
 import os
 
+from ..gtaLib.img import img
+from ..gtaLib.dff import dff
+
 from . import dff_importer
 
 from ..gtaLib.map import MapFileText
@@ -32,6 +35,12 @@ class MapFileImporter:
         self.entries = entries
         self.imported_objects = []
         self.collection = None
+
+    def find_dependency_collection (self, dependency):
+        for coll in bpy.data.collections:
+            if coll.name.lower() == dependency.lower():
+                return coll
+        return None
 
     def import_entry (self, entry : tuple[str, MapSection]):
         entry_obj = bpy.data.objects.new(name=str(entry), object_data=None)
@@ -52,9 +61,7 @@ class MapFileImporter:
 
         entry_obj.scale = section_data.get_scale ()
 
-        section_props = getattr(entry_obj.dff.map_props, section_name.lower() + "_data")
-        for field in fields(section_data):
-            setattr(section_props, field.name, getattr(section_data, field.name))
+        entry_obj.dff.map_props.read_from_section_object (section_data)
 
         # Put into collection for instancing purposes
         entry_collection_name = section_data.get_collection_name ()
@@ -69,13 +76,7 @@ class MapFileImporter:
 
     def set_object_instancing (self, entry : MapSection, obj):
         for link in entry.get_linked_entries ():
-            collection_name = link
-
-            collection = None
-            for coll in bpy.data.collections:
-                if coll.name.lower() == collection_name.lower():
-                    collection = coll
-                    break
+            collection = self.find_dependency_collection (link)
 
             if collection:
                 obj.instance_type = 'COLLECTION'
@@ -101,35 +102,63 @@ class MapFileImporter:
             self.import_entry (entry)
 
 #######################################################
-def import_map_file (file, game, txd_images, dff_search_path):
+def __handle_dff_search_in_folder (dff_folder, dependency, dependency_collection):
+    file_path = bpy.path.resolve_ncase (f"{dff_folder}/{dependency}")
+    if os.path.isfile (file_path) == False:
+        print(f"Dependency DFF file not found: {file_path}")
+        return None
+
+    dff_file = dff ()
+    dff_file.load_file (file_path)
+
+    return dff_file
+
+#######################################################
+def __handle_dff_search_in_img_file (img_file_path, dependency, dependency_collection):
+    img_file = img.open (img_file_path)
+    entry_idx = img_file.find_entry_idx (dependency)
+
+    if entry_idx == -1:
+        return None
+
+    entry_data = img_file.read_entry (entry_idx)[1]
+    dff_file = dff()
+    dff_file.load_memory (entry_data)
+
+    return dff_file
+
+#######################################################
+def import_map_file (file, game, txd_images, dff_search_paths):
     map_file = MapFileText (game)
     map_file.load_file (file)
 
     importer = MapFileImporter (map_file.entries)
+    collection_name = os.path.basename (file)
     importer.perform_import ({
-        'collection_name': os.path.basename(file)
+        'collection_name': collection_name
     })
 
+    dependency_collection = create_collection (collection_name + "_deps")
+    dependency_collection.hide_viewport = True
+
     for dependency in importer.get_instancing_dependencies ():
-        dff_folder = dff_search_path
-        file_path = bpy.path.resolve_ncase (f"{dff_folder}/{dependency}")
-        if os.path.isfile (file_path) == False:
-            print(f"Dependency DFF file not found: {file_path}")
+        if importer.find_dependency_collection (dependency) is not None:
             continue
 
-        dff_importer.import_dff (
-            {
-                'file_name'        : file_path,
-                'txd_images'       : txd_images,
-                'image_ext'        : None,
-                'connect_bones'    : False,
-                'use_mat_split'    : False,
-                'remove_doubles'   : False,
-                'create_backfaces' : False,
-                'group_materials'  : True,
-                'import_normals'   : True,
-                'materials_naming' : True,
-            }
-        )
+        for dff_folder in dff_search_paths:
+
+            dff_file = None
+            if os.path.isdir (dff_folder):
+                dff_file = __handle_dff_search_in_folder (dff_folder, dependency, dependency_collection)
+            elif os.path.isfile (dff_folder) and dff_folder.endswith(".img"):
+                dff_file = __handle_dff_search_in_img_file (dff_folder, dependency, dependency_collection)
+
+            if dff_file is not None:
+                importer_dff = dff_importer.DffFileImporter (
+                    dff_file = dff_file,
+                    collection_name = dependency
+                )
+                dependency_collection.children.link (importer_dff.perform_import ())
+                break
 
     importer.perform_instancing ()
