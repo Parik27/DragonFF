@@ -20,6 +20,7 @@ import os
 import time
 
 from bpy_extras.io_utils import ImportHelper, ExportHelper
+from ..gtaLib.map_format_types import MapTextSectionFormat
 from ..gtaLib.map import MapFileText
 from ..ops.map_exporter import MapFileExporter
 
@@ -245,10 +246,10 @@ class EXPORT_OT_map (bpy.types.Operator, ExportHelper):
         start = time.time()
         try:
             objects = collect_objects_for_export (only_selected=self.only_selected)
-            exporter = MapFileExporter(objects)
+            exporter = MapFileExporter(objects, "SA", MapTextSectionFormat)
             entries = exporter.perform_export ()
 
-            map_file = MapFileText ()
+            map_file = MapFileText ("SA")
             map_file.entries.extend (entries)
             map_file.write_file (self.filepath)
 

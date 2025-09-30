@@ -17,6 +17,7 @@
 from dataclasses import MISSING, Field, fields
 from typing import get_args, get_origin
 import bpy
+from ..gtaLib.map_format_types import MapSection, MapSectionFormat
 
 from .col_ot import FaceGroupsDrawer
 from .map_ot import SCENE_OT_ipl_select, OBJECT_OT_dff_add_cull
@@ -45,23 +46,62 @@ def get_valid_map_formats (props, context):
     return []
 
 class DFFMapPropsBase (bpy.types.PropertyGroup):
-
     section : bpy.props.EnumProperty(items=get_valid_map_sections)
     current_format : bpy.props.EnumProperty(items=get_valid_map_formats)
+    show_all_properties : bpy.props.BoolProperty (
+        name="Show All Properties",
+        description="Show all the properties even if they are not supported by the current format",
+        default=False
+    )
+
+    def get_section_type (self) -> type[MapSection] | None:
+        for section_type in MAP_SECTION_TYPES:
+            if section_type.get_name() == self.section:
+                return section_type
+        return None
+
+    def get_section_format_object (self) -> MapSectionFormat | None:
+        section_type = self.get_section_type ()
+        if section_type:
+            return section_type.get_format_by_name (self.current_format)
+        return None
+
+    def get_section_props (self):
+        section_prop_name = self.section.lower() + '_data'
+        return getattr(self, section_prop_name, None)
+
+    def to_section_object (self) -> MapSection:
+        section_type = self.get_section_type ()
+        section_props = self.get_section_props ()
+
+        if not section_type or not section_props:
+            return None
+
+        kwargs = {}
+        for field in fields(section_type):
+            kwargs[field.name] = getattr (section_props, field.name, field.default)
+
+        section_data = section_type (**kwargs)
+        return section_data
 
 #######################################################
 class DFFMapPropertiesMenu:
     @staticmethod
-    def draw_section_specific_menu (layout, context, settings, section):
-        section_prop_name = section.lower() + '_data'
-        section_prop = getattr(settings, section_prop_name, None)
+    def draw_section_specific_menu (layout, context, settings : DFFMapPropsBase, section):
+        section_prop = settings.get_section_props ()
         if section_prop is None:
             return
 
         box = layout.box()
         box.label(text=f"{section} Properties", icon='SETTINGS')
+        section_format_type = settings.get_section_format_object ()
         for field_name, field_value in section_prop.__annotations__.items():
-            box.prop(section_prop, field_name)
+            if (
+                    settings.show_all_properties
+                    or section_format_type is None
+                    or section_format_type.supports_field (field_name)
+            ):
+                box.prop(section_prop, field_name)
 
     @staticmethod
     def draw_menu (layout, context):
@@ -69,6 +109,7 @@ class DFFMapPropertiesMenu:
         settings = context.object.dff.map_props
         box.prop(settings, "section", text="Section")
         box.prop(settings, "current_format", text="Format")
+        box.prop(settings, "show_all_properties")
 
         DFFMapPropertiesMenu.draw_section_specific_menu (layout, context, settings, settings.section)
 
@@ -112,6 +153,7 @@ class DFFMapPropertiesGenerator():
         for field in fields(section_type):
             bpy_prop = DFFMapPropertiesGenerator.generate_bpy_prop_from_section_field(field)
             DFFSectionProps.__annotations__[field.name] = bpy_prop
+
         return DFFSectionProps
 
     @staticmethod

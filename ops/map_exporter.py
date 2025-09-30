@@ -14,40 +14,34 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from dataclasses import fields
-
-from ..gtaLib.map_format_types import MapSection
-from ..gtaLib.map_formats import MAP_SECTION_TYPES
-
 class MapFileExporter:
-    def __init__ (self, objects, options = {}):
+    def __init__ (self, objects, target_game, target_exporter, options = {}):
         self.objects = objects
-        self.options = options
-
-    def get_section_class_from_name (self, name) -> type[MapSection]:
-        for section_type in MAP_SECTION_TYPES:
-            if section_type.get_name() == name:
-                return section_type
-        return None
+        self.target_game = target_game
+        self.target_exporter = target_exporter
+        self.options = {}
+        self.messages = []
 
     def export_object (self, obj):
-        section_name = obj.dff.map_props.section
-        section_type = self.get_section_class_from_name (section_name)
         current_format = obj.dff.map_props.current_format
+        section_data = obj.dff.map_props.to_section_object ()
 
-        section_props = getattr (obj.dff.map_props, section_name.lower() + "_data")
-        kwargs = {}
-        for field in fields(section_type):
-            kwargs[field.name] = getattr (section_props, field.name, field.default)
-
-        section_data = section_type (**kwargs)
+        if not section_data:
+            return None
 
         rotation = obj.matrix_local.to_3x3().transposed().to_quaternion()
         section_data.set_location (obj.location)
         section_data.set_rotation ((rotation.x, rotation.y, rotation.z, rotation.w))
         section_data.set_scale (obj.scale)
 
-        return (current_format, section_data)
+        best_format = section_data.choose_best_format_for_game (self.target_exporter,
+                                                                self.target_game,
+                                                                current_format)
+
+        if best_format is None:
+            return None
+
+        return (best_format, section_data)
 
     def perform_export (self):
         entries = []
@@ -55,6 +49,12 @@ class MapFileExporter:
             if obj.dff.type != "MAP":
                 continue
 
-            entries.append (self.export_object (obj))
+            exported_object = self.export_object (obj)
+            if exported_object is not None:
+                entries.append (exported_object)
+            else:
+                self.messages.append (
+                    ("ERROR", f"No exportable format found for {obj.name}")
+                )
 
         return entries
