@@ -129,11 +129,13 @@ class MapBinarySectionFormat(MapSectionFormat):
 
         for field in self.fields_order:
             value = getattr(data_class, field)
-            if isinstance(value, (list, tuple)):
+            print(value)
+            if hasattr(value, '__iter__') or hasattr(value, '__getitem__'):
                 data.extend(value)
             else:
                 data.append(value)
 
+        print(data)
         return struct.pack (self.struct_format, *data)
 
 

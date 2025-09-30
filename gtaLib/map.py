@@ -22,12 +22,21 @@ from .map_formats import (
     MAP_SECTION_TYPES, MapTextSectionFormat, MapBinarySectionFormat, MapCarsSection, MapInstSection
 )
 
-#######################################################
-# Map files are ide/ipl type files
-class MapFileText:
-    def __init__(self, game):
+class MapFileBase:
+    def __init__ (self, game):
         self.game = game
         self.entries = []
+
+    def load_file (self, filename): ...
+    def load_file_stream (self, f): ...
+    def load_memory (self, data): ...
+    def write_file (self, filepath): ...
+    def write_memory (self): ...
+
+
+#######################################################
+# Map files are ide/ipl type files
+class MapFileText(MapFileBase):
 
     def load_file (self, filename):
         with open(filename, 'r') as f:
@@ -79,9 +88,7 @@ class MapFileText:
         return f.getvalue()
 
 #######################################################
-class MapFileBinary:
-    def __init__(self):
-        self.entries = []
+class MapFileBinary(MapFileBase):
 
     def load_file (self, filename):
         with open(filename, 'rb') as f:
@@ -102,6 +109,10 @@ class MapFileBinary:
         f.seek(cars_offset)
         for _ in range(num_cars):
             self.entries.append(MapCarsSection.read (MapBinarySectionFormat, "SA", f))
+
+    def write_file (self, filename):
+        with open(filename, 'wb') as f:
+            f.write (self.write_memory ())
 
     def write_memory (self):
         f = BytesIO()

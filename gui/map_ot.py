@@ -20,8 +20,8 @@ import os
 import time
 
 from bpy_extras.io_utils import ImportHelper, ExportHelper
-from ..gtaLib.map_format_types import MapTextSectionFormat
-from ..gtaLib.map import MapFileText
+from ..gtaLib.map_format_types import MapTextSectionFormat, MapBinarySectionFormat
+from ..gtaLib.map import MapFileBinary, MapFileText
 from ..ops.map_exporter import MapFileExporter
 
 from ..ops import map_importer
@@ -215,6 +215,11 @@ def collect_objects_for_export (only_selected = False):
 #######################################################
 class EXPORT_OT_map (bpy.types.Operator, ExportHelper):
 
+    SUPPORTED_EXPORTS = [
+        ("Text IPL/IDE (III/VC/SA)", MapTextSectionFormat, MapFileText),
+        ("Binary IPL (SA)", MapBinarySectionFormat, MapFileBinary)
+    ]
+
     bl_idname           = "export_scene.dff_ipl_cull"
     bl_description      = "Export a Map File"
     bl_label            = "DragonFF Map (.ide/.ipl)"
@@ -228,6 +233,14 @@ class EXPORT_OT_map (bpy.types.Operator, ExportHelper):
     filter_glob         : bpy.props.StringProperty(default="*.ipl",
                                               options={'HIDDEN'})
 
+    exporter : bpy.props.EnumProperty(
+        name = "Exported Format",
+        items = (
+            (str(idx), exporter_data[0], exporter_data[0])
+            for idx, exporter_data in enumerate(SUPPORTED_EXPORTS)
+        )
+    )
+
     only_selected       : bpy.props.BoolProperty(
         name            = "Only Selected",
         default         = False
@@ -239,17 +252,24 @@ class EXPORT_OT_map (bpy.types.Operator, ExportHelper):
 
         layout.prop(self, "only_selected")
         layout.prop(context.scene.dff, "game_version_dropdown", text="Game")
+        layout.prop(self, "exporter")
 
     #######################################################
     def execute(self, context):
 
         start = time.time()
         try:
+            target_exporter_idx = int(self.exporter)
+            target_exporter = self.SUPPORTED_EXPORTS[target_exporter_idx]
+            exporter_section_format_type = target_exporter[1]
+            exporter_class = target_exporter[2]
+
+            game = context.scene.dff.game_version_dropdown
             objects = collect_objects_for_export (only_selected=self.only_selected)
-            exporter = MapFileExporter(objects, "SA", MapTextSectionFormat)
+            exporter = MapFileExporter(objects, game, exporter_section_format_type)
             entries = exporter.perform_export ()
 
-            map_file = MapFileText ("SA")
+            map_file = exporter_class (game)
             map_file.entries.extend (entries)
             map_file.write_file (self.filepath)
 
@@ -257,6 +277,7 @@ class EXPORT_OT_map (bpy.types.Operator, ExportHelper):
 
         except Exception as e:
             self.report({"ERROR"}, str(e))
+            raise e
 
         return {'FINISHED'}
 
