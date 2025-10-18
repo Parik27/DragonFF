@@ -206,6 +206,8 @@ class material_helper:
     #######################################################
     def set_uv_animation(self, uv_anim):
 
+        anim_data = self.material.node_tree.animation_data_create()
+
         if self.principled:
             mapping = self.principled.base_color_texture.node_mapping_get()
             mapping.vector_type = 'POINT'
@@ -213,14 +215,28 @@ class material_helper:
             fps = bpy.context.scene.render.fps
 
             action = bpy.data.actions.new(uv_anim.name)
+            anim_data.action = action
+
+            if bpy.app.version < (4, 4, 0):
+                action_fcurves = action.fcurves
+
+            else:
+                slot = action.slots.new(id_type='NODETREE', name='UV')
+                anim_data.action_slot = slot
+
+                layer = action.layers.new('UV')
+                strip = layer.strips.new(type='KEYFRAME')
+                channelbag = strip.channelbag(slot, ensure=True)
+
+                action_fcurves = channelbag.fcurves
 
             fcurves = [
                 None,
-                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=0),
-                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=1),
+                action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=0),
+                action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=1),
                 None,
-                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=0),
-                action.fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=1),
+                action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=0),
+                action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=1),
             ]
 
             for frame_idx, frame in enumerate(uv_anim.frames):
@@ -263,9 +279,6 @@ class material_helper:
                     # Could also use round here perhaps. I don't know what's better
                     kp.co = frame.time * fps, val
                     kp.interpolation = 'LINEAR'
-
-        anim_data = self.material.node_tree.animation_data_create()
-        anim_data.action = action
 
         self.material.dff.animation_name   = uv_anim.name
         self.material.dff.export_animation = True

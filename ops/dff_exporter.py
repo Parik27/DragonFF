@@ -18,6 +18,7 @@ import bpy
 import bmesh
 import mathutils
 
+from bpy_extras import anim_utils
 from collections import OrderedDict
 
 from ..gtaLib import dff
@@ -201,6 +202,23 @@ class material_helper:
         if not anim_data:
             return None
 
+        # Check if action exists
+        action = anim_data.action
+        if not action:
+            return None
+
+        if bpy.app.version < (4, 4, 0):
+            action_fcurves = action.fcurves
+
+        else:
+            # Check if action slot exists
+            action_slot = anim_data.action_slot
+            if not action_slot:
+                return None
+
+            channelbag = anim_utils.action_get_channelbag_for_slot(action, action_slot)
+            action_fcurves = channelbag.fcurves
+
         fps = bpy.context.scene.render.fps
 
         anim = dff.UVAnim()
@@ -224,7 +242,7 @@ class material_helper:
         }
 
         # Set keyframes_dict
-        for curve in anim_data.action.fcurves:
+        for curve in action_fcurves:
 
             # Rw doesn't support Z texture coordinate.
             if curve.array_index > 1:
