@@ -32,31 +32,9 @@ from ..ops.ext_2dfx_importer import ext_2dfx_importer
 from ..ops.state import State
 
 #######################################################
-class dff_importer:
-
-    txd_images         = {}
-    image_ext          = "png"
-    materials_naming   = "DEF"
-    use_bone_connect   = False
-    current_collection = None
-    use_mat_split      = False
-    remove_doubles     = False
-    create_backfaces   = False
-    import_normals     = False
-    group_materials    = False
-    version            = ""
-    warning            = ""
-
-    __slots__ = [
-        'dff',
-        'meshes',
-        'objects',
-        'file_name',
-        'skin_data',
-        'bones'
-    ]
-
+class DffFileImporter:
     #######################################################
+    @staticmethod
     def multiply_matrix(a, b):
         return a @ b
 
@@ -68,25 +46,42 @@ class dff_importer:
         return name
     
     #######################################################
-    def _init():
-        self = dff_importer
+    def __init__(self, dff_file, collection_name,
+                 image_search_dir="", txd_images={},
+                 image_ext = "png", materials_naming = "DEF",
+                 connect_bones = False, use_mat_split = False,
+                 remove_doubles = False, create_backfaces = False,
+                 import_normals = False, group_materials = False):
 
         # Variables
-        self.dff = None
+        self.dff = dff_file
         self.meshes = {}
         self.delta_morph = {}
         self.objects = {}
-        self.file_name = ""
         self.skin_data = {}
         self.bones = {}
         self.frame_bones = {}
         self.materials = {}
+        self.current_collection = None
         self.warning = ""
+        self.version = ""
+        self.warning = ""
+
+        self.txd_images = txd_images
+        self.collection_name = collection_name
+        self.image_search_dir = image_search_dir
+        self.materials_naming = materials_naming
+        self.connect_bones = connect_bones
+        self.use_mat_split = use_mat_split
+        self.image_ext = image_ext
+        self.remove_doubles = remove_doubles
+        self.create_backfaces = create_backfaces
+        self.import_normals = import_normals
+        self.group_materials = group_materials
 
     #######################################################
     # TODO: Cyclomatic Complexity too high
-    def import_atomics():
-        self = dff_importer
+    def import_atomics(self):
 
         # Import atomics (meshes)
         for atomic_index, atomic in enumerate(self.dff.atomic_list):
@@ -140,7 +135,7 @@ class dff_importer:
             if 'extra_vert_color' in geom.extensions:
                 extra_vertex_color = bm.loops.layers.color.new()
 
-            if (dff_importer.use_mat_split or not geom.triangles) and 'mat_split' in geom.extensions:
+            if (self.use_mat_split or geom.triangles is None) and 'mat_split' in geom.extensions:
                 faces = geom.extensions['mat_split']
             else:
                 faces = geom.triangles
@@ -209,8 +204,8 @@ class dff_importer:
                         uv_coords = layer[vert_index]
 
                         loop[bl_layer].uv = (
-                            uv_coords.u,
-                            1 - uv_coords.v # Y coords are flipped in Blender
+                            uv_coords[0],
+                            1 - uv_coords[1] # Y coords are flipped in Blender
                         )
                     # Vertex colors
                     if geom.flags & dff.rpGEOMETRYPRELIT:
@@ -252,7 +247,7 @@ class dff_importer:
             self.import_materials(geom, frame, mesh, mat_order)
 
             obj = bpy.data.objects.new('mesh', mesh)
-            link_object(obj, dff_importer.current_collection)
+            link_object(obj, self.current_collection)
 
             obj.rotation_mode       = 'QUATERNION'
 
@@ -303,14 +298,12 @@ class dff_importer:
 
                 
     #######################################################
-    def set_empty_draw_properties(empty):
+    def set_empty_draw_properties(self, empty):
         empty.empty_display_type = 'CUBE'
         empty.empty_display_size = 0.05
 
     ##################################################################
-    def generate_material_name(material, fallback):
-
-        self = dff_importer
+    def generate_material_name(self, material, fallback):
         name = None
         
         patterns = {
@@ -367,9 +360,7 @@ class dff_importer:
         
     ##################################################################
     # TODO: MatFX: Dual Textures
-    def import_materials(geometry, frame, mesh, mat_order):
-
-        self = dff_importer
+    def import_materials(self, geometry, frame, mesh, mat_order):
         from bpy_extras.image_utils import load_image
 
         # Refactored
@@ -400,7 +391,7 @@ class dff_importer:
                     image = self.txd_images[texture.name][0]
 
                 elif self.image_ext:
-                    path    = os.path.dirname(self.file_name)
+                    path    = os.path.dirname(self.image_search_dir)
                     image_name = "%s.%s" % (texture.name, self.image_ext)
 
                     # name.None shouldn't exist, lol / Share loaded images among imported materials
@@ -438,7 +429,7 @@ class dff_importer:
                             image = self.txd_images[texture.name][0]
 
                         else:
-                            path = os.path.dirname(self.file_name)
+                            path = os.path.dirname(self.image_search_dir)
                             image_name = "%s.%s" % (texture.name, self.image_ext)
 
                             # see name.None note above / Share loaded images among imported materials
@@ -459,6 +450,7 @@ class dff_importer:
                         )
 
             # Surface Properties
+            props = None
             if material.surface_properties is not None:
                 props = material.surface_properties
 
@@ -505,8 +497,7 @@ class dff_importer:
                 self.materials[hash(material)] = helper.material
 
     #######################################################
-    def construct_bone_dict():
-        self = dff_importer
+    def construct_bone_dict(self):
 
         bone_indices = {
             bone.id
@@ -523,7 +514,7 @@ class dff_importer:
                                               'index': index}
 
     #######################################################
-    def align_roll( vec, vecz, tarz ):
+    def align_roll( self, vec, vecz, tarz ):
 
         sine_roll = vec.normalized().dot(vecz.normalized().cross(tarz.normalized()))
 
@@ -540,9 +531,7 @@ class dff_importer:
             return -math.asin( sine_roll ) - math.pi
 
     #######################################################
-    def get_skinned_obj_index(frame, frame_index):
-        self = dff_importer
-
+    def get_skinned_obj_index(self, frame, frame_index):
         possible_frames = [
             frame.parent, # The parent frame 
             frame_index - 1, # The previous frame
@@ -561,13 +550,11 @@ class dff_importer:
         return None
         
     #######################################################
-    def construct_armature(frame, frame_index):
-
-        self = dff_importer
+    def construct_armature(self, frame, frame_index):
         
         armature = bpy.data.armatures.new(self.clean_object_name(frame.name))
         obj = bpy.data.objects.new(self.clean_object_name(frame.name), armature)
-        link_object(obj, dff_importer.current_collection)
+        link_object(obj, self.current_collection)
 
         skinned_obj_data = None
         skinned_objs = []
@@ -636,7 +623,7 @@ class dff_importer:
                 if skinned_obj_data is None:
                     e_bone.matrix = self.multiply_matrix(e_bone.parent.matrix, e_bone.matrix)
 
-                if self.use_bone_connect:
+                if self.connect_bones:
 
                     if not bone_list[bone_frame.parent][1]:
 
@@ -646,7 +633,7 @@ class dff_importer:
 
                             length = (e_bone.parent.head - e_bone.head).length
                             e_bone.length      = length
-                            e_bone.use_connect = self.use_bone_connect
+                            e_bone.use_connect = self.connect_bones
 
                             bone_list[bone_frame.parent][1] = True
 
@@ -664,7 +651,7 @@ class dff_importer:
         return (armature, obj)
 
     #######################################################
-    def set_vertex_groups(obj, skin_data):
+    def set_vertex_groups(self, obj, skin_data):
 
         # Allocate vertex groups
         for _ in range(skin_data.num_bones):
@@ -681,9 +668,7 @@ class dff_importer:
                 obj.vertex_groups[bone].add([i], weight, 'ADD')
 
     #######################################################
-    def remove_object_doubles():
-        self = dff_importer
-
+    def remove_object_doubles(self):
         for frame in self.meshes:
             for mesh in self.meshes[frame]:
                 bm = bmesh.new()
@@ -704,16 +689,13 @@ class dff_importer:
                 bm.to_mesh(mesh.data)
 
     #######################################################
-    def link_obj_to_frame_bone(obj, frame_index):
-        self = dff_importer
-
+    def link_obj_to_frame_bone(self, obj, frame_index):
         frame_bone = self.frame_bones[frame_index]
         armature, bone_name = frame_bone['armature'], frame_bone['name']
         set_parent_bone(obj, armature, bone_name)
 
     #######################################################
-    def import_frames():
-        self = dff_importer
+    def import_frames(self):
 
         # Initialise bone indices for use in armature construction
         self.construct_bone_dict()
@@ -783,7 +765,7 @@ class dff_importer:
             if obj is None:
                 if len(meshes) != 1:
                     obj = bpy.data.objects.new(self.clean_object_name(frame.name), None)
-                    link_object(obj, dff_importer.current_collection)
+                    link_object(obj, self.current_collection)
 
                     # Set empty display properties to something decent
                     self.set_empty_draw_properties(obj)
@@ -824,27 +806,18 @@ class dff_importer:
             self.remove_object_doubles()
 
     #######################################################
-    def import_2dfx():
-        self = dff_importer
-
+    def import_2dfx(self):
         importer = ext_2dfx_importer(self.dff.ext_2dfx)
 
         for obj in importer.get_objects():
             link_object(obj, self.current_collection)
 
     #######################################################
-    def import_dff(file_name):
-        self = dff_importer
-        self._init()
-
-        # Load the DFF
-        self.dff = dff.dff()
-        self.dff.load_file(file_name)
-        self.file_name = file_name
-
+    def perform_import (self):
         # Create a new group/collection
         self.current_collection = create_collection(
-            os.path.basename(file_name)
+            self.collection_name,
+            False
         )
 
         # Create a placeholder frame if there are no frames in the file
@@ -870,7 +843,7 @@ class dff_importer:
         
         # Add collisions
         for collision in self.dff.collisions:
-            col = import_col_mem(collision.data, os.path.basename(file_name), False)
+            col = import_col_mem(collision.data, self.collection_name, False)
 
             for collection in col:
                 self.current_collection.children.link(collection)
@@ -880,6 +853,7 @@ class dff_importer:
                     hide_object(object)
 
         State.update_scene()
+        return self.current_collection
 
 #######################################################
 def set_parent_bone(obj, armature, bone_name):
@@ -909,17 +883,17 @@ def set_parent_bone(obj, armature, bone_name):
 #######################################################
 def import_dff(options):
 
-    # Shadow function
-    dff_importer.txd_images       = options['txd_images']
-    dff_importer.image_ext        = options['image_ext']
-    dff_importer.use_bone_connect = options['connect_bones']
-    dff_importer.use_mat_split    = options['use_mat_split']
-    dff_importer.remove_doubles   = options['remove_doubles']
-    dff_importer.create_backfaces = options['create_backfaces']
-    dff_importer.group_materials  = options['group_materials']
-    dff_importer.import_normals   = options['import_normals']
-    dff_importer.materials_naming = options['materials_naming']
+    file_path = options.pop ("file_name")
 
-    dff_importer.import_dff(options['file_name'])
+    dff_file = dff.dff()
+    dff_file.load_file (file_path)
 
-    return dff_importer
+
+    importer = DffFileImporter(dff_file, os.path.basename(file_path),
+                               image_search_dir=os.path.dirname(file_path),
+                               **options)
+
+    collection = importer.perform_import ()
+    bpy.context.scene.collection.children.link (collection)
+
+    return importer

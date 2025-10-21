@@ -8,7 +8,8 @@ from .col_ot import EXPORT_OT_col, \
     COLLECTION_OT_dff_generate_bounds, \
     OBJECT_OT_dff_add_collision_box, OBJECT_OT_dff_add_collision_sphere
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
-from .map_ot import EXPORT_OT_ipl_cull
+from .map_ot import EXPORT_OT_map
+from .map_menus import DFFMapPropertiesGenerator, DFFMapPropertiesMenu
 from .cull_menus import CULLObjectProps, CULLMenus
 from ..gtaLib.data import presets
 
@@ -245,13 +246,13 @@ class DFF_MT_ExportChoice(bpy.types.Menu):
         op.use_active_collection = False
         self.layout.operator(EXPORT_OT_txd.bl_idname,
                              text="DragonFF TXD (.txd)")
-        self.layout.operator(EXPORT_OT_ipl_cull.bl_idname,
-                             text="DragonFF CULL (.ipl)")
+        self.layout.operator(EXPORT_OT_map.bl_idname,
+                             text="DragonFF Map (.ide/.ipl)")
 
 
 #######################################################
 def import_dff_func(self, context):
-    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff, .txd, .col)")
+    self.layout.operator(IMPORT_OT_dff.bl_idname, text="DragonFF DFF (.dff, .txd, .col, .ide, .ipl)")
 
 #######################################################
 def export_dff_func(self, context):
@@ -447,6 +448,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         elif settings.type == '2DFX':
             self.draw_2dfx_menu(context)
 
+        elif settings.type == 'MAP':
+            DFFMapPropertiesMenu.draw_menu (layout, context)
+
         elif settings.type == 'CULL':
             self.draw_cull_menu(context)
 
@@ -597,6 +601,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('2DFX', '2DFX', 'Object is a 2D effect'),
             ('CULL', 'CULL', 'Object is a CULL zone'),
+            ('MAP', 'Map Object', 'Object is a map object'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
     )
@@ -743,6 +748,8 @@ compatibiility with DFF Viewers"
 
     # 2DFX properties
     ext_2dfx : bpy.props.PointerProperty(type=EXT2DFXObjectProps)
+
+    map_props : bpy.props.PointerProperty(type=DFFMapPropertiesGenerator.get_main_properties_class ())
 
     # CULL properties
     cull: bpy.props.PointerProperty(type=CULLObjectProps)

@@ -1,7 +1,10 @@
 import bpy
 import os
-from bpy_extras.io_utils import ImportHelper, ExportHelper
+from bpy_extras.io_utils import ImportHelper, ExportHelper, poll_file_object_drop
 import time
+from ..gtaLib.map import MapFileText
+
+from ..ops.map_importer import MapFileImporter, import_map_file
 
 from ..ops import dff_exporter, dff_importer, col_importer, txd_importer
 from ..ops.state import State
@@ -25,6 +28,12 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     directory           : bpy.props.StringProperty(maxlen=1024,
                                               default="",
                                               subtype='DIR_PATH')
+
+    collection          : bpy.props.StringProperty(
+        name="Source Collection",
+        description="Export only objects from this collection (and its children)",
+        default="",
+    )
 
     mass_export         : bpy.props.BoolProperty(
         name            = "Mass Export",
@@ -241,9 +250,9 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
     
     bl_idname      = "import_scene.dff"
     bl_description = 'Import a Renderware DFF, TXD or COL File'
-    bl_label       = "DragonFF DFF (.dff, .txd, .col)"
+    bl_label       = "DragonFF DFF (.dff, .txd, .col, .ide, .ipl)"
 
-    filter_glob   : bpy.props.StringProperty(default="*.dff;*.txd;*.col",
+    filter_glob   : bpy.props.StringProperty(default="*.dff;*.txd;*.col;*.ide;*.ipl",
                                               options={'HIDDEN'})
 
     directory     : bpy.props.StringProperty(maxlen=1024,
@@ -374,6 +383,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         box_dff.prop(self, "group_materials")
         box_dff.prop(self, "materials_naming")
 
+        box_dff = layout.box()
+        box_dff.label(text="Map")
+        box_dff.prop(context.scene.dff, "dff_folder")
+        box_dff.prop(context.scene.dff, "game_version_dropdown")
+
+
     #######################################################
     def execute(self, context):
 
@@ -423,6 +438,18 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                     context.scene.collection.children.unlink(c)
                     collection.children.link(c)
 
+            elif file.lower().endswith(".ide") or file.lower().endswith(".ipl"):
+                import_map_file (
+                    file,
+                    context.scene.dff.game_version_dropdown,
+                    txd_images,
+                    [
+                        context.scene.dff.dff_folder,
+                        f"{context.scene.dff.game_root}/models/gta3.img",
+                        f"{context.scene.dff.game_root}/models/gta_int.img",
+                     ]
+                )
+
             elif file.lower().endswith(".dff"):
                 # Set image_ext to none if scan images is disabled
                 image_ext = self.image_ext
@@ -465,6 +492,17 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
 
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+class IO_FH_dff(bpy.types.FileHandler):
+    bl_idname = "IO_FH_dff"
+    bl_label = "DFF"
+    bl_import_operator = "import_scene.dff"
+    bl_export_operator = "export_dff.scene"
+    bl_file_extensions = ".dff"
+
+    @classmethod
+    def poll_drop(cls, context):
+        return poll_file_object_drop(context)
 
 #######################################################
 class SCENE_OT_dff_frame_move(bpy.types.Operator):
