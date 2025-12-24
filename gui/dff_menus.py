@@ -31,6 +31,10 @@ texture_uv_addressing_items = (
 )
 
 #######################################################
+def breakable_obj_poll_func(self, obj):
+    return obj.dff.type == 'BRK'
+
+#######################################################
 class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
     bl_idname      = "MATERIAL_PT_dffMaterials"
@@ -368,6 +372,11 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
             box.prop(settings, "uv_map2", text="UV Map 2")
 
         box = layout.box()
+        box.prop(settings, "export_breakable", text="Export Breakable")
+        if settings.export_breakable:
+            box.prop(settings, "breakable_object", text="Object")
+
+        box = layout.box()
         box.label(text="Atomic")
         box.prop(settings, "pipeline", text="Pipeline")
         if settings.pipeline == 'CUSTOM':
@@ -413,6 +422,14 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         EXT2DFXMenus.draw_menu(int(settings.effect), layout, context)
 
     #######################################################
+    def draw_breakable_menu(self, context):
+        layout = self.layout
+        settings = context.object.dff
+
+        box = layout.box()
+        box.prop(settings, "breakable_pos_rule", text="Position Rule")
+
+    #######################################################
     def draw_cull_menu(self, context):
         CULLMenus.draw_menu(self.layout, context)
 
@@ -446,6 +463,9 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         elif settings.type == '2DFX':
             self.draw_2dfx_menu(context)
+
+        elif settings.type == 'BRK':
+            self.draw_breakable_menu(context)
 
         elif settings.type == 'CULL':
             self.draw_cull_menu(context)
@@ -596,6 +616,7 @@ class DFFObjectProps(bpy.types.PropertyGroup):
             ('COL', 'Collision Object', 'Object is a collision object'),
             ('SHA', 'Shadow Object', 'Object is a shadow object'),
             ('2DFX', '2DFX', 'Object is a 2D effect'),
+            ('BRK', 'Breakable Object', 'Object is a breakable model'),
             ('CULL', 'CULL', 'Object is a CULL zone'),
             ('NON', "Don't export", 'Object will NOT be exported.')
         )
@@ -714,6 +735,23 @@ compatibiility with DFF Viewers"
     sky_gfx : bpy.props.BoolProperty(
         default = False,
         description = "Enable SkyGFX (Wind Shader)"
+    )
+
+    export_breakable : bpy.props.BoolProperty(
+        default = False,
+        description = "Enable Breakable Model"
+    )
+
+    breakable_object : bpy.props.PointerProperty(
+        type = bpy.types.Object,
+        poll = breakable_obj_poll_func
+    )
+
+    breakable_pos_rule : bpy.props.EnumProperty(
+        items = (
+            ('0', 'Object Origin', ''),
+            ('1', 'Collision Origin', '')
+        )
     )
 
     frame_index : bpy.props.IntProperty(

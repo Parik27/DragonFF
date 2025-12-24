@@ -132,6 +132,7 @@ types = {
     "Extra Vert Color"        : 39056121,
     "Collision Model"         : 39056122,
     "Reflection Material"     : 39056124,
+    "Breakable Model"         : 39056125,
     "Frame"                   : 39056126,
     "SAMP Collision Model"    : 39056127,
 }
@@ -1025,7 +1026,7 @@ class SkinPLG:
 
             if platform == NativePlatformType.OGL:
                 # Use the already created SkinPLG from NativeDataPLG
-                self = geometry.extensions.get("skin") or self
+                self = geometry.extensions.get("skin", self)
 
                 from .native_wdgl import NativeOGLSkin
                 NativeOGLSkin.unpack(self, data[16:])
@@ -1584,6 +1585,138 @@ class Extension2dfx:
     def __add__(self, other):
         self.entries += other.entries # concatinate entries
         return self
+
+#######################################################
+class ExtensionBreakable:
+
+    #######################################################
+    def __init__(self):
+        self.magic = 0
+        self.pos_rule = 1
+        self.positions = []
+        self.uvs = []
+        self.prelits = []
+        self.triangles = []
+        self.texture_names = []
+        self.texture_masks = []
+        self.ambient_colors = []
+
+    #######################################################
+    @staticmethod
+    def from_mem(data, offset):
+        self = ExtensionBreakable()
+
+        _Triangle = namedtuple("_Triangle", "a b c")
+
+        self.magic = unpack_from("<I", data, offset)[0]
+        pos = 4 + offset
+
+        if self.magic == 0:
+            return self
+
+        self.pos_rule = unpack_from("<I", data, pos)[0]
+        pos += 4
+
+        verts_num, pos_off, uv_off, prelit_off = unpack_from("<H2xIII", data, pos)
+        pos += 16
+
+        tris_num, vert_idx_off, mat_idx_off = unpack_from("<H2xII", data, pos)
+        pos += 12
+
+        mats_num, tex_off, tex_name_off, tex_mask_off, ambient_off = unpack_from("<H2xIIII", data, pos)
+        pos += 20
+
+        for _ in range(verts_num):
+            self.positions.append(Sections.read(Vector, data, pos))
+            pos += 12
+
+        for _ in range(verts_num):
+            self.uvs.append(Sections.read(TexCoords, data, pos))
+            pos += 8
+
+        for _ in range(verts_num):
+            self.prelits.append(Sections.read(RGBA, data, pos))
+            pos += 4
+
+        _triangles = []
+        for _ in range(tris_num):
+            _tri = _Triangle._make(
+                unpack_from("<3H", data, pos)
+            )
+            _triangles.append(_tri)
+            pos += 6
+
+        for _tri in _triangles:
+            mat = unpack_from("<H", data, pos)[0]
+            tri = Triangle._make(
+                (
+                    _tri.b,
+                    _tri.a,
+                    mat,
+                    _tri.c
+                )
+            )
+            self.triangles.append(tri)
+            pos += 2
+
+        for _ in range(mats_num):
+            tex_name = data[pos:pos+strlen(data, pos)].decode("utf-8")
+            self.texture_names.append(tex_name)
+            pos += 32
+
+        for _ in range(mats_num):
+            tex_mask = data[pos:pos+strlen(data, pos)].decode("utf-8")
+            self.texture_masks.append(tex_mask)
+            pos += 32
+
+        for _ in range(mats_num):
+            self.ambient_colors.append(Sections.read(Vector, data, pos))
+            pos += 12
+
+        return self
+
+    #######################################################
+    def to_mem(self):
+
+        data = bytearray()
+        data += pack("<I", self.magic)
+
+        if self.magic != 0:
+            data += pack("<I", self.pos_rule)
+
+            verts_num = len(self.positions)
+            tris_num = len(self.triangles)
+            mats_num = len(self.texture_names)
+
+            data += pack("<H2x12x", verts_num)
+            data += pack("<H2x8x", tris_num)
+            data += pack("<H2x16x", mats_num)
+
+            for p in self.positions:
+                data += Sections.write(Vector, p)
+
+            for uv in self.uvs:
+                data += Sections.write(TexCoords, uv)
+
+            for p in self.prelits:
+                data += Sections.write(RGBA, p)
+
+            for tri in self.triangles:
+                data += pack("<3H", tri.a, tri.b, tri.c)
+
+            for tri in self.triangles:
+                data += pack("<H", tri.material)
+
+            for tn in self.texture_names:
+                data += pack("<32s", tn.encode("utf-8"))
+
+            for tm in self.texture_masks:
+                data += pack("<32s", tm.encode("utf-8"))
+
+            for ac in self.ambient_colors:
+                data += Sections.write(Vector, ac)
+
+        return Sections.write_chunk(data, types["Breakable Model"])
 
 #######################################################
 class ExtensionColl:
@@ -2590,6 +2723,12 @@ class dff:
                     UserData.from_mem(self.data[self.pos:])
 
                 self._read(chunk.size)
+
+            elif chunk.type == types["Breakable Model"]:
+                geometry.extensions["breakable_model"] = ExtensionBreakable.from_mem(
+                    self.data,
+                    self._read(chunk.size)
+                )
 
             # 2dfx (usually at the last geometry index)
             elif chunk.type == types["2d Effect"]:

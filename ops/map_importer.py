@@ -156,6 +156,7 @@ class map_importer:
                     'group_materials'  : True,
                     'import_normals'   : True,
                     'materials_naming' : "DEF",
+                    'import_breakable' : self.settings.import_breakable,
                 }
             )
 
