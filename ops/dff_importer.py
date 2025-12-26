@@ -43,6 +43,7 @@ class dff_importer:
     remove_doubles     = False
     create_backfaces   = False
     import_normals     = False
+    import_breakable   = True
     group_materials    = False
     version            = ""
     warning            = ""
@@ -82,6 +83,30 @@ class dff_importer:
         self.frame_bones = {}
         self.materials = {}
         self.warning = ""
+
+    #######################################################
+    def find_texture_image(name):
+        self = dff_importer
+        from bpy_extras.image_utils import load_image
+
+        if name in self.txd_images:
+            return self.txd_images[name][0]
+
+        if self.image_ext:
+            path = os.path.dirname(self.file_name)
+            image_name = "%s.%s" % (name, self.image_ext)
+
+            # see name.None note above / Share loaded images among imported materials
+            if (image_name in bpy.data.images and
+                    path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
+                return bpy.data.images[image_name]
+
+            return load_image(image_name,
+                            path,
+                            recursive=False,
+                            place_holder=True,
+                            check_existing=True
+                            )
 
     #######################################################
     # TODO: Cyclomatic Complexity too high
@@ -337,7 +362,21 @@ class dff_importer:
                 self.meshes[atomic.frame] = [obj]
                 self.delta_morph[atomic.frame] = [geom.extensions.get('delta_morph')]
 
-                
+            # Create breakable model
+            if self.import_breakable and 'breakable_model' in geom.extensions:
+                breakable_obj = self.create_breakable_model_object(geom.extensions['breakable_model'])
+
+                if breakable_obj:
+                    breakable_obj.name = f'{frame.name}_breakable'
+                    breakable_obj.parent = obj
+
+                    breakable_collection = bpy.data.collections.get('Breakable') or create_collection('Breakable')
+                    link_object(breakable_obj, breakable_collection)
+                    hide_object(breakable_obj)
+
+                obj.dff.export_breakable = True
+                obj.dff.breakable_object = breakable_obj
+
     #######################################################
     def set_empty_draw_properties(empty):
         empty.empty_display_type = 'CUBE'
@@ -406,7 +445,6 @@ class dff_importer:
     def import_materials(geometry, frame, mesh, mat_order):
 
         self = dff_importer
-        from bpy_extras.image_utils import load_image
 
         # Refactored
         for index, mat_idx in enumerate(mat_order):
@@ -430,26 +468,7 @@ class dff_importer:
             # Loading Texture
             if material.is_textured == 1:
                 texture = material.textures[0]
-                image   = None
-
-                if texture.name in self.txd_images:
-                    image = self.txd_images[texture.name][0]
-
-                elif self.image_ext:
-                    path    = os.path.dirname(self.file_name)
-                    image_name = "%s.%s" % (texture.name, self.image_ext)
-
-                    # name.None shouldn't exist, lol / Share loaded images among imported materials
-                    if (image_name in bpy.data.images and
-                            path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                        image = bpy.data.images[image_name]
-                    else:
-                        image = load_image(image_name,
-                                        path,
-                                        recursive=False,
-                                        place_holder=True,
-                                        check_existing=True
-                                        )
+                image = self.find_texture_image(texture.name)
                 helper.set_texture(image, texture.name, texture.filters, texture.uv_addressing)
 
             # Normal Map
@@ -468,27 +487,7 @@ class dff_importer:
                         texture = bump_fx.bump_map
 
                     if texture:
-                        image = None
-
-                        if texture.name in self.txd_images:
-                            image = self.txd_images[texture.name][0]
-
-                        else:
-                            path = os.path.dirname(self.file_name)
-                            image_name = "%s.%s" % (texture.name, self.image_ext)
-
-                            # see name.None note above / Share loaded images among imported materials
-                            if (image_name in bpy.data.images and
-                                    path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                                image = bpy.data.images[image_name]
-                            else:
-                                image = load_image(image_name,
-                                                path,
-                                                recursive=False,
-                                                place_holder=True,
-                                                check_existing=True
-                                               )
-
+                        image = self.find_texture_image(texture.name)
                         helper.set_normal_map(image,
                                               texture.name,
                                               bump_fx.intensity
@@ -715,6 +714,89 @@ class dff_importer:
                 weight = skin_data.vertex_bone_weights[i][j]
                 
                 obj.vertex_groups[bone].add([i], weight, 'ADD')
+
+    #######################################################
+    def create_breakable_model_object(breakable_model):
+        self = dff_importer
+
+        if breakable_model.magic == 0:
+            return None
+
+        mesh = bpy.data.meshes.new("breakable")
+        bm = bmesh.new()
+
+        # Vertices
+        for v in breakable_model.positions:
+            bm.verts.new(v)
+
+        bm.verts.ensure_lookup_table()
+        bm.verts.index_update()
+
+        # Add UV Layer
+        uv_layer = bm.loops.layers.uv.new()
+
+        # Add Vertex Colors
+        if breakable_model.prelits:
+            vertex_color = bm.loops.layers.color.new()
+
+        # Faces
+        for f in breakable_model.triangles:
+            face_vertices = (f.a, f.b, f.c)
+
+            try:
+                face = bm.faces.new(
+                    [
+                        bm.verts[f.a],
+                        bm.verts[f.b],
+                        bm.verts[f.c]
+                    ])
+
+            except ValueError:
+                continue
+
+            face.material_index = f.material
+
+            # Setting UV coordinates
+            for loop_index, loop in enumerate(face.loops):
+                vert_index = face_vertices[loop_index]
+                uv_coords = breakable_model.uvs[vert_index]
+
+                loop[uv_layer].uv = (
+                    uv_coords.u,
+                    1 - uv_coords.v # Y coords are flipped in Blender
+                )
+
+                # Vertex colors
+                if breakable_model.prelits:
+                    loop[vertex_color] = [
+                        c / 255.0 for c in
+                        breakable_model.prelits[vert_index]
+                    ]
+
+        bm.to_mesh(mesh)
+        mesh.update()
+
+        # Create materials
+        for mat_idx, tex_name in enumerate(breakable_model.texture_names):
+            ambient_color = breakable_model.ambient_colors[mat_idx]
+
+            name = "%s.%d" % (self.clean_object_name(tex_name), mat_idx)
+            mat = bpy.data.materials.new(name)
+            mat.blend_method = 'CLIP'
+
+            helper = material_helper(mat)
+            helper.principled.base_color = ambient_color
+
+            image = self.find_texture_image(tex_name)
+            helper.set_texture(image, tex_name)
+
+            mesh.materials.append(helper.material)
+
+        breakable_obj = bpy.data.objects.new(mesh.name, mesh)
+        breakable_obj.dff.type = 'BRK'
+        breakable_obj.dff.breakable_pos_rule = str(breakable_model.pos_rule)
+
+        return breakable_obj
 
     #######################################################
     def remove_object_doubles():
@@ -955,6 +1037,7 @@ def import_dff(options):
     dff_importer.group_materials  = options['group_materials']
     dff_importer.import_normals   = options['import_normals']
     dff_importer.materials_naming = options['materials_naming']
+    dff_importer.import_breakable = options.get('import_breakable', True)
 
     dff_importer.import_dff(options['file_name'])
 

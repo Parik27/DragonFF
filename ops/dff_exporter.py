@@ -889,8 +889,116 @@ class dff_exporter:
             vertices_list, skin_plg, dm_entries, obj, geometry, len(vcols))
 
         self.populate_geometry_from_faces_data(faces_list, geometry)
-        
-    
+
+    #######################################################
+    @staticmethod
+    def populate_geometry_with_breakable_object(obj, geometry):
+        self = dff_exporter
+
+        breakable_model = dff.ExtensionBreakable()
+        geometry.extensions["breakable_model"] = breakable_model
+
+        if not obj or obj.type != 'MESH':
+            breakable_model.magic = 0
+            return
+
+        breakable_model.magic = 0x64646464
+        breakable_model.pos_rule = int(obj.dff.breakable_pos_rule)
+
+        mesh, _ = self.convert_to_mesh(obj)
+        self.triangulate_mesh(mesh, False)
+
+        vcols = self.get_vertex_colors(mesh)
+        verts_indices = {}
+        vertices_list = []
+        faces_list = []
+
+        # Check for vertices once before exporting to report instanstly
+        if len(mesh.vertices) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
+
+        for polygon in mesh.polygons:
+            face = {"verts": [], "mat_idx": polygon.material_index}
+
+            for loop_index in polygon.loop_indices:
+                loop = mesh.loops[loop_index]
+                vert_index = loop.vertex_index
+                vertex = mesh.vertices[vert_index]
+
+                if mesh.uv_layers:
+                    uv = mesh.uv_layers[0].data[loop_index].uv
+                    uv = (uv.x, uv.y)
+                else:
+                    uv = (0.0, 1.0)
+
+                if vcols:
+                    vert_col = vcols[0][loop_index]
+                else:
+                    vert_col = (1.0, 1.0, 1.0)
+
+                key = (vert_index, uv)
+
+                if key not in verts_indices:
+                    face['verts'].append(len(vertices_list))
+                    verts_indices[key] = len(vertices_list)
+                    vertices_list.append({"idx": vert_index,
+                                          "co": vertex.co,
+                                          "uv": uv,
+                                          "vert_col": vert_col})
+                else:
+                    face['verts'].append(verts_indices[key])
+
+            faces_list.append(face)
+
+        # Check vertices count again since duplicate vertices may have increased
+        # vertices count above the limit
+        if not self.exclude_geo_faces and len(vertices_list) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
+
+        for vertex in vertices_list:
+            breakable_model.positions.append(dff.Vector._make(vertex['co']))
+
+            uv = vertex['uv']
+            breakable_model.uvs.append(dff.TexCoords(uv[0], 1-uv[1]))
+
+            vert_col = vertex['vert_col']
+            breakable_model.prelits.append(dff.RGBA._make(
+                int(col * 255) for col in vert_col))
+
+        triangles = [
+            dff.Triangle._make((
+                verts[1], #b
+                verts[0], #a
+                face['mat_idx'], #material
+                verts[2] #c
+            ))
+            for face in faces_list
+            for verts in [face['verts']]
+        ]
+        breakable_model.triangles.extend(triangles)
+        breakable_model.triangles.sort(key=lambda triangle: triangle.material)
+
+        for mat_slot in obj.material_slots:
+            texture_name = ""
+            mask_name = ""
+            ambient_color = (1, 1, 1)
+
+            if mat_slot.material:
+                helper = material_helper(mat_slot.material)
+
+                # Set texture name
+                texture = helper.get_texture()
+                if texture:
+                    texture_name = texture.name
+
+                # Set ambient color
+                if helper.principled:
+                    ambient_color = helper.principled.base_color[:3]
+
+            breakable_model.texture_names.append(texture_name)
+            breakable_model.texture_masks.append(mask_name)
+            breakable_model.ambient_colors.append(dff.Vector._make(ambient_color))
+
     #######################################################
     @staticmethod
     def convert_to_mesh(obj):
@@ -976,6 +1084,10 @@ class dff_exporter:
 
         geometry.surface_properties = (0,0,0)
         geometry.materials = self.generate_material_list(obj)
+
+        # Add Breakable Extension
+        if obj.dff.export_breakable:
+            self.populate_geometry_with_breakable_object(obj.dff.breakable_object, geometry)
 
         geometry.export_flags['export_normals'] = obj.dff.export_normals
         geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
