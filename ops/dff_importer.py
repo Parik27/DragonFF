@@ -145,22 +145,46 @@ class dff_importer:
             else:
                 faces = geom.triangles
 
+            has_normals = geom.has_normals
             use_face_loops = geom.native_platform_type == dff.NativePlatformType.GC
-            use_custom_normals = geom.has_normals and self.import_normals
+            use_custom_normals = has_normals and self.import_normals
+
             last_face_index = len(faces) - 1
-            vert_index = -1
-            skipped_backfaces_num = 0
+            skipped_double_faces_num = 0
+            face_map = {}
+            double_faces = set()
+
+            if self.create_backfaces and not has_normals:
+                if bpy.app.version >= (4, 4, 0):
+                    backface_layer = bm.faces.layers.bool.new("backface")
+                else:
+                    backface_layer = None
 
             for fi, f in enumerate(faces):
+                vert_indices = (f.a, f.b, f.c)
+
+                # Skip a face with less than 3 vertices
+                if len(set(vert_indices)) < 3:
+                    continue
 
                 # Skip double face (keep the last one)
-                if fi < last_face_index:
+                # has_normals only
+                if has_normals and fi < last_face_index:
                     next_face = faces[fi + 1]
-                    if set((f.a, f.b, f.c)) == set((next_face.a, next_face.b, next_face.c)):
-                        vert_index += 3
+                    if set(vert_indices) == set((next_face.a, next_face.b, next_face.c)):
+                        skipped_double_faces_num += 1
                         continue
 
-                face_vertices = (f.a, f.b, f.c)
+                # Skip already created face
+                face_key = tuple(sorted(vert_indices))
+                if face_key in face_map:
+
+                    # Store double faces for normal calculation
+                    if not has_normals:
+                        double_faces.add(face_map[face_key])
+
+                    skipped_double_faces_num += 1
+                    continue
 
                 try:
                     face = bm.faces.new(
@@ -170,38 +194,22 @@ class dff_importer:
                             bm.verts[f.c]
                         ])
 
-                except ValueError:
+                except ValueError as e:
+                    print(e)
+                    continue
 
-                    # Skip a face with less than 3 vertices
-                    if len(set(face_vertices)) < 3:
-                        vert_index += 3
-                        continue
-
-                    # Create backface
-                    if self.create_backfaces:
-                        bm.verts.new(geom.vertices[f.a])
-                        bm.verts.new(geom.vertices[f.b])
-                        bm.verts.new(geom.vertices[f.c])
-
-                        bm.verts.ensure_lookup_table()
-                        bm.verts.index_update()
-
-                        face = bm.faces.new(bm.verts[-3:])
-
-                    else:
-                        skipped_backfaces_num += 1
-                        vert_index += 3
-                        continue
+                face_map[face_key] = face
 
                 if len(mat_indices) > 0:
                     face.material_index = mat_indices[f.material]
 
+                if use_face_loops:
+                    vert_index = fi * 3
+                    vert_indices = (vert_index, vert_index + 1, vert_index + 2)
+
                 # Setting UV coordinates
                 for loop_index, loop in enumerate(face.loops):
-                    if use_face_loops:
-                        vert_index += 1
-                    else:
-                        vert_index = face_vertices[loop_index]
+                    vert_index = vert_indices[loop_index]
                     for i, layer in enumerate(geom.uv_layers):
 
                         bl_layer = uv_layers[i]
@@ -232,10 +240,38 @@ class dff_importer:
 
                 face.smooth = True
 
-            bm.to_mesh(mesh)
+            if double_faces:
+                double_faces = list(double_faces)
 
-            if skipped_backfaces_num:
-                print('Skipped %d backfaces for atomic %d' % (skipped_backfaces_num, atomic_index))
+                # Calculate normals
+                bmesh.ops.recalc_face_normals(bm, faces=double_faces)
+
+                bm_welded = bm.copy()
+                bm_welded.faces.ensure_lookup_table()
+                face_pairs = [(face, bm_welded.faces[face.index]) for face in double_faces]
+
+                bmesh.ops.remove_doubles(bm_welded, verts=bm_welded.verts, dist=0.0001)
+                bmesh.ops.recalc_face_normals(bm_welded, faces=bm_welded.faces)
+
+                for face, welded_face in face_pairs:
+                    if welded_face.is_valid and face.normal.dot(welded_face.normal) < 0.0:
+                        face.normal_flip()
+
+                bm_welded.free()
+
+                # Create backfaces
+                if self.create_backfaces:
+                    bmesh.ops.duplicate(bm, geom=double_faces)
+                    bmesh.ops.reverse_faces(bm, faces=double_faces)
+                    if backface_layer is not None:
+                        for face in double_faces:
+                            face[backface_layer] = True
+                    skipped_double_faces_num = 0
+
+            if skipped_double_faces_num:
+                print('Skipped %d double faces for atomic %d' % (skipped_double_faces_num, atomic_index))
+
+            bm.to_mesh(mesh)
 
             # Set loop normals
             if normals:
@@ -245,7 +281,7 @@ class dff_importer:
                 if bpy.app.version < (4, 1, 0):
                     mesh.use_auto_smooth = True
 
-            mesh['dragon_normals'] = geom.has_normals
+            mesh['dragon_normals'] = has_normals
             mesh.update()
 
             # Import materials and add the mesh to the meshes list
