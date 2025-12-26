@@ -857,6 +857,7 @@ class dff_importer:
                     for dm in delta_morph.entries:
                         sk = mesh.shape_key_add(name=dm.name)
                         sk.interpolation = 'KEY_LINEAR'
+                        sk.value = 0.0
 
                         positions, normals, prelits, uvs = dm.positions, dm.normals, dm.prelits, dm.uvs
                         for i, vi in enumerate(dm.indices):
