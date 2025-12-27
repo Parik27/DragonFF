@@ -849,6 +849,8 @@ class dff_exporter:
         if not self.exclude_geo_faces and len(mesh.vertices) > 0xFFFF:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
 
+        apply_rot_mat = apply_trans_mat.to_3x3().normalized()
+
         for polygon in mesh.polygons:
             face = {"verts": [], "mat_idx": polygon.material_index}
 
@@ -886,7 +888,7 @@ class dff_exporter:
 
                     if apply_trans_mat:
                         co = apply_trans_mat @ co
-                        normal = apply_trans_mat @ normal
+                        normal = apply_rot_mat @ normal
 
                     face['verts'].append (len(vertices_list))
                     verts_indices[key] = len(vertices_list)
