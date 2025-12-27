@@ -169,7 +169,8 @@ class col_importer:
                 print(e)
                 
         bm.to_mesh(mesh)
-        
+        bm.free()
+
         # Face groups get stored in a face attribute on the mesh, each face storing the index of its group
         if face_groups:
             if (2, 93, 0) > bpy.app.version:
@@ -180,7 +181,7 @@ class col_importer:
 
             for fg_idx, fg in enumerate(face_groups):
                 for face_idx in range(fg.start, fg.end+1):
-                    if face_idx >= len(bm.faces):
+                    if face_idx >= len(mesh.polygons):
                         break
                     attribute.data[face_idx].value = fg_idx
 

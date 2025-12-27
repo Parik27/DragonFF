@@ -297,6 +297,7 @@ class dff_importer:
                 print('Skipped %d double faces for atomic %d' % (skipped_double_faces_num, atomic_index))
 
             bm.to_mesh(mesh)
+            bm.free()
 
             # Set loop normals
             if normals:
@@ -445,6 +446,9 @@ class dff_importer:
     def import_materials(geometry, frame, mesh, mat_order):
 
         self = dff_importer
+
+        if not geometry.materials:
+            return
 
         # Refactored
         for index, mat_idx in enumerate(mat_order):
@@ -774,6 +778,8 @@ class dff_importer:
                     ]
 
         bm.to_mesh(mesh)
+        bm.free()
+
         mesh.update()
 
         # Create materials
@@ -820,6 +826,7 @@ class dff_importer:
                     modifier.use_edge_angle = False
                 
                 bm.to_mesh(mesh.data)
+                bm.free()
 
     #######################################################
     def link_obj_to_frame_bone(obj, frame_index):
