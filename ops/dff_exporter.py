@@ -16,6 +16,7 @@
 
 import bpy
 import bmesh
+import math
 import mathutils
 
 from bpy_extras import anim_utils
@@ -31,7 +32,17 @@ def clear_extension(string):
     
     k = string.rfind('.')
     return string if k < 0 else string[:k]
-    
+
+#######################################################
+def is_matrix_identity(mat, epsilon=1e-6):
+
+    identity = mathutils.Matrix.Identity(len(mat))
+    for i in range(len(mat)):
+        for j in range(len(mat)):
+            if not math.isclose(mat[i][j], identity[i][j], abs_tol=epsilon):
+                return False
+    return True
+
 #######################################################
 class material_helper:
 
@@ -592,22 +603,22 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def get_delta_morph_entries(obj, shape_keys):
+    def get_delta_morph_entries(sks):
         dm_entries = []
-        self = dff_exporter
 
-        if shape_keys and len(shape_keys.key_blocks) > 1:
-            for kb in shape_keys.key_blocks[1:]:
-                min_corner = mathutils.Vector(min(v.co[i] for v in kb.data) for i in range(3))
-                max_corner = mathutils.Vector(max(v.co[i] for v in kb.data) for i in range(3))
-                dimensions = mathutils.Vector(max_corner[i] - min_corner[i] for i in range(3))
+        if len(sks) > 1:
+            for kb in sks[1:]:
+                name, cos = kb
+
+                min_corner = mathutils.Vector(min(v[i] for v in cos) for i in range(3))
+                max_corner = mathutils.Vector(max(v[i] for v in cos) for i in range(3))
+                dimensions = max_corner - min_corner
 
                 sphere_center = 0.5 * (min_corner + max_corner)
-                sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
                 sphere_radius = 1.732 * max(*dimensions) / 2
 
                 entrie = dff.DeltaMorph()
-                entrie.name = kb.name
+                entrie.name = name
                 entrie.bounding_sphere = dff.Sphere._make(
                     list(sphere_center) + [sphere_radius]
                 )
@@ -797,7 +808,7 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def populate_geometry_with_mesh_data(obj, geometry):
+    def populate_geometry_with_mesh_data(obj, geometry, apply_trans_mat):
         self = dff_exporter
 
         mesh, shape_keys = self.convert_to_mesh(obj)
@@ -817,13 +828,22 @@ class dff_exporter:
         if bpy.app.version < (4, 1, 0):
             mesh.calc_normals_split()
 
+        # Extract shape keys
+        sks = []
+        if shape_keys:
+            for kb in shape_keys.key_blocks:
+                if apply_trans_mat:
+                    sks.append((kb.name, [apply_trans_mat @ v.co for v in kb.data]))
+                else:
+                    sks.append((kb.name, [v.co for v in kb.data]))
+
         vcols = self.get_vertex_colors (mesh)
         verts_indices = {}
         vertices_list = []
         faces_list = []
 
         skin_plg, bone_groups = self.get_skin_plg_and_bone_groups(obj, mesh)
-        dm_entries = self.get_delta_morph_entries(obj, shape_keys)
+        dm_entries = self.get_delta_morph_entries(sks)
 
         # Check for vertices once before exporting to report instanstly
         if not self.exclude_geo_faces and len(mesh.vertices) > 0xFFFF:
@@ -839,7 +859,7 @@ class dff_exporter:
                 uvs = []
                 vert_cols = []
                 bones = []
-                sk_cos = []
+                sk_cos = [cos[vert_index] for _, cos in sks] if sks else []
 
                 for uv_layer in mesh.uv_layers:
                     uvs.append(uv_layer.data[loop_index].uv)
@@ -855,10 +875,7 @@ class dff_exporter:
                     if group.group in bone_groups and group.weight > 0:
                         bones.append((bone_groups[group.group], group.weight))
 
-                if shape_keys:
-                    for kb in shape_keys.key_blocks:
-                        sk_cos.append(kb.data[vert_index].co)
-
+                co = vertex.co
                 normal = normals[loop_index if use_loop_normals else vert_index]
 
                 key = (vert_index,
@@ -866,10 +883,15 @@ class dff_exporter:
                        tuple(tuple(uv) for uv in uvs))
 
                 if key not in verts_indices:
+
+                    if apply_trans_mat:
+                        co = apply_trans_mat @ co
+                        normal = apply_trans_mat @ normal
+
                     face['verts'].append (len(vertices_list))
                     verts_indices[key] = len(vertices_list)
                     vertices_list.append({"idx": vert_index,
-                                          "co": vertex.co,
+                                          "co": co,
                                           "normal": normal,
                                           "uvs": uvs,
                                           "vert_cols": vert_cols,
@@ -913,6 +935,11 @@ class dff_exporter:
         vertices_list = []
         faces_list = []
 
+        # Get applying transform matrix
+        apply_trans_mat = obj.matrix_parent_inverse.inverted() @ obj.matrix_local
+        if is_matrix_identity(apply_trans_mat):
+            apply_trans_mat = None
+
         # Check for vertices once before exporting to report instanstly
         if len(mesh.vertices) > 0xFFFF:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
@@ -924,6 +951,7 @@ class dff_exporter:
                 loop = mesh.loops[loop_index]
                 vert_index = loop.vertex_index
                 vertex = mesh.vertices[vert_index]
+                co = vertex.co
 
                 if mesh.uv_layers:
                     uv = mesh.uv_layers[0].data[loop_index].uv
@@ -939,10 +967,14 @@ class dff_exporter:
                 key = (vert_index, uv)
 
                 if key not in verts_indices:
+
+                    if apply_trans_mat:
+                        co = apply_trans_mat @ co
+
                     face['verts'].append(len(vertices_list))
                     verts_indices[key] = len(vertices_list)
                     vertices_list.append({"idx": vert_index,
-                                          "co": vertex.co,
+                                          "co": co,
                                           "uv": uv,
                                           "vert_col": vert_col})
                 else:
@@ -1066,17 +1098,28 @@ class dff_exporter:
             self.create_frame(obj, set_parent=False)
             frame_index = self.get_last_frame_index()
 
+        # Get applying transform matrix
+        apply_trans_mat = None
+        if not obj.dff.is_frame:
+            apply_trans_mat = obj.matrix_parent_inverse.inverted() @ obj.matrix_local
+            if is_matrix_identity(apply_trans_mat):
+                apply_trans_mat = None
+
         # Create geometry
         geometry = dff.Geometry()
-        self.populate_geometry_with_mesh_data (obj, geometry)
+        self.populate_geometry_with_mesh_data (obj, geometry, apply_trans_mat)
 
         # Bounding sphere
-        sphere_center = 0.125 * sum(
-            (mathutils.Vector(b) for b in obj.bound_box),
-            mathutils.Vector()
-        )
-        sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
-        sphere_radius = 1.732 * max(*obj.dimensions) / 2
+        if apply_trans_mat:
+            bbox = [apply_trans_mat @ mathutils.Vector(b) for b in obj.bound_box]
+        else:
+            bbox = obj.bound_box
+        min_corner = mathutils.Vector(min(b[i] for b in bbox) for i in range(3))
+        max_corner = mathutils.Vector(max(b[i] for b in bbox) for i in range(3))
+        dimensions = max_corner - min_corner
+
+        sphere_center = 0.5 * (min_corner + max_corner)
+        sphere_radius = 1.732 * max(*dimensions) / 2
 
         geometry.bounding_sphere = dff.Sphere._make(
             list(sphere_center) + [sphere_radius]
