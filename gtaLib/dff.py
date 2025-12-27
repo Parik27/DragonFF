@@ -123,6 +123,7 @@ types = {
     "Material Effects PLG"    : 288,
     "Delta Morph PLG"         : 290,
     "UV Animation PLG"        : 309,
+    "NTL Material Extension"  : 375,
     "Bin Mesh PLG"            : 1294,
     "Native Data PLG"         : 1296,
     "SkyGFX"                  : 60909,
@@ -2647,7 +2648,11 @@ class dff:
                                                                     self._read(32)
                                                                 ).decode('ascii')
                                             )
-                                            
+
+                                    if chunk.type == types["NTL Material Extension"]:
+                                        # TODO: Have no idea how to read this extension, so fill it with zeros
+                                        self.data = self.data[:self.pos] + (b'\0' * chunk.size) + self.data[self.pos:]
+
                                     self.pos = __chunk_end
                                     
                                     
