@@ -335,14 +335,6 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         settings = context.object.dff
 
         box = layout.box()
-        box.prop(settings, "export_normals", text="Export Normals")
-        box.prop(settings, "export_split_normals", text="Export Custom Split Normals")
-        box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
-        box.prop(settings, "triangle_strip", text="Use Triangle Strip")
-        box.prop(settings, "light", text="Enable Lighting")
-        box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
-
-        box = layout.box()
         row = box.row()
         if settings.is_frame_locked:
             row.enabled = False
@@ -350,6 +342,14 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         if settings.is_frame:
             box.prop(settings, "export_frame_name", text="Export Frame Name")
+
+        box = layout.box()
+        box.prop(settings, "export_normals", text="Export Normals")
+        box.prop(settings, "export_split_normals", text="Export Custom Split Normals")
+        box.prop(settings, "export_binsplit", text="Export Bin Mesh PLG")
+        box.prop(settings, "triangle_strip", text="Use Triangle Strip")
+        box.prop(settings, "light", text="Enable Lighting")
+        box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
 
         properties = [
             ["day_cols", "Day Vertex Colours"],
