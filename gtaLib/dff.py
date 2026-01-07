@@ -473,7 +473,7 @@ class Material:
             self._hasMatFX = False
             return bytearray()
             
-        if effectType != 3 or effectType != 6: #Both effects are set
+        if effectType != 3 and effectType != 6: #Both effects are set
             data += pack("<I", 0)
 
         self._hasMatFX = True
