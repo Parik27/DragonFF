@@ -45,6 +45,7 @@ def get_valid_map_formats (props, context):
 
     return []
 
+#######################################################
 class DFFMapPropsBase (bpy.types.PropertyGroup):
     section : bpy.props.EnumProperty(items=get_valid_map_sections)
     current_format : bpy.props.EnumProperty(items=get_valid_map_formats)

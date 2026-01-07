@@ -32,7 +32,7 @@ class MapObjDefSection (MapSection):
 
 #######################################################
 @dataclass
-@add_format("IPL - III", ["III"], MapTextSectionFormat("inst", ['ide', 'model_name', 'interior', 'location', 'location', 'location', 'rotation', 'rotation', 'rotation', 'rotation', 'lod']))
+@add_format("IPL - III/VC", ["III", "VC"], MapTextSectionFormat("inst", ['ide', 'model_name', 'interior', 'location', 'location', 'location', 'rotation', 'rotation', 'rotation', 'rotation']))
 @add_format("IPL - VC", ["VC"], MapTextSectionFormat("inst", ['ide', 'model_name', 'interior', 'location', 'location', 'location', 'scale', 'scale', 'scale', 'rotation', 'rotation', 'rotation', 'rotation']))
 @add_format("IPL - SA", ["SA"], MapTextSectionFormat("inst", ['ide', 'model_name', 'interior', 'location', 'location', 'location', 'rotation', 'rotation', 'rotation', 'rotation', 'lod']))
 @add_format("Binary", ["SA"], MapBinarySectionFormat ("<fffffffiii", ['location', 'rotation', 'ide', 'interior', 'lod']))
@@ -44,8 +44,8 @@ class MapInstSection(MapSection):
 
     _ : KW_ONLY
     model_name : str = "dummy"
-    interior : int = -1
-    lod : int = 0
+    interior : int = 0
+    lod : int = -1
 
     def get_linked_entries (self):
         return [f"ide_{self.ide}"]

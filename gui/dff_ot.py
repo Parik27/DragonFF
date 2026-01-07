@@ -141,6 +141,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
             layout.prop(self, "preserve_positions")
             layout.prop(self, "preserve_rotations")
 
+        layout.prop(self, "filepath")
         layout.prop(self, "only_selected")
 
         box = layout.box()

@@ -849,8 +849,8 @@ class DffFileImporter:
                 self.current_collection.children.link(collection)
 
                 # Hide objects
-                for object in collection.objects:
-                    hide_object(object)
+                # for object in collection.objects:
+                #     hide_object(object)
 
         State.update_scene()
         return self.current_collection
