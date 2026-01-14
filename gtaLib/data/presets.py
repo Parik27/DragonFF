@@ -23,6 +23,18 @@ material_colours = {
     (0, 16, 255, 255)  : ("ImVehFT - Light Night", ""),
     (0, 17, 255, 255)  : ("ImVehFT - Light All-day", ""),
     (0, 18, 255, 255)  : ("ImVehFT - Default Day", ""),
+    (255, 200, 100, 255)  : ("ModelExtras - Dashboard Engine On", ""),
+    (255, 200, 101, 255)  : ("ModelExtras - Dashboard Engine Broken", ""),
+    (255, 200, 102, 255)  : ("ModelExtras - Dashboard Fog Light", ""),
+    (255, 200, 103, 255)  : ("ModelExtras - Dashboard High Beam", ""),
+    (255, 200, 104, 255)  : ("ModelExtras - Dashboard Low Beam", ""),
+    (255, 200, 105, 255)  : ("ModelExtras - Dashboard Indicator Left", ""),
+    (255, 200, 106, 255)  : ("ModelExtras - Dashboard Indicator Right", ""),
+    (255, 200, 107, 255)  : ("ModelExtras - Dashboard Siren Lights",""),
+    (255, 200, 108, 255)  : ("ModelExtras - Dashboard Boot Open",""),
+    (255, 200, 109, 255)  : ("ModelExtras - Dashboard Bonnet Open",""),
+    (255, 200, 110, 255)  : ("ModelExtras - Dashboard Door Open",""),
+    (255, 200, 111, 255)  : ("ModelExtras - Dashboard Roof Open",""),
 }
 
 material_specular_levels = {
