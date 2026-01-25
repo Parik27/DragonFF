@@ -132,30 +132,6 @@ class material_helper:
             self.material.ambient            = props.ambient
 
     #######################################################
-    def set_normal_map(self, image, label, intensity):
-
-        if self.principled:
-            self.principled.node_normalmap_get()
-            
-            self.principled.normalmap_texture.image = image
-            self.principled.node_normalmap.label    = label
-            self.principled.normalmap_strength      = intensity
-
-        else:
-            slot = self.material.texture_slots.add()
-            slot.texture = bpy.data.textures.new(
-                name = label,
-                type = "IMAGE"
-            )
-            
-            slot.texture.image = image
-            slot.texture.use_normal_map = True
-            slot.use_map_color_diffuse  = False
-            slot.use_map_normal         = True
-            slot.normal_factor          = intensity
-        pass
-
-    #######################################################
     def set_environment_map(self, plugin):
 
         if plugin.env_map:
@@ -164,6 +140,16 @@ class material_helper:
         self.material.dff.export_env_map       = True
         self.material.dff.env_map_coef         = plugin.coefficient
         self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha        
+
+    #######################################################
+    def set_dual_texture(self, plugin):
+
+        if plugin.texture:
+            self.material.dff.dual_tex         = plugin.texture.name
+
+        self.material.dff.export_dual_tex      = True
+        self.material.dff.dual_src_blend       = str(plugin.src_blend)
+        self.material.dff.dual_dst_blend       = str(plugin.dst_blend)
 
     #######################################################
     def set_specular_material(self, plugin):
@@ -281,6 +267,7 @@ class material_helper:
                     kp.interpolation = 'LINEAR'
 
         self.material.dff.animation_name   = uv_anim.name
+        self.material.dff.uv_channel       = uv_anim.uv_channel
         self.material.dff.export_animation = True
 
     #######################################################

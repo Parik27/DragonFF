@@ -102,39 +102,32 @@ class material_helper:
         return dff.GeomSurfPro(ambient, specular, diffuse)
 
     #######################################################
-    def get_normal_map(self):
+    def get_bump_map(self):
 
         bump_texture = None
-        height_texture = dff.Texture()
+        height_texture = None
 
         if not self.material.dff.export_bump_map:
             return None
+
+        bump_texture_name = self.material.dff.bump_map_tex
+        intensity = self.material.dff.bump_map_intensity
+        bump_dif_alpha = self.material.dff.bump_dif_alpha
+
+        base_color_texture = None
+        if bump_dif_alpha:
+            base_color_texture = self.get_texture()
+
+        # Create bump texture (may have empty name when use diffuse alpha is set)
+        bump_texture = dff.Texture()
+        bump_texture.name = bump_texture_name
         
-        # 2.8
-        if self.principled:
-            
-            if self.principled.normalmap_texture.image is not None:
-
-                bump_texture = dff.Texture()
-                
-                node_label = self.principled.node_normalmap.label
-                image_name = self.principled.normalmap_texture.image.name
-
-                bump_texture.name = clear_extension(
-                    node_label
-                    if node_label in image_name and node_label != ""
-                    else image_name
-                )
-                intensity = self.principled.normalmap_strength
-
-        height_texture.name = self.material.dff.bump_map_tex
-        if height_texture.name == "":
-            height_texture = None
-
-        if bump_texture is not None:
-            return dff.BumpMapFX(intensity, height_texture, bump_texture)
-
-        return None
+        # If diffuse alpha is checked use material texture as heightmap
+        if bump_dif_alpha and base_color_texture:
+            height_texture = dff.Texture()
+            height_texture.name = base_color_texture.name
+        
+        return dff.BumpMapFX(intensity, height_texture, bump_texture)
 
     #######################################################
     def get_environment_map(self):
@@ -151,6 +144,22 @@ class material_helper:
         texture.filters = 0
         
         return dff.EnvMapFX(coef, use_fb_alpha, texture)
+
+    #######################################################
+    def get_dual_texture(self):
+
+        if not self.material.dff.export_dual_tex:
+            return None
+
+        texture_name = self.material.dff.dual_tex
+        src_blend    = int(self.material.dff.dual_src_blend)
+        dst_blend    = int(self.material.dff.dual_dst_blend)
+
+        texture = dff.Texture()
+        texture.name = texture_name
+        texture.filters = 0
+        
+        return dff.DualFX(src_blend, dst_blend, texture)
 
     #######################################################
     def get_specular_material(self):
@@ -223,6 +232,7 @@ class material_helper:
 
         anim = dff.UVAnim()
         anim.name = self.material.dff.animation_name
+        anim.uv_channel = self.material.dff.uv_channel
 
         # Multiple keyframes may contain the same time,
         # so time_inc is added for the key
@@ -516,8 +526,9 @@ class dff_exporter:
                 material.textures.append(texture)
 
             # Materials
-            material.add_plugin('bump_map', helper.get_normal_map())
+            material.add_plugin('bump_map', helper.get_bump_map())
             material.add_plugin('env_map', helper.get_environment_map())
+            material.add_plugin('dual', helper.get_dual_texture())
             material.add_plugin('spec', helper.get_specular_material())
             material.add_plugin('refl', helper.get_reflection_material())
             material.add_plugin('udata', helper.get_user_data())

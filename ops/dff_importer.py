@@ -442,7 +442,7 @@ class dff_importer:
         return name if name else fallback
         
     ##################################################################
-    # TODO: MatFX: Dual Textures
+
     def import_materials(geometry, frame, mesh, mat_order):
 
         self = dff_importer
@@ -475,27 +475,25 @@ class dff_importer:
                 image = self.find_texture_image(texture.name)
                 helper.set_texture(image, texture.name, texture.filters, texture.uv_addressing)
 
-            # Normal Map
+            # Bump Map
             if 'bump_map' in material.plugins:
                 mat.dff.export_bump_map = True
                 
                 for bump_fx in material.plugins['bump_map']:
 
-                    texture = None
                     if bump_fx.height_map is not None:
-                        texture = bump_fx.height_map
+                        # Store height map texture name internally
+                        mat.dff.height_map_tex = bump_fx.height_map.name
+                        
                         if bump_fx.bump_map is not None:
+                            # Both height and bump maps present - use diffuse alpha
                             mat.dff.bump_map_tex = bump_fx.bump_map.name
+                            mat.dff.bump_dif_alpha = True
+                            mat.dff.bump_map_intensity = bump_fx.intensity
 
                     elif bump_fx.bump_map is not None:
-                        texture = bump_fx.bump_map
-
-                    if texture:
-                        image = self.find_texture_image(texture.name)
-                        helper.set_normal_map(image,
-                                              texture.name,
-                                              bump_fx.intensity
-                        )
+                        mat.dff.bump_map_tex = bump_fx.bump_map.name
+                        mat.dff.bump_map_intensity = bump_fx.intensity
 
             # Surface Properties
             if material.surface_properties is not None:
@@ -511,6 +509,11 @@ class dff_importer:
             if 'env_map' in material.plugins:
                 plugin = material.plugins['env_map'][0]
                 helper.set_environment_map(plugin)
+
+            # Dual Texture
+            if 'dual' in material.plugins:
+                plugin = material.plugins['dual'][0]
+                helper.set_dual_texture(plugin)
 
             # Specular Material
             if 'spec' in material.plugins:

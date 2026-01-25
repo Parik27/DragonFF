@@ -30,6 +30,21 @@ texture_uv_addressing_items = (
     ("4", "Border", "")
 )
 
+texture_blend_items = (
+    ("0",  "Disabled",      "No blending is performed"),
+    ("1",  "Zero",          "RGBA channels are set to zero"),
+    ("2",  "One",           "RGBA channels are set to one"),
+    ("3",  "Src Color",     "Source RGBA values"),
+    ("4",  "Inv Src Color", "Inverse of source RGBA values"),
+    ("5",  "Src Alpha",     "Source alpha on all channels"),
+    ("6",  "Inv Src Alpha", "Inverse source alpha on all channels"),
+    ("7",  "Dst Alpha",     "Destination alpha on all channels"),
+    ("8",  "Inv Dst Alpha", "Inverse destination alpha on all channels"),
+    ("9",  "Dst Color",     "Destination RGBA values"),
+    ("10", "Inv Dst Color", "Inverse destination RGBA values"),
+    ("11", "Src Alpha Sat", "Source alpha saturated")
+)
+
 #######################################################
 def breakable_obj_poll_func(self, obj):
     return obj.dff.type == 'BRK'
@@ -82,7 +97,41 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             self.draw_labelled_prop(
                 box.row(), settings, ["env_map_coef"], "Coefficient")
             self.draw_labelled_prop(
-                box.row(), settings, ["env_map_fb_alpha"], "Use FB Alpha")
+                box.row(), settings, ["env_map_fb_alpha"], "Use Framebuffer Alpha")
+
+    #######################################################
+    def draw_material_prop_box(self, context, box):
+
+        settings = context.material.dff
+        box.label(text="Material properties")
+
+        # This is for conveniently setting the base colour from the settings
+        # without removing the texture node
+        
+        try:
+
+            node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
+            prop = node.inputs[0]
+            prop_val = "default_value"
+                
+            row = box.row()
+            row.prop(
+                prop,
+                prop_val,
+                text="Color")
+            
+            row.prop(settings,
+                     "preset_mat_cols",
+                     text="",
+                     icon="MATERIAL",
+                     icon_only=True
+            )
+            
+        except Exception:
+            pass
+
+        self.draw_labelled_prop(
+            box.row(), settings, ["ambient"], "Ambient")
 
     #######################################################
     def draw_texture_prop_box(self, context, box):
@@ -91,9 +140,9 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
         box.label(text="Texture properties")
 
-        box.prop(settings, "tex_filters", text="Filters")
+        box.prop(settings, "tex_filters", text="Filtering")
         self.draw_labelled_prop(
-            box.row(), settings, ["tex_u_addr", "tex_v_addr"], "UV addressing")
+            box.row(), settings, ["tex_u_addr", "tex_v_addr"], "UV Addressing")
 
     #######################################################
     def draw_bump_map_box(self, context, box):
@@ -102,7 +151,25 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box.row().prop(settings, "export_bump_map")
         
         if settings.export_bump_map:
-            box.row().prop(settings, "bump_map_tex", text="Height Map Texture")
+            box.row().prop(settings, "bump_map_tex", text="Texture")
+            
+            self.draw_labelled_prop(
+                box.row(), settings, ["bump_map_intensity"], "Intensity")
+            
+            self.draw_labelled_prop(
+                box.row(), settings, ["bump_dif_alpha"], "Use Diffuse Alpha")
+
+    #######################################################
+    def draw_dual_tex_box(self, context, box):
+
+        settings = context.material.dff
+        box.row().prop(settings, "export_dual_tex")
+        
+        if settings.export_dual_tex:
+            box.row().prop(settings, "dual_tex", text="Texture")
+            
+            self.draw_labelled_prop(
+                box.row(), settings, ["dual_src_blend", "dual_dst_blend"], "Blending")
 
     #######################################################
     def draw_uv_anim_box(self, context, box):
@@ -112,6 +179,9 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box.row().prop(settings, "export_animation")
         if settings.export_animation:
             box.row().prop(settings, "animation_name", text="Name")
+            
+            self.draw_labelled_prop(
+                box.row(), settings, ["uv_channel"], "Map")
             
             
     #######################################################
@@ -132,9 +202,9 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
                 "Offset"
             )
 
-            row = box.row()
-            row.prop(settings, "reflection_intensity", text="Intensity")
-            row.prop(settings, "preset_reflection_intensities", text="", icon="PRESET", icon_only=True)
+            self.draw_labelled_prop(
+                box.row(), settings, ["reflection_intensity"], "Intensity")
+            # row.prop(settings, "preset_reflection_intensities", text="", icon="PRESET", icon_only=True)
 
     #######################################################
     def draw_specl_box(self, context, box):
@@ -143,11 +213,11 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box.row().prop(settings, "export_specular")
 
         if settings.export_specular:
-            row = box.row()
-            row.prop(settings, "specular_level", text="Level")
-            row.prop(settings, "preset_specular_levels", text="", icon="PRESET", icon_only=True)
-
             box.row().prop(settings, "specular_texture", text="Texture")
+
+            self.draw_labelled_prop(
+                box.row(), settings, ["specular_level"], "Level")
+            # row.prop(settings, "preset_specular_levels", text="", icon="PRESET", icon_only=True)
 
     #######################################################
     def draw_mesh_menu(self, context):
@@ -155,40 +225,14 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         layout = self.layout
         settings = context.material.dff
 
-        layout.prop(settings, "ambient")
-
-        # This is for conveniently setting the base colour from the settings
-        # without removing the texture node
-        
-        try:
-
-            node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
-            prop = node.inputs[0]
-            prop_val = "default_value"
-                
-            row = layout.row()
-            row.prop(
-                prop,
-                prop_val,
-                text="Color")
-            
-            row.prop(settings,
-                     "preset_mat_cols",
-                     text="",
-                     icon="MATERIAL",
-                     icon_only=True
-            )
-            
-        except Exception:
-            pass
-
-
-        self.draw_texture_prop_box (context, layout.box())
-        self.draw_env_map_box      (context, layout.box())
-        self.draw_bump_map_box     (context, layout.box())
-        self.draw_refl_box         (context, layout.box())
-        self.draw_specl_box        (context, layout.box())
-        self.draw_uv_anim_box      (context, layout.box())
+        self.draw_material_prop_box (context, layout.box())
+        self.draw_texture_prop_box  (context, layout.box())
+        self.draw_bump_map_box      (context, layout.box())
+        self.draw_env_map_box       (context, layout.box())
+        self.draw_dual_tex_box      (context, layout.box())
+        self.draw_uv_anim_box       (context, layout.box())
+        self.draw_specl_box         (context, layout.box())
+        self.draw_refl_box          (context, layout.box())
 
     #######################################################
     # Callback function from preset_mat_cols enum
@@ -531,28 +575,37 @@ class OBJECT_PT_dffCollections(bpy.types.Panel):
 #######################################################
 class DFFMaterialProps(bpy.types.PropertyGroup):
 
-    ambient           : bpy.props.FloatProperty  (name="Ambient Shading", default=1)
-    tex_filters       : bpy.props.EnumProperty  (items=texture_filters_items, default="0")
-    tex_u_addr        : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
-    tex_v_addr        : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
+    ambient            : bpy.props.FloatProperty  (name="Ambient Shading", default=1)
+    tex_filters        : bpy.props.EnumProperty  (items=texture_filters_items, default="0")
+    tex_u_addr         : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
+    tex_v_addr         : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
 
     # Environment Map
-    export_env_map    : bpy.props.BoolProperty   (name="Environment Map")
-    env_map_tex       : bpy.props.StringProperty ()
-    env_map_coef      : bpy.props.FloatProperty  ()
-    env_map_fb_alpha  : bpy.props.BoolProperty   ()
+    export_env_map     : bpy.props.BoolProperty   (name="Environment Map")
+    env_map_tex        : bpy.props.StringProperty ()
+    env_map_coef       : bpy.props.FloatProperty  (default=1.0)
+    env_map_fb_alpha   : bpy.props.BoolProperty   ()
 
     # Bump Map
-    export_bump_map   : bpy.props.BoolProperty   (name="Bump Map")
-    bump_map_tex      : bpy.props.StringProperty ()
+    export_bump_map    : bpy.props.BoolProperty   (name="Bump Map")
+    bump_map_intensity : bpy.props.FloatProperty  (default=1.0)
+    bump_map_tex       : bpy.props.StringProperty ()
+    height_map_tex     : bpy.props.StringProperty ()  # Store internally just in case
+    bump_dif_alpha     : bpy.props.BoolProperty   (name="Use Diffuse Alpha")
+    
+    # Dual Texture
+    export_dual_tex    : bpy.props.BoolProperty   (name="Dual Texture")
+    dual_tex           : bpy.props.StringProperty ()
+    dual_src_blend     : bpy.props.EnumProperty  (name="", items=texture_blend_items, default="5")
+    dual_dst_blend     : bpy.props.EnumProperty  (name="", items=texture_blend_items, default="6")
 
     # Reflection
     export_reflection    : bpy.props.BoolProperty  (name="Reflection Material")
-    reflection_scale_x   : bpy.props.FloatProperty ()
-    reflection_scale_y   : bpy.props.FloatProperty ()
-    reflection_offset_x  : bpy.props.FloatProperty ()
-    reflection_offset_y  : bpy.props.FloatProperty ()
-    reflection_intensity : bpy.props.FloatProperty ()
+    reflection_scale_x   : bpy.props.FloatProperty (default=1.0)
+    reflection_scale_y   : bpy.props.FloatProperty (default=1.0)
+    reflection_offset_x  : bpy.props.FloatProperty (default=1.0)
+    reflection_offset_y  : bpy.props.FloatProperty (default=1.0)
+    reflection_intensity : bpy.props.FloatProperty (default=0.1)
 
     # Pre-set Reflection Intensity
     preset_reflection_intensities : bpy.props.EnumProperty(
@@ -574,7 +627,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
 
     # Specularity
     export_specular  : bpy.props.BoolProperty(name="Specular Material")
-    specular_level   : bpy.props.FloatProperty  ()
+    specular_level   : bpy.props.FloatProperty  (default=0.1)
     specular_texture : bpy.props.StringProperty ()
 
     # Pre-set Specular Level
@@ -596,6 +649,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     # UV Animation
     export_animation : bpy.props.BoolProperty   (name="UV Animation")
     animation_name   : bpy.props.StringProperty ()
+    uv_channel       : bpy.props.IntProperty    (min=0, max=7, default=0)
 
     # Pre-set Material Colours
     preset_mat_cols : bpy.props.EnumProperty(

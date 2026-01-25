@@ -408,6 +408,21 @@ class Material:
         return data
 
     #######################################################
+    def dualfx_to_mem(self):
+        dual_fx = self.plugins['dual'][0]
+        
+        data = pack("<IIII",
+                    4,
+                    dual_fx.src_blend,
+                    dual_fx.dst_blend,
+                    dual_fx.texture is not None
+        )
+        if dual_fx.texture is not None:
+            data += dual_fx.texture.to_mem()
+
+        return data
+
+    #######################################################
     def plugins_to_mem(self):
         data = self.matfx_to_mem()
 
@@ -444,36 +459,37 @@ class Material:
     #######################################################
     def matfx_to_mem(self):
         data = bytearray()
-
         effectType = 0
-        if 'bump_map' in self.plugins:
-            data += self.bumpfx_to_mem()
-            effectType = 1
-            
-            if 'env_map' in self.plugins: #rwMATFXEFFECTBUMPENVMAP
+        
+        if 'dual' in self.plugins or 'uv_anim' in self.plugins:
+            if 'dual' in self.plugins and 'uv_anim' in self.plugins:
+                data += pack("<I", 5)
+                data += self.dualfx_to_mem()
+                effectType = 6
+            elif 'dual' in self.plugins:
+                data += self.dualfx_to_mem()
+                effectType = 4
+            else:
+                data += pack("<I", 5)
+                effectType = 5
+        
+        elif 'bump_map' in self.plugins or 'env_map' in self.plugins:
+            if 'bump_map' in self.plugins and 'env_map' in self.plugins:
+                data += self.bumpfx_to_mem()
                 data += self.envfx_to_mem()
                 effectType = 3
-                
-            
-        elif 'env_map' in self.plugins:
-            data += self.envfx_to_mem()
-            effectType = 2
-            
-        elif 'dual' in self.plugins:
-            effectType = 4
-            
-            if 'uv_anim' in self.plugins: #rwMATFXEFFECTDUALUVTTRANSFORM
-                effectType = 6
-
-        elif 'uv_anim' in self.plugins:
-            effectType = 5
-            data += pack("<I", 5)
+            elif 'bump_map' in self.plugins:
+                data += self.bumpfx_to_mem()
+                effectType = 1
+            else:
+                data += self.envfx_to_mem()
+                effectType = 2
 
         if effectType == 0:
             self._hasMatFX = False
             return bytearray()
-            
-        if effectType != 3 and effectType != 6: #Both effects are set
+        
+        if effectType not in (3, 6):
             data += pack("<I", 0)
 
         self._hasMatFX = True
@@ -776,7 +792,7 @@ class UVAnim:
         "flags",
         "duration",
         "name",
-        "node_to_uv",
+        "uv_channel",
         "frames"
     ]
 
@@ -786,7 +802,7 @@ class UVAnim:
         self.flags = 0
         self.duration = 0
         self.name = ""
-        self.node_to_uv = [0] * 8
+        self.uv_channel = 0
         self.frames = []
 
     #######################################################
@@ -796,8 +812,8 @@ class UVAnim:
         _data = unpack_from("<4xiiif4x32s", data)
         self.type_id, num_frames, self.flags, self.duration, self.name = _data
 
-        _data = unpack_from("8f", data, 56)
-        self.node_to_uv = list(_data)
+        _data = unpack_from("8I", data, 56)
+        self.uv_channel = _data[0]
 
         for pos in range(88, 88 + num_frames * 32, 32):
             self.frames.append(
@@ -811,14 +827,14 @@ class UVAnim:
     #######################################################
     def to_mem(self):
 
-        data = pack("<iiiif4x32s8f",
+        data = pack("<iiiif4x32s8I",
                     0x100,
                     self.type_id,
                     len(self.frames),
                     self.flags,
                     self.duration,
                     self.name.encode('ascii'),
-                    *self.node_to_uv)
+                    self.uv_channel, 0, 0, 0, 0, 0, 0, 0)
 
         for frame in self.frames:
             data += Sections.write(UVFrame, frame)
@@ -2452,7 +2468,7 @@ class dff:
             height_map = self.read_texture()
             self.pos = chunk_end
 
-        return BumpMapFX(intensity, bump_map, height_map)        
+        return BumpMapFX(intensity, height_map, bump_map)        
 
     #######################################################
     def read_matfx_envmap(self):
