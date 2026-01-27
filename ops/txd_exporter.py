@@ -63,7 +63,7 @@ class txd_exporter:
         texture_native.mask = ""
         
         # Raster format flags for RGBA8888: format type (8888=5) at bit 8-11, no mipmaps, no palette
-        texture_native.raster_format_flags = (txd.RasterFormat.RASTER_8888 << 8) | 0x05
+        texture_native.raster_format_flags = txd.RasterFormat.RASTER_8888 << 8
         texture_native.d3d_format = txd.D3DFormat.D3D_8888
         texture_native.width = width
         texture_native.height = height
