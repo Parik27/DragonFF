@@ -461,16 +461,28 @@ class Material:
         data = bytearray()
         effectType = 0
         
-        if 'dual' in self.plugins or 'uv_anim' in self.plugins:
-            if 'dual' in self.plugins and 'uv_anim' in self.plugins:
-                data += pack("<I", 5)
-                data += self.dualfx_to_mem()
-                effectType = 6
-            elif 'dual' in self.plugins:
-                data += self.dualfx_to_mem()
-                effectType = 4
-            else:
-                data += pack("<I", 5)
+        if 'dual' in self.plugins or 'uv_anim' in self.plugins:  
+            if 'dual' in self.plugins and 'uv_anim' in self.plugins:  
+                dual_fx = self.plugins['dual'][0]  
+                if dual_fx.texture is None or dual_fx.texture.name == "":  
+                    # Dual texture is empty, use UV transform only  
+                    data += pack("<I", 5)  
+                    effectType = 5  
+                else:  
+                    # Both present and dual texture is not empty  
+                    data += pack("<I", 5)  
+                    data += self.dualfx_to_mem()  
+                    effectType = 6  
+            elif 'dual' in self.plugins:  
+                dual_fx = self.plugins['dual'][0]  
+                if dual_fx.texture is None or dual_fx.texture.name == "":  
+                    # Dual texture is empty, don't export anything  
+                    effectType = 0  
+                else:  
+                    data += self.dualfx_to_mem()  
+                    effectType = 4  
+            else:  
+                data += pack("<I", 5)  
                 effectType = 5
         
         elif 'bump_map' in self.plugins or 'env_map' in self.plugins:
