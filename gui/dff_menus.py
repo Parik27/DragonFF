@@ -65,18 +65,23 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
     #######################################################
     def draw_col_menu(self, context):
-
         layout = self.layout
         settings = context.material.dff
 
-        props = [["col_mat_index", "Material"],
-                 ["col_flags", "Flags"],
-                 ["col_brightness", "Brightness"],
-                 ["col_day_light", "Day Light"],
-                 ["col_night_light", "Night Light"]]
-        
+        box = layout.box()
+        box.label(text="Collision properties")
+
+        props = [
+            ["col_mat_index", "Material"],
+            ["col_flags", "Flags"],
+            ["col_brightness", "Brightness"],
+            ["col_day_light", "Day Light"],
+            ["col_night_light", "Night Light"],
+        ]
+
         for prop in props:
-            self.draw_labelled_prop(layout.row(), settings, [prop[0]], prop[1])
+            self.draw_labelled_prop(box.row(), settings, [prop[0]], prop[1])
+
 
     #######################################################
     def draw_labelled_prop(self, row, settings, props, label, text=""):
@@ -84,24 +89,26 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         row.label(text=label)
         for prop in props:
             row.prop(settings, prop, text=text)
-        
+
     #######################################################
-    def draw_env_map_box(self, context, box):
-
+    def draw_texture_prop_box(self, context, box):
         settings = context.material.dff
-
-        box.row().prop(context.material.dff, "export_env_map")
-        if settings.export_env_map:
-            box.row().prop(settings, "env_map_tex", text="Texture")
-
-            self.draw_labelled_prop(
-                box.row(), settings, ["env_map_coef"], "Coefficient")
-            self.draw_labelled_prop(
-                box.row(), settings, ["env_map_fb_alpha"], "Use Framebuffer Alpha")
+        box.label(text="Texture properties")
+        
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Filtering")
+        split.prop(settings, "tex_filters", text="")
+        
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="UV Addressing")
+        prop_row = split.row(align=True)
+        prop_row.prop(settings, "tex_u_addr", text="")
+        prop_row.prop(settings, "tex_v_addr", text="")
 
     #######################################################
     def draw_material_prop_box(self, context, box):
-
         settings = context.material.dff
         box.label(text="Material properties")
 
@@ -109,115 +116,140 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         # without removing the texture node
         
         try:
-
             node = next((node for node in context.material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
             prop = node.inputs[0]
             prop_val = "default_value"
-                
-            row = box.row()
-            row.prop(
-                prop,
-                prop_val,
-                text="Color")
             
-            row.prop(settings,
-                     "preset_mat_cols",
-                     text="",
-                     icon="MATERIAL",
-                     icon_only=True
-            )
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Color")
+            
+            color_row = split.row()
+            color_row.prop(prop, prop_val, text="")
+            color_row.prop(settings, "preset_mat_cols", text="", icon="MATERIAL", icon_only=True)
             
         except Exception:
             pass
 
-        self.draw_labelled_prop(
-            box.row(), settings, ["ambient"], "Ambient")
-
-    #######################################################
-    def draw_texture_prop_box(self, context, box):
-
-        settings = context.material.dff
-
-        box.label(text="Texture properties")
-
-        box.prop(settings, "tex_filters", text="Filtering")
-        self.draw_labelled_prop(
-            box.row(), settings, ["tex_u_addr", "tex_v_addr"], "UV Addressing")
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Ambient")
+        split.prop(settings, "ambient", text="")
 
     #######################################################
     def draw_bump_map_box(self, context, box):
-
         settings = context.material.dff
         box.row().prop(settings, "export_bump_map")
         
         if settings.export_bump_map:
-            box.row().prop(settings, "bump_map_tex", text="Texture")
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Texture")
+            split.prop(settings, "bump_map_tex", text="")
             
-            self.draw_labelled_prop(
-                box.row(), settings, ["bump_map_intensity"], "Intensity")
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Intensity")
+            split.prop(settings, "bump_map_intensity", text="")
             
             self.draw_labelled_prop(
                 box.row(), settings, ["bump_dif_alpha"], "Use Diffuse Alpha")
 
     #######################################################
-    def draw_dual_tex_box(self, context, box):
+    def draw_env_map_box(self, context, box):
+        settings = context.material.dff
+        box.row().prop(context.material.dff, "export_env_map")
+        
+        if settings.export_env_map:
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Texture")
+            split.prop(settings, "env_map_tex", text="")
 
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Coefficient")
+            split.prop(settings, "env_map_coef", text="")
+            
+            self.draw_labelled_prop(
+                box.row(), settings, ["env_map_fb_alpha"], "Use Framebuffer Alpha")
+
+    #######################################################
+    def draw_dual_tex_box(self, context, box):
         settings = context.material.dff
         box.row().prop(settings, "export_dual_tex")
         
         if settings.export_dual_tex:
-            box.row().prop(settings, "dual_tex", text="Texture")
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Texture")
+            split.prop(settings, "dual_tex", text="")
             
-            self.draw_labelled_prop(
-                box.row(), settings, ["dual_src_blend", "dual_dst_blend"], "Blending")
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Blending")
+            prop_row = split.row(align=True)
+            prop_row.prop(settings, "dual_src_blend", text="")
+            prop_row.prop(settings, "dual_dst_blend", text="")
 
     #######################################################
     def draw_uv_anim_box(self, context, box):
-
         settings = context.material.dff
-
         box.row().prop(settings, "export_animation")
+        
         if settings.export_animation:
-            box.row().prop(settings, "animation_name", text="Name")
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Name")
+            split.prop(settings, "animation_name", text="")
             
-            self.draw_labelled_prop(
-                box.row(), settings, ["uv_channel"], "Map")
-            
-            
-    #######################################################
-    def draw_refl_box(self, context, box):
-
-        settings = context.material.dff
-        box.row().prop(settings, "export_reflection")
-
-        if settings.export_reflection:
-            box.prop(settings, "preset_reflection_scales", text="Scale Preset", icon="PRESET", icon_only=True)
-
-            self.draw_labelled_prop(
-                box.row(), settings, ["reflection_scale_x", "reflection_scale_y"],
-                "Scale"
-            )
-            self.draw_labelled_prop(
-                box.row(), settings, ["reflection_offset_x", "reflection_offset_y"],
-                "Offset"
-            )
-
-            self.draw_labelled_prop(
-                box.row(), settings, ["reflection_intensity"], "Intensity")
-            # row.prop(settings, "preset_reflection_intensities", text="", icon="PRESET", icon_only=True)
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Map")
+            split.prop(settings, "uv_channel", text="")
 
     #######################################################
     def draw_specl_box(self, context, box):
-
         settings = context.material.dff
         box.row().prop(settings, "export_specular")
-
+        
         if settings.export_specular:
-            box.row().prop(settings, "specular_texture", text="Texture")
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Texture")
+            split.prop(settings, "specular_texture", text="")
+            
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Level")
+            split.prop(settings, "specular_level", text="")
 
-            self.draw_labelled_prop(
-                box.row(), settings, ["specular_level"], "Level")
-            # row.prop(settings, "preset_specular_levels", text="", icon="PRESET", icon_only=True)
+    #######################################################
+    def draw_refl_box(self, context, box):
+        settings = context.material.dff
+        box.row().prop(settings, "export_reflection")
+        
+        if settings.export_reflection:
+            box.prop(settings, "preset_reflection_scales", text="Scale Preset", icon="PRESET", icon_only=True)
+            
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Scale")
+            prop_row = split.row(align=True)
+            prop_row.prop(settings, "reflection_scale_x", text="")
+            prop_row.prop(settings, "reflection_scale_y", text="")
+            
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Offset")
+            prop_row = split.row(align=True)
+            prop_row.prop(settings, "reflection_offset_x", text="")
+            prop_row.prop(settings, "reflection_offset_y", text="")
+            
+            split = box.row().split(factor=0.4)
+            split.alignment = 'LEFT'
+            split.label(text="Intensity")
+            split.prop(settings, "reflection_intensity", text="")
 
     #######################################################
     def draw_mesh_menu(self, context):
