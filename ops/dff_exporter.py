@@ -262,6 +262,7 @@ class material_helper:
         for time in sorted_times:
             time_values[time] = [None] * 6
 
+        # Populate time_values with actual keyframe data
         for curve in action_fcurves:
             if curve.data_path not in data_path_offset:
                 continue
@@ -287,35 +288,97 @@ class material_helper:
                 
                 time_values[time][idx] = val
 
-        for time in sorted_times:
-            if time_values[time][5] is not None:
-                pos_y = time_values[time][5]
-                scale_y = time_values[time][2] if time_values[time][2] is not None else mapping.inputs['Scale'].default_value[1]
-                time_values[time][5] = 1 - (pos_y + scale_y)
+        first_time = sorted_times[0]
+        first_frame = first_time * fps
 
-        default_scale_y = mapping.inputs['Scale'].default_value[1]
-        default_pos_y = mapping.inputs['Location'].default_value[1]
-        
         defaults = [
             0.0,  # rot_z
-            mapping.inputs['Scale'].default_value[0],  # scale_x
-            default_scale_y,  # scale_y
+            1.0,  # scale_x
+            1.0,  # scale_y
             0.0,  # skew
-            mapping.inputs['Location'].default_value[0],  # pos_x
-            1 - (default_pos_y + default_scale_y)  # pos_y (flipped with scale)
+            0.0,  # pos_x
+            0.0   # pos_y
         ]
-        
+
+        # Override defaults with actual values from first keyframe
+        for curve in action_fcurves:
+            if curve.data_path not in data_path_offset:
+                continue
+            
+            offset = data_path_offset[curve.data_path]
+            
+            # Not rot_x/rot_y
+            if offset == 0 and curve.array_index != 2:
+                continue
+            
+            # Skip Z for pos / scale
+            if curve.array_index > 1:
+                continue
+            
+            val = curve.evaluate(first_frame)
+            
+            if offset == 0:  # rot_z
+                idx = 0
+            else:
+                idx = offset + curve.array_index
+            
+            defaults[idx] = val
+
+        for idx in range(6):
+            prev_time = None
+            prev_val = None
+            next_keyframes = {}
+            
+            # Find next keyframe for each time
+            for i, time in enumerate(sorted_times):
+                for j in range(i + 1, len(sorted_times)):
+                    if time_values[sorted_times[j]][idx] is not None:
+                        next_keyframes[time] = (sorted_times[j], time_values[sorted_times[j]][idx])
+                        break
+            
+            # Interpolate missing values
+            for time in sorted_times:
+                if time_values[time][idx] is not None:
+                    prev_time = time
+                    prev_val = time_values[time][idx]
+                else:
+                    if prev_val is None and time not in next_keyframes:
+                        # No prev, no next: use default
+                        time_values[time][idx] = defaults[idx]
+                    elif prev_val is None:
+                        # No prev, has next: use next
+                        time_values[time][idx] = next_keyframes[time][1]
+                    elif time not in next_keyframes:
+                        # Has prev, no next: hold previous
+                        time_values[time][idx] = prev_val
+                    else:
+                        # Has both: interpolate
+                        next_time, next_val = next_keyframes[time]
+                        duration = next_time - prev_time
+                        
+                        if duration == 0.0:
+                            time_values[time][idx] = prev_val
+                        else:
+                            fraction = (time - prev_time) / duration
+                            time_values[time][idx] = prev_val + (next_val - prev_val) * fraction
+
+        # Flip pos_y
         for time in sorted_times:
-            for i in range(6):
-                if time_values[time][i] is None:
-                    time_values[time][i] = defaults[i]
+            pos_y = time_values[time][5]
+            scale_y = time_values[time][2]
+            time_values[time][5] = 1 - (pos_y + scale_y)
 
         anim = dff.UVAnim()
         anim.name = self.material.dff.animation_name
         anim.uv_channel = self.material.dff.uv_channel
 
+        def flip_uv(uv_list):
+            uv = list(uv_list)
+            uv[5] = 1 - (uv[5] + uv[2])
+            return uv
+
         if has_constant:
-            anim.frames.append(dff.UVFrame(0.0, list(defaults), -1))
+            anim.frames.append(dff.UVFrame(0.0, flip_uv(defaults), -1))
         
         for i, time in enumerate(sorted_times):
             is_last = (i == len(sorted_times) - 1)
@@ -330,12 +393,14 @@ class material_helper:
             
             if interp_mode == 'CONSTANT':
                 # First frame: hold previous value at this time (close old segment)
+                if prev_uv is None:
+                    prev_uv = flip_uv(defaults)
                 anim.frames.append(dff.UVFrame(time - time_offset, list(prev_uv), prev_idx))
                 prev_idx = len(anim.frames) - 1
                 
                 # Second frame: use NEXT keyframe's value (or wrap to initial if last)
                 if is_last:
-                    next_uv = defaults
+                    next_uv = flip_uv(defaults)
                 else:
                     next_time = sorted_times[i + 1]
                     next_uv = time_values[next_time]
