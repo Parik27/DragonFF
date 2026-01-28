@@ -2661,12 +2661,12 @@ class dff:
 
                                         chunk = self.read_chunk()
                                         
-                                        anim_count = unpack_from("<I",
-                                                                 self.data,
-                                                                 self._read(4))
+                                        # Number of animations is a bitmask
+                                        mask = unpack_from("<I", self.data, self._read(4))[0]
+                                        anim_count = bin(mask & 0xFF).count('1')
 
                                         # Read n animations
-                                        for i in range(anim_count[0]):
+                                        for i in range(anim_count):
                                             material.add_plugin('uv_anim',
                                                                 self.raw(
                                                                     strlen(
