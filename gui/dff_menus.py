@@ -102,7 +102,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         
         split = box.row().split(factor=0.4)
         split.alignment = 'LEFT'
-        split.label(text="UV Addressing")
+        split.label(text="Addressing")
         prop_row = split.row(align=True)
         prop_row.prop(settings, "tex_u_addr", text="")
         prop_row.prop(settings, "tex_v_addr", text="")
@@ -203,10 +203,13 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             split.label(text="Name")
             split.prop(settings, "animation_name", text="")
             
-            split = box.row().split(factor=0.4)
-            split.alignment = 'LEFT'
-            split.label(text="Map")
-            split.prop(settings, "uv_channel", text="")
+            #split = box.row().split(factor=0.4)
+            #split.alignment = 'LEFT'
+            #split.label(text="Map")
+            #split.prop(settings, "uv_channel", text="")
+
+            self.draw_labelled_prop(
+                box.row(), settings, ["force_dual_pass"], "Force Dual Pass")
 
     #######################################################
     def draw_specl_box(self, context, box):
@@ -230,8 +233,6 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box.row().prop(settings, "export_reflection")
         
         if settings.export_reflection:
-            box.prop(settings, "preset_reflection_scales", text="Scale Preset", icon="PRESET", icon_only=True)
-            
             split = box.row().split(factor=0.4)
             split.alignment = 'LEFT'
             split.label(text="Scale")
@@ -250,6 +251,8 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             split.alignment = 'LEFT'
             split.label(text="Intensity")
             split.prop(settings, "reflection_intensity", text="")
+            
+            box.prop(settings, "preset_reflection_scales", text="Presets", icon="PRESET", icon_only=True)
 
     #######################################################
     def draw_mesh_menu(self, context):
@@ -682,6 +685,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     export_animation : bpy.props.BoolProperty   (name="UV Animation")
     animation_name   : bpy.props.StringProperty ()
     uv_channel       : bpy.props.IntProperty    (min=0, max=7, default=0)
+    force_dual_pass  : bpy.props.BoolProperty   (name="Force Dual Pass")
 
     # Pre-set Material Colours
     preset_mat_cols : bpy.props.EnumProperty(

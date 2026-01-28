@@ -589,7 +589,21 @@ class dff_exporter:
             if anim:
                 material.add_plugin('uv_anim', anim.name)
                 self.dff.uvanim_dict.append(anim)
-                
+
+            # Create a dummy uv anim to apply to the second uv channel to force dual pass blending
+            if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
+                dummy_anim = dff.UVAnim()
+                dummy_anim.name = "DragonFF"
+                dummy_anim.uv_channel = 1
+                dummy_anim.duration = 1.0
+                dummy_anim.frames = [
+                    dff.UVFrame(0.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0], -1),
+                    dff.UVFrame(1.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0],  0)
+                ]
+
+                material.add_plugin('uv_anim', dummy_anim.name)
+                self.dff.uvanim_dict.append(dummy_anim)
+
             materials.append(material)
                 
         return materials

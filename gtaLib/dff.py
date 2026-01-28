@@ -444,7 +444,7 @@ class Material:
 
         # UV Animation PLG
         if 'uv_anim' in self.plugins:
-            _data = pack("<I", len(self.plugins['uv_anim']))
+            _data = pack("<I", (1 << len(self.plugins['uv_anim'])) - 1) #bitmask
             for frame_name in self.plugins['uv_anim']:
                 _data += pack("<32s", frame_name.encode('ascii'))
 

@@ -539,6 +539,16 @@ class dff_importer:
                         helper.set_uv_animation(uv_anim)
                         break
                 
+                # Detect if a dummy animation to force dual pass was used on export
+                if len(material.plugins['uv_anim']) > 1:  
+                    second_anim_name = material.plugins['uv_anim'][1]  
+                    for uv_anim in self.dff.uvanim_dict:  
+                        if (uv_anim.name == second_anim_name and   
+                            uv_anim.name == "DragonFF" and   
+                            uv_anim.uv_channel == 1):  
+                            helper.material.dff.force_dual_pass = True  
+                            break
+                
             # Add imported material to the object
             mesh.materials.append(helper.material)
 
