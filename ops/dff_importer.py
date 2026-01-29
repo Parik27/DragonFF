@@ -42,9 +42,10 @@ class dff_importer:
     use_mat_split      = False
     remove_doubles     = False
     create_backfaces   = False
-    import_normals     = False
+    import_normals     = True
     import_breakable   = True
     group_materials    = False
+    hide_damage_parts  = False
     version            = ""
     warning            = ""
 
@@ -1018,6 +1019,11 @@ class dff_importer:
                 for object in collection.objects:
                     hide_object(object)
 
+        if dff_importer.hide_damage_parts:
+            for obj in bpy.data.objects:
+                if obj.name.lower().endswith(('_dam', '_vlo')):
+                    hide_object(obj)
+
         State.update_scene()
 
 #######################################################
@@ -1049,16 +1055,17 @@ def set_parent_bone(obj, armature, bone_name):
 def import_dff(options):
 
     # Shadow function
-    dff_importer.txd_images       = options['txd_images']
-    dff_importer.image_ext        = options['image_ext']
-    dff_importer.use_bone_connect = options['connect_bones']
-    dff_importer.use_mat_split    = options['use_mat_split']
-    dff_importer.remove_doubles   = options['remove_doubles']
-    dff_importer.create_backfaces = options['create_backfaces']
-    dff_importer.group_materials  = options['group_materials']
-    dff_importer.import_normals   = options['import_normals']
-    dff_importer.materials_naming = options['materials_naming']
-    dff_importer.import_breakable = options.get('import_breakable', True)
+    dff_importer.txd_images        = options['txd_images']
+    dff_importer.image_ext         = options['image_ext']
+    dff_importer.use_bone_connect  = options['connect_bones']
+    dff_importer.use_mat_split     = options['use_mat_split']
+    dff_importer.remove_doubles    = options['remove_doubles']
+    dff_importer.create_backfaces  = options['create_backfaces']
+    dff_importer.group_materials   = options['group_materials']
+    dff_importer.import_normals    = options['import_normals']
+    dff_importer.materials_naming  = options['materials_naming']
+    dff_importer.import_breakable  = options.get('import_breakable', True)
+    dff_importer.hide_damage_parts = options.get('hide_damage_parts', False)
 
     dff_importer.import_dff(options['file_name'])
 
