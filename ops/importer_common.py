@@ -121,15 +121,9 @@ class material_helper:
     #######################################################
     def set_surface_properties(self, props):
 
-        if self.principled:
-            self.principled.specular       = props.specular
-            self.principled.roughness      = props.diffuse
-            self.material.dff.ambient = props.ambient
-            
-        else:
-            self.material.diffuse_intensity  = props.diffuse
-            self.material.specular_intensity = props.specular
-            self.material.ambient            = props.ambient
+        self.material.dff.diffuse  = props.diffuse
+        self.material.dff.specular = props.specular
+        self.material.dff.ambient  = props.ambient
 
     #######################################################
     def set_environment_map(self, plugin):

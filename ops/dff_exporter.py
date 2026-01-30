@@ -88,17 +88,10 @@ class material_helper:
     #######################################################
     def get_surface_properties(self):
 
-        if self.principled:
-            specular = self.principled.specular
-            diffuse = self.principled.roughness
-            ambient = self.material.dff.ambient
-            
-        else:
+        ambient  = self.material.dff.ambient
+        specular = self.material.dff.specular
+        diffuse  = self.material.dff.diffuse
 
-            specular = self.material.specular_intensity
-            diffuse  = self.material.diffuse_intensity
-            ambient  = self.material.ambient
-            
         return dff.GeomSurfPro(ambient, specular, diffuse)
 
     #######################################################

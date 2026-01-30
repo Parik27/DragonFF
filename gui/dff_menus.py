@@ -135,6 +135,16 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         split.alignment = 'LEFT'
         split.label(text="Ambient")
         split.prop(settings, "ambient", text="")
+        
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Specular")
+        split.prop(settings, "specular", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Diffuse")
+        split.prop(settings, "diffuse", text="")
 
     #######################################################
     def draw_bump_map_box(self, context, box):
@@ -252,7 +262,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             split.label(text="Intensity")
             split.prop(settings, "reflection_intensity", text="")
             
-            box.prop(settings, "preset_reflection_scales", text="Presets", icon="PRESET", icon_only=True)
+            #box.prop(settings, "preset_reflection_scales", text="Presets", icon="PRESET", icon_only=True)
 
     #######################################################
     def draw_mesh_menu(self, context):
@@ -610,7 +620,9 @@ class OBJECT_PT_dffCollections(bpy.types.Panel):
 #######################################################
 class DFFMaterialProps(bpy.types.PropertyGroup):
 
-    ambient            : bpy.props.FloatProperty  (name="Ambient Shading", default=1)
+    ambient            : bpy.props.FloatProperty  (name="Ambient Shading",   default=0.5)
+    specular           : bpy.props.FloatProperty  (name="Specular Lighting", default=0.5)
+    diffuse            : bpy.props.FloatProperty  (name="Diffuse Intensity", default=0.5)
     tex_filters        : bpy.props.EnumProperty  (items=texture_filters_items, default="0")
     tex_u_addr         : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
     tex_v_addr         : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
