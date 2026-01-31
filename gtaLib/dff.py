@@ -804,7 +804,7 @@ class UVAnim:
         "flags",
         "duration",
         "name",
-        "uv_channel",
+        "node_to_uv",
         "frames"
     ]
 
@@ -814,7 +814,7 @@ class UVAnim:
         self.flags = 0
         self.duration = 0
         self.name = ""
-        self.uv_channel = 0
+        self.node_to_uv = [0] * 8
         self.frames = []
 
     #######################################################
@@ -825,7 +825,7 @@ class UVAnim:
         self.type_id, num_frames, self.flags, self.duration, self.name = _data
 
         _data = unpack_from("8I", data, 56)
-        self.uv_channel = _data[0]
+        self.node_to_uv = list(_data)
 
         for pos in range(88, 88 + num_frames * 32, 32):
             self.frames.append(
@@ -846,7 +846,7 @@ class UVAnim:
                     self.flags,
                     self.duration,
                     self.name.encode('ascii'),
-                    self.uv_channel, 0, 0, 0, 0, 0, 0, 0)
+                    *self.node_to_uv)
 
         for frame in self.frames:
             data += Sections.write(UVFrame, frame)
@@ -2449,8 +2449,8 @@ class dff:
 
     #######################################################
     def read_matfx_bumpmap(self):
-        bump_map   = None
         intensity  = 0.0
+        bump_map   = None
         height_map = None
         
         intensity, contains_bump_map = unpack_from("<fI",

@@ -573,7 +573,7 @@ class dff_importer:
                     for uv_anim in self.dff.uvanim_dict:  
                         if (uv_anim.name == second_anim_name and   
                             uv_anim.name == "DragonFF" and   
-                            uv_anim.uv_channel == 1):  
+                            uv_anim.node_to_uv[0] == 1):  
                             helper.material.dff.force_dual_pass = True  
                             break
                 

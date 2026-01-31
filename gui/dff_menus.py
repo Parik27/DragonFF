@@ -212,11 +212,6 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             split.alignment = 'LEFT'
             split.label(text="Name")
             split.prop(settings, "animation_name", text="")
-            
-            #split = box.row().split(factor=0.4)
-            #split.alignment = 'LEFT'
-            #split.label(text="Map")
-            #split.prop(settings, "uv_channel", text="")
 
             self.draw_labelled_prop(
                 box.row(), settings, ["force_dual_pass"], "Force Dual Pass")
@@ -696,7 +691,6 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     # UV Animation
     export_animation : bpy.props.BoolProperty   (name="UV Animation")
     animation_name   : bpy.props.StringProperty ()
-    uv_channel       : bpy.props.IntProperty    (min=0, max=7, default=0)
     force_dual_pass  : bpy.props.BoolProperty   (name="Force Dual Pass")
 
     # Pre-set Material Colours

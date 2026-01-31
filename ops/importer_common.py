@@ -265,7 +265,6 @@ class material_helper:
                     kp.interpolation = 'LINEAR'
         
         self.material.dff.animation_name   = uv_anim.name
-        self.material.dff.uv_channel       = uv_anim.uv_channel
         self.material.dff.export_animation = True
 
     #######################################################

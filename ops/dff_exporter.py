@@ -363,7 +363,6 @@ class material_helper:
 
         anim = dff.UVAnim()
         anim.name = self.material.dff.animation_name
-        anim.uv_channel = self.material.dff.uv_channel
 
         def flip_uv(uv_list):
             uv = list(uv_list)
@@ -587,7 +586,7 @@ class dff_exporter:
             if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
                 dummy_anim = dff.UVAnim()
                 dummy_anim.name = "DragonFF"
-                dummy_anim.uv_channel = 1
+                dummy_anim.node_to_uv[0] = 1
                 dummy_anim.duration = 1.0
                 dummy_anim.frames = [
                     dff.UVFrame(0.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0], -1),
