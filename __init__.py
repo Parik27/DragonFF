@@ -110,6 +110,7 @@ def register():
     bpy.types.Material.dff = bpy.props.PointerProperty(type=gui.DFFMaterialProps)
     bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
     bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
+    bpy.types.Scene.dff_uv_animator_props = bpy.props.PointerProperty(type=gui.UVAnimatorProperties)
 
     bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
     bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
@@ -119,7 +120,6 @@ def register():
     bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
     bpy.types.VIEW3D_MT_add.append(gui.add_object_dff_func)
 
-    bpy.types.Scene.uv_animator_props = bpy.props.PointerProperty(type=gui.UVAnimatorProperties)
     gui.State.hook_events()
 
 #######################################################
@@ -131,7 +131,7 @@ def unregister():
     del bpy.types.Material.dff
     del bpy.types.Object.dff
     del bpy.types.Collection.dff
-    del bpy.types.Scene.uv_animator_props
+    del bpy.types.Scene.dff_uv_animator_props
 
     bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
     bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)

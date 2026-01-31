@@ -38,7 +38,7 @@ class UV_OT_AnimateSpriteSheet(Operator):
                 context.active_object.active_material.use_nodes)
 
     def execute(self, context):
-        props = context.scene.uv_animator_props
+        props = context.scene.dff_uv_animator_props
         mat = context.active_object.active_material
         nodes = mat.node_tree.nodes
 
@@ -121,7 +121,7 @@ class NODE_PT_UVAnimator(Panel):
 
     def draw(self, context):
         layout = self.layout
-        props = context.scene.uv_animator_props
+        props = context.scene.dff_uv_animator_props
 
         if not context.active_object or not context.active_object.active_material:
             layout.label(text="No active material", icon='ERROR')
