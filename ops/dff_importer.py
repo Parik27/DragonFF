@@ -1032,9 +1032,14 @@ class dff_importer:
         self.import_frames()
         self.import_2dfx()
 
+        if dff_importer.hide_damage_parts:
+            for obj in self.objects.values():
+                if obj.name.lower().endswith(('_dam', '_vlo')):
+                    hide_object(obj)
+
         # Set imported version
         self.version = "0x%05x" % self.dff.rw_version
-        
+
         # Add collisions
         for collision in self.dff.collisions:
             col = import_col_mem(collision.data, os.path.basename(file_name), False)
@@ -1045,11 +1050,6 @@ class dff_importer:
                 # Hide objects
                 for object in collection.objects:
                     hide_object(object)
-
-        if dff_importer.hide_damage_parts:
-            for obj in bpy.data.objects:
-                if obj.name.lower().endswith(('_dam', '_vlo')):
-                    hide_object(obj)
 
         State.update_scene()
 
