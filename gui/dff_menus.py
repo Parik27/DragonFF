@@ -765,7 +765,7 @@ compatibiility with DFF Viewers"
     )
 
     triangle_strip : bpy.props.BoolProperty(
-        default=False,
+        default=True,
         description="Use Triangle Strip instead of Triangle List for Bin Mesh PLG"
     )
 
