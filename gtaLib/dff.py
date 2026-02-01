@@ -408,6 +408,21 @@ class Material:
         return data
 
     #######################################################
+    def dualfx_to_mem(self):
+        dual_fx = self.plugins['dual'][0]
+        
+        data = pack("<IIII",
+                    4,
+                    dual_fx.src_blend,
+                    dual_fx.dst_blend,
+                    dual_fx.texture is not None
+        )
+        if dual_fx.texture is not None:
+            data += dual_fx.texture.to_mem()
+
+        return data
+
+    #######################################################
     def plugins_to_mem(self):
         data = self.matfx_to_mem()
 
@@ -429,7 +444,7 @@ class Material:
 
         # UV Animation PLG
         if 'uv_anim' in self.plugins:
-            _data = pack("<I", len(self.plugins['uv_anim']))
+            _data = pack("<I", (1 << len(self.plugins['uv_anim'])) - 1) #bitmask
             for frame_name in self.plugins['uv_anim']:
                 _data += pack("<32s", frame_name.encode('ascii'))
 
@@ -444,36 +459,49 @@ class Material:
     #######################################################
     def matfx_to_mem(self):
         data = bytearray()
-
         effectType = 0
-        if 'bump_map' in self.plugins:
-            data += self.bumpfx_to_mem()
-            effectType = 1
-            
-            if 'env_map' in self.plugins: #rwMATFXEFFECTBUMPENVMAP
+        
+        if 'dual' in self.plugins or 'uv_anim' in self.plugins:  
+            if 'dual' in self.plugins and 'uv_anim' in self.plugins:  
+                dual_fx = self.plugins['dual'][0]  
+                if dual_fx.texture is None or dual_fx.texture.name == "":  
+                    # Dual texture is empty, use UV transform only  
+                    data += pack("<I", 5)  
+                    effectType = 5  
+                else:  
+                    # Both present and dual texture is not empty  
+                    data += pack("<I", 5)  
+                    data += self.dualfx_to_mem()  
+                    effectType = 6  
+            elif 'dual' in self.plugins:  
+                dual_fx = self.plugins['dual'][0]  
+                if dual_fx.texture is None or dual_fx.texture.name == "":  
+                    # Dual texture is empty, don't export anything  
+                    effectType = 0  
+                else:  
+                    data += self.dualfx_to_mem()  
+                    effectType = 4  
+            else:  
+                data += pack("<I", 5)  
+                effectType = 5
+        
+        elif 'bump_map' in self.plugins or 'env_map' in self.plugins:
+            if 'bump_map' in self.plugins and 'env_map' in self.plugins:
+                data += self.bumpfx_to_mem()
                 data += self.envfx_to_mem()
                 effectType = 3
-                
-            
-        elif 'env_map' in self.plugins:
-            data += self.envfx_to_mem()
-            effectType = 2
-            
-        elif 'dual' in self.plugins:
-            effectType = 4
-            
-            if 'uv_anim' in self.plugins: #rwMATFXEFFECTDUALUVTTRANSFORM
-                effectType = 6
-
-        elif 'uv_anim' in self.plugins:
-            effectType = 5
-            data += pack("<I", 5)
+            elif 'bump_map' in self.plugins:
+                data += self.bumpfx_to_mem()
+                effectType = 1
+            else:
+                data += self.envfx_to_mem()
+                effectType = 2
 
         if effectType == 0:
             self._hasMatFX = False
             return bytearray()
-            
-        if effectType != 3 and effectType != 6: #Both effects are set
+        
+        if effectType not in (3, 6):
             data += pack("<I", 0)
 
         self._hasMatFX = True
@@ -796,7 +824,7 @@ class UVAnim:
         _data = unpack_from("<4xiiif4x32s", data)
         self.type_id, num_frames, self.flags, self.duration, self.name = _data
 
-        _data = unpack_from("8f", data, 56)
+        _data = unpack_from("8I", data, 56)
         self.node_to_uv = list(_data)
 
         for pos in range(88, 88 + num_frames * 32, 32):
@@ -811,7 +839,7 @@ class UVAnim:
     #######################################################
     def to_mem(self):
 
-        data = pack("<iiiif4x32s8f",
+        data = pack("<iiiif4x32s8I",
                     0x100,
                     self.type_id,
                     len(self.frames),
@@ -2421,8 +2449,8 @@ class dff:
 
     #######################################################
     def read_matfx_bumpmap(self):
-        bump_map   = None
         intensity  = 0.0
+        bump_map   = None
         height_map = None
         
         intensity, contains_bump_map = unpack_from("<fI",
@@ -2452,7 +2480,7 @@ class dff:
             height_map = self.read_texture()
             self.pos = chunk_end
 
-        return BumpMapFX(intensity, bump_map, height_map)        
+        return BumpMapFX(intensity, height_map, bump_map)        
 
     #######################################################
     def read_matfx_envmap(self):
@@ -2633,12 +2661,12 @@ class dff:
 
                                         chunk = self.read_chunk()
                                         
-                                        anim_count = unpack_from("<I",
-                                                                 self.data,
-                                                                 self._read(4))
+                                        # Number of animations is a bitmask
+                                        mask = unpack_from("<I", self.data, self._read(4))[0]
+                                        anim_count = bin(mask & 0xFF).count('1')
 
                                         # Read n animations
-                                        for i in range(anim_count[0]):
+                                        for i in range(anim_count):
                                             material.add_plugin('uv_anim',
                                                                 self.raw(
                                                                     strlen(

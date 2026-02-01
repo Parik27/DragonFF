@@ -91,7 +91,10 @@ _classes = [
     gui.CollisionCollectionGizmoGroup,
     gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
-    gui.Escalator2DFXGizmoGroup
+    gui.Escalator2DFXGizmoGroup,
+    gui.UVAnimatorProperties,
+    gui.UV_OT_AnimateSpriteSheet,
+    gui.NODE_PT_UVAnimator
 ]
 
 #######################################################
@@ -107,6 +110,7 @@ def register():
     bpy.types.Material.dff = bpy.props.PointerProperty(type=gui.DFFMaterialProps)
     bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
     bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
+    bpy.types.Scene.dff_uv_animator_props = bpy.props.PointerProperty(type=gui.UVAnimatorProperties)
 
     bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
     bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
@@ -127,6 +131,7 @@ def unregister():
     del bpy.types.Material.dff
     del bpy.types.Object.dff
     del bpy.types.Collection.dff
+    del bpy.types.Scene.dff_uv_animator_props
 
     bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
     bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)

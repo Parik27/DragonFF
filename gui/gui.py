@@ -22,3 +22,4 @@ from .dff_ot import *
 from .map_ot import *
 from .map_menus import *
 from .gizmos import *
+from .uvanim_helper import *

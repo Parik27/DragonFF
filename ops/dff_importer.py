@@ -42,9 +42,10 @@ class dff_importer:
     use_mat_split      = False
     remove_doubles     = False
     create_backfaces   = False
-    import_normals     = False
+    import_normals     = True
     import_breakable   = True
     group_materials    = False
+    hide_damage_parts  = False
     version            = ""
     warning            = ""
 
@@ -410,29 +411,56 @@ class dff_importer:
             name = "glass"
 
         colors = {
-            (255, 60, 0, 255): "right rear light",
-            (185, 255, 0, 255): "left rear light",
-            (0, 255, 200, 255): "right front light",
-            (255, 175, 0, 255): "left front light",
-            (255, 0, 255, 255): "fourth",
-            (0, 255, 255, 255): "third",
-            (255, 0, 175, 255): "secondary",
-            (60, 255, 0, 255): "primary",
-            (184, 255, 0, 255): "breaklight l",
-            (255, 59, 0, 255): "breaklight r",
-            (255, 173, 0, 255): "revlight L",
-            (0, 255, 198, 255): "revlight r",
-            (255, 174, 0, 255): "foglight l",
-            (0, 255, 199, 255): "foglight r",
-            (183, 255, 0, 255): "indicator lf",
-            (255, 58, 0, 255): "indicator rf",
-            (182, 255, 0, 255): "indicator lm",
-            (255, 57, 0, 255): "indicator rm",
-            (181, 255, 0, 255): "indicator lr",
-            (255, 56, 0, 255): "indicator rr",
-            (0, 16, 255, 255): "light night",
-            (0, 17, 255, 255): "light all-day",
-            (0, 18, 255, 255): "default day"
+            ( 60, 255,   0, 255) : "primary",
+            (255,   0, 175, 255) : "secondary",
+            (  0, 255, 255, 255) : "tertiary",
+            (255,   0, 255, 255) : "quaternary",
+            (255, 175,   0, 255) : "headlight lf",
+            (  0, 255, 200, 255) : "headlight rf",
+            (185, 255,   0, 255) : "taillight lr",
+            (255,  60,   0, 255) : "taillight rr",
+            (  0,  18, 255, 255) : "light constant",
+            (  0,  16, 255, 255) : "light night",
+            (  0,  17, 255, 255) : "light day",
+            (184, 255,   0, 255) : "brake l",
+            (255,  59,   0, 255) : "brake r",
+            (255, 200,   5, 255) : "brake l na",
+            (255, 200,   6, 255) : "brake r na",
+            (255, 173,   0, 255) : "reverse l",
+            (  0, 255, 198, 255) : "reverse r",
+            (255, 174,   0, 255) : "foglight l",
+            (  0, 255, 199, 255) : "foglight r",
+            (255, 200,   1, 255) : "side l",
+            (255, 200,   2, 255) : "side r",
+            (255, 200,   3, 255) : "stt l",
+            (255, 200,   4, 255) : "stt r",
+            (255, 200,   7, 255) : "spotlight",
+            (183, 255,   0, 255) : "indicator lf",
+            (255,  58,   0, 255) : "indicator rf",
+            (182, 255,   0, 255) : "indicator lm",
+            (255,  57,   0, 255) : "indicator rm",
+            (181, 255,   0, 255) : "indicator lr",
+            (255,  56,   0, 255) : "indicator rr",
+            (255, 199,   1, 255) : "strobelight 1",
+            (255, 199,   2, 255) : "strobelight 2",
+            (255, 199,   3, 255) : "strobelight 3",
+            (255, 199,   4, 255) : "strobelight 4",
+            (255, 199,   5, 255) : "strobelight 5",
+            (255, 199,   6, 255) : "strobelight 6",
+            (255, 199,   7, 255) : "strobelight 7",
+            (255, 199,   8, 255) : "strobelight 8",
+            (255, 200, 100, 255) : "dash engine on",
+            (255, 200, 101, 255) : "dash engine broken",
+            (255, 200, 102, 255) : "dash fog light",
+            (255, 200, 103, 255) : "dash high beam",
+            (255, 200, 104, 255) : "dash low beam",
+            (255, 200, 105, 255) : "dash turn left",
+            (255, 200, 106, 255) : "dash turn right",
+            (255, 200, 107, 255) : "dash siren",
+            (255, 200, 108, 255) : "dash boot",
+            (255, 200, 109, 255) : "dash bonnet",
+            (255, 200, 110, 255) : "dash door",
+            (255, 200, 111, 255) : "dash roof"
         }
 
         for color in colors:
@@ -442,7 +470,7 @@ class dff_importer:
         return name if name else fallback
         
     ##################################################################
-    # TODO: MatFX: Dual Textures
+
     def import_materials(geometry, frame, mesh, mat_order):
 
         self = dff_importer
@@ -475,27 +503,25 @@ class dff_importer:
                 image = self.find_texture_image(texture.name)
                 helper.set_texture(image, texture.name, texture.filters, texture.uv_addressing)
 
-            # Normal Map
+            # Bump Map
             if 'bump_map' in material.plugins:
                 mat.dff.export_bump_map = True
                 
                 for bump_fx in material.plugins['bump_map']:
 
-                    texture = None
                     if bump_fx.height_map is not None:
-                        texture = bump_fx.height_map
+                        # Store height map texture name internally
+                        mat.dff.height_map_tex = bump_fx.height_map.name
+                        
                         if bump_fx.bump_map is not None:
+                            # Both height and bump maps present - use diffuse alpha
                             mat.dff.bump_map_tex = bump_fx.bump_map.name
+                            mat.dff.bump_dif_alpha = True
+                            mat.dff.bump_map_intensity = bump_fx.intensity
 
                     elif bump_fx.bump_map is not None:
-                        texture = bump_fx.bump_map
-
-                    if texture:
-                        image = self.find_texture_image(texture.name)
-                        helper.set_normal_map(image,
-                                              texture.name,
-                                              bump_fx.intensity
-                        )
+                        mat.dff.bump_map_tex = bump_fx.bump_map.name
+                        mat.dff.bump_map_intensity = bump_fx.intensity
 
             # Surface Properties
             if material.surface_properties is not None:
@@ -511,6 +537,11 @@ class dff_importer:
             if 'env_map' in material.plugins:
                 plugin = material.plugins['env_map'][0]
                 helper.set_environment_map(plugin)
+
+            # Dual Texture
+            if 'dual' in material.plugins:
+                plugin = material.plugins['dual'][0]
+                helper.set_dual_texture(plugin)
 
             # Specular Material
             if 'spec' in material.plugins:
@@ -535,6 +566,16 @@ class dff_importer:
                     if uv_anim.name == plugin:
                         helper.set_uv_animation(uv_anim)
                         break
+                
+                # Detect if a dummy animation to force dual pass was used on export
+                if len(material.plugins['uv_anim']) > 1:  
+                    second_anim_name = material.plugins['uv_anim'][1]  
+                    for uv_anim in self.dff.uvanim_dict:  
+                        if (uv_anim.name == second_anim_name and   
+                            uv_anim.name == "DragonFF" and   
+                            uv_anim.node_to_uv[0] == 1):  
+                            helper.material.dff.force_dual_pass = True  
+                            break
                 
             # Add imported material to the object
             mesh.materials.append(helper.material)
@@ -991,9 +1032,14 @@ class dff_importer:
         self.import_frames()
         self.import_2dfx()
 
+        if dff_importer.hide_damage_parts:
+            for obj in self.objects.values():
+                if obj.name.lower().endswith(('_dam', '_vlo')):
+                    hide_object(obj)
+
         # Set imported version
         self.version = "0x%05x" % self.dff.rw_version
-        
+
         # Add collisions
         for collision in self.dff.collisions:
             col = import_col_mem(collision.data, os.path.basename(file_name), False)
@@ -1036,16 +1082,17 @@ def set_parent_bone(obj, armature, bone_name):
 def import_dff(options):
 
     # Shadow function
-    dff_importer.txd_images       = options['txd_images']
-    dff_importer.image_ext        = options['image_ext']
-    dff_importer.use_bone_connect = options['connect_bones']
-    dff_importer.use_mat_split    = options['use_mat_split']
-    dff_importer.remove_doubles   = options['remove_doubles']
-    dff_importer.create_backfaces = options['create_backfaces']
-    dff_importer.group_materials  = options['group_materials']
-    dff_importer.import_normals   = options['import_normals']
-    dff_importer.materials_naming = options['materials_naming']
-    dff_importer.import_breakable = options.get('import_breakable', True)
+    dff_importer.txd_images        = options['txd_images']
+    dff_importer.image_ext         = options['image_ext']
+    dff_importer.use_bone_connect  = options['connect_bones']
+    dff_importer.use_mat_split     = options['use_mat_split']
+    dff_importer.remove_doubles    = options['remove_doubles']
+    dff_importer.create_backfaces  = options['create_backfaces']
+    dff_importer.group_materials   = options['group_materials']
+    dff_importer.import_normals    = options['import_normals']
+    dff_importer.materials_naming  = options['materials_naming']
+    dff_importer.import_breakable  = options.get('import_breakable', True)
+    dff_importer.hide_damage_parts = options.get('hide_damage_parts', False)
 
     dff_importer.import_dff(options['file_name'])
 

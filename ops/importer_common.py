@@ -121,39 +121,9 @@ class material_helper:
     #######################################################
     def set_surface_properties(self, props):
 
-        if self.principled:
-            self.principled.specular       = props.specular
-            self.principled.roughness      = props.diffuse
-            self.material.dff.ambient = props.ambient
-            
-        else:
-            self.material.diffuse_intensity  = props.diffuse
-            self.material.specular_intensity = props.specular
-            self.material.ambient            = props.ambient
-
-    #######################################################
-    def set_normal_map(self, image, label, intensity):
-
-        if self.principled:
-            self.principled.node_normalmap_get()
-            
-            self.principled.normalmap_texture.image = image
-            self.principled.node_normalmap.label    = label
-            self.principled.normalmap_strength      = intensity
-
-        else:
-            slot = self.material.texture_slots.add()
-            slot.texture = bpy.data.textures.new(
-                name = label,
-                type = "IMAGE"
-            )
-            
-            slot.texture.image = image
-            slot.texture.use_normal_map = True
-            slot.use_map_color_diffuse  = False
-            slot.use_map_normal         = True
-            slot.normal_factor          = intensity
-        pass
+        self.material.dff.diffuse  = props.diffuse
+        self.material.dff.specular = props.specular
+        self.material.dff.ambient  = props.ambient
 
     #######################################################
     def set_environment_map(self, plugin):
@@ -164,6 +134,16 @@ class material_helper:
         self.material.dff.export_env_map       = True
         self.material.dff.env_map_coef         = plugin.coefficient
         self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha        
+
+    #######################################################
+    def set_dual_texture(self, plugin):
+
+        if plugin.texture:
+            self.material.dff.dual_tex         = plugin.texture.name
+
+        self.material.dff.export_dual_tex      = True
+        self.material.dff.dual_src_blend       = str(plugin.src_blend)
+        self.material.dff.dual_dst_blend       = str(plugin.dst_blend)
 
     #######################################################
     def set_specular_material(self, plugin):
@@ -205,82 +185,73 @@ class material_helper:
 
     #######################################################
     def set_uv_animation(self, uv_anim):
-
         anim_data = self.material.node_tree.animation_data_create()
-
+       
         if self.principled:
             mapping = self.principled.base_color_texture.node_mapping_get()
             mapping.vector_type = 'POINT'
-
             fps = bpy.context.scene.render.fps
-
             action = bpy.data.actions.new(uv_anim.name)
             anim_data.action = action
-
+           
             if bpy.app.version < (4, 4, 0):
                 action_fcurves = action.fcurves
-
             else:
                 slot = action.slots.new(id_type='NODETREE', name='UV')
                 anim_data.action_slot = slot
-
                 layer = action.layers.new('UV')
                 strip = layer.strips.new(type='KEYFRAME')
                 channelbag = strip.channelbag(slot, ensure=True)
-
                 action_fcurves = channelbag.fcurves
-
+           
             fcurves = [
-                None,
+                action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[2].default_value', index=2),
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=0),
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=1),
                 None,
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=0),
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=1),
             ]
-
-            for frame_idx, frame in enumerate(uv_anim.frames):
+           
+            frames_to_import = uv_anim.frames
+            if len(frames_to_import) > 1:
+                last = frames_to_import[-1]
+                prev = frames_to_import[-2]
+                if last.time > prev.time and last.uv == prev.uv:
+                    frames_to_import = uv_anim.frames[:-1]
+           
+            for frame_idx, frame in enumerate(frames_to_import):
                 for fc_idx, fc in enumerate(fcurves):
                     if not fc:
                         continue
-
+                   
                     should_add_kp = True
-
-                    # Try to add constant interpolation
-                    if frame_idx > 0 and frame.time == uv_anim.frames[frame_idx-1].time:
-
-                        # We can overwrite the very first one keyframe
+                   
+                    if frame_idx > 0 and frame.time == frames_to_import[frame_idx-1].time:
                         if len(fc.keyframe_points) < 2:
                             should_add_kp = False
-
                         else:
                             prev_kp, kp = fc.keyframe_points[-2:]
-
-                            # We can overwrite the previous keyframe with constant interpolation
                             if prev_kp.interpolation == 'CONSTANT':
                                 should_add_kp = False
-
-                            # The values ​​of the previous keyframes are equal,
-                            # so we can use constant interpolation and overwrite the last one
                             elif prev_kp.co[1] == kp.co[1]:
                                 should_add_kp = False
                                 prev_kp.interpolation = 'CONSTANT'
-
+                   
                     if should_add_kp:
                         fc.keyframe_points.add(1)
-
+                   
                     kp = fc.keyframe_points[-1]
                     val = frame.uv[fc_idx]
-
-                    # Y coords are flipped in Blender
+                   
                     if fc_idx == 5:
-                        val = 1 - val
-
-                    # Could also use round here perhaps. I don't know what's better
-                    kp.co = frame.time * fps, val
+                        scale_y = frame.uv[2]
+                        val = 1 - (val + scale_y)
+                   
+                    kp.co = frame.time * fps + 1, val
                     kp.interpolation = 'LINEAR'
-
-        self.material.dff.animation_name   = uv_anim.name
+       
+        self.material.dff.animation_name = uv_anim.name
         self.material.dff.export_animation = True
 
     #######################################################
