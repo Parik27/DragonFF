@@ -190,6 +190,7 @@ class material_helper:
     
     #######################################################
     def get_uv_animation(self):
+
         # See if export_animation checkbox is checked
         if not self.material.dff.export_animation:
             return None
@@ -210,209 +211,121 @@ class material_helper:
 
         if bpy.app.version < (4, 4, 0):
             action_fcurves = action.fcurves
+
         else:
             # Check if action slot exists
             action_slot = anim_data.action_slot
             if not action_slot:
                 return None
+
             channelbag = anim_utils.action_get_channelbag_for_slot(action, action_slot)
             action_fcurves = channelbag.fcurves
 
         fps = bpy.context.scene.render.fps
-        mapping = self.principled.base_color_texture.node_mapping_get()
 
+        mapping = self.principled.base_color_texture.node_mapping_get()
         data_path_offset = {
-            f'nodes["{mapping.name}"].inputs[2].default_value': 0,  # rot z (index 0)
-            f'nodes["{mapping.name}"].inputs[3].default_value': 1,  # scale x / y (index 1, 2)
-            f'nodes["{mapping.name}"].inputs[1].default_value': 4,  # pos_x / pos_y (index 4, 5)
+            f'nodes["{mapping.name}"].inputs[2].default_value': 0,  # rot z
+            f'nodes["{mapping.name}"].inputs[3].default_value': 1,  # scale x/y
+            f'nodes["{mapping.name}"].inputs[1].default_value': 4,  # pos x/y
         }
 
+        all_times = set()
         keyframe_data = {}
+
         for curve in action_fcurves:
             if curve.data_path not in data_path_offset:
                 continue
+
+            offset = data_path_offset[curve.data_path]
+            if offset == 0 and curve.array_index != 2:
+                continue
+
+            if curve.array_index > 1:
+                continue
+
             for keyframe in curve.keyframe_points:
                 time = keyframe.co[0] / fps
+                all_times.add(time)
                 interp = keyframe.interpolation
+
                 if time not in keyframe_data or interp == 'CONSTANT':
                     keyframe_data[time] = interp
 
-        sorted_times = sorted(keyframe_data.keys())
-        if not sorted_times:
+        if not all_times:
             return None
 
-        # Check if animation has ANY constant interpolation
-        has_constant = any(mode == 'CONSTANT' for mode in keyframe_data.values())
+        sorted_times = sorted(all_times)
+        time_offset = sorted_times[0]
+        shifted_times = [t - time_offset for t in sorted_times]
 
-        # For CONSTANT: first keyframe should be at 1.0 (after initial 0.0 frame)
-        # For LINEAR: first keyframe should be at 0.0 (no initial frame)
-        if has_constant:
-            time_offset = sorted_times[0] - (1.0 / fps)
-        else:
-            time_offset = sorted_times[0]
+        def get_uv_at(time):
+            frame = time * fps
+            uv = [0.0, 1.0, 1.0, 0.0, 0.0, 0.0]
+            for curve in action_fcurves:
+                if curve.data_path not in data_path_offset:
+                    continue
+
+                offset = data_path_offset[curve.data_path]
+
+                if offset == 0 and curve.array_index != 2:
+                    continue
+
+                if curve.array_index > 1:
+                    continue
+
+                idx = offset + curve.array_index if offset != 0 else 0
+                uv[idx] = curve.evaluate(frame)
+            return uv
 
         time_values = {}
-        for time in sorted_times:
-            time_values[time] = [None] * 6
 
-        # Populate time_values with actual keyframe data
-        for curve in action_fcurves:
-            if curve.data_path not in data_path_offset:
-                continue
+        for i, shifted_t in enumerate(shifted_times):
+            original_t = sorted_times[i]
+            time_values[shifted_t] = get_uv_at(original_t)
 
-            offset = data_path_offset[curve.data_path]
-            
-            # Not rot_x/rot_y
-            if offset == 0 and curve.array_index != 2:
-                continue
-            
-            # Skip Z for pos / scale
-            if curve.array_index > 1:
-                continue
+        interp_data = {}
 
-            for keyframe in curve.keyframe_points:
-                time = keyframe.co[0] / fps
-                val = keyframe.co[1]
-                
-                if offset == 0:  # rot_z
-                    idx = 0
-                else:
-                    idx = offset + curve.array_index
-                
-                time_values[time][idx] = val
-
-        first_time = sorted_times[0]
-        first_frame = first_time * fps
-
-        defaults = [
-            0.0,  # rot_z
-            1.0,  # scale_x
-            1.0,  # scale_y
-            0.0,  # skew
-            0.0,  # pos_x
-            0.0   # pos_y
-        ]
-
-        # Override defaults with actual values from first keyframe
-        for curve in action_fcurves:
-            if curve.data_path not in data_path_offset:
-                continue
-            
-            offset = data_path_offset[curve.data_path]
-            
-            # Not rot_x/rot_y
-            if offset == 0 and curve.array_index != 2:
-                continue
-            
-            # Skip Z for pos / scale
-            if curve.array_index > 1:
-                continue
-            
-            val = curve.evaluate(first_frame)
-            
-            if offset == 0:  # rot_z
-                idx = 0
-            else:
-                idx = offset + curve.array_index
-            
-            defaults[idx] = val
-
-        for idx in range(6):
-            prev_time = None
-            prev_val = None
-            next_keyframes = {}
-            
-            # Find next keyframe for each time
-            for i, time in enumerate(sorted_times):
-                for j in range(i + 1, len(sorted_times)):
-                    if time_values[sorted_times[j]][idx] is not None:
-                        next_keyframes[time] = (sorted_times[j], time_values[sorted_times[j]][idx])
-                        break
-            
-            # Interpolate missing values
-            for time in sorted_times:
-                if time_values[time][idx] is not None:
-                    prev_time = time
-                    prev_val = time_values[time][idx]
-                else:
-                    if prev_val is None and time not in next_keyframes:
-                        # No prev, no next: use default
-                        time_values[time][idx] = defaults[idx]
-                    elif prev_val is None:
-                        # No prev, has next: use next
-                        time_values[time][idx] = next_keyframes[time][1]
-                    elif time not in next_keyframes:
-                        # Has prev, no next: hold previous
-                        time_values[time][idx] = prev_val
-                    else:
-                        # Has both: interpolate
-                        next_time, next_val = next_keyframes[time]
-                        duration = next_time - prev_time
-                        
-                        if duration == 0.0:
-                            time_values[time][idx] = prev_val
-                        else:
-                            fraction = (time - prev_time) / duration
-                            time_values[time][idx] = prev_val + (next_val - prev_val) * fraction
-
-        # Flip pos_y
-        for time in sorted_times:
-            pos_y = time_values[time][5]
-            scale_y = time_values[time][2]
-            time_values[time][5] = 1 - (pos_y + scale_y)
+        for i, shifted_t in enumerate(shifted_times):
+            original_t = sorted_times[i]
+            interp = keyframe_data.get(original_t, 'LINEAR')
+            interp_data[shifted_t] = 'CONSTANT' if interp == 'CONSTANT' else 'LINEAR'
 
         anim = dff.UVAnim()
         anim.name = self.material.dff.animation_name
+        uv_0 = time_values[0]
+        flipped_0 = [uv_0[0], uv_0[1], uv_0[2], 0.0, uv_0[4], 1 - (uv_0[5] + uv_0[2])]
+        anim.frames.append(dff.UVFrame(0.0, flipped_0, -1))
+        prev_idx = 0
 
-        def flip_uv(uv_list):
-            uv = list(uv_list)
-            uv[5] = 1 - (uv[5] + uv[2])
-            return uv
+        for i in range(len(shifted_times) - 1):
+            next_t = shifted_times[i + 1]
+            interp = interp_data[shifted_times[i]]
+            prev_uv = anim.frames[-1].uv
+            current_uv = time_values[next_t]
+            flipped_current = [current_uv[0], current_uv[1], current_uv[2], 0.0, current_uv[4], 1 - (current_uv[5] + current_uv[2])]
 
-        if has_constant:
-            anim.frames.append(dff.UVFrame(0.0, flip_uv(defaults), -1))
-        
-        for i, time in enumerate(sorted_times):
-            is_last = (i == len(sorted_times) - 1)
-            interp_mode = keyframe_data[time]
-            
-            if len(anim.frames) > 0:
-                prev_uv = anim.frames[-1].uv
+            if interp == 'CONSTANT':
+                anim.frames.append(dff.UVFrame(next_t, list(prev_uv), prev_idx))
+                prev_idx = len(anim.frames) - 1
+                anim.frames.append(dff.UVFrame(next_t, flipped_current, prev_idx))
                 prev_idx = len(anim.frames) - 1
             else:
-                prev_uv = None
-                prev_idx = -1
-            
-            if interp_mode == 'CONSTANT':
-                # First frame: hold previous value at this time (close old segment)
-                if prev_uv is None:
-                    prev_uv = flip_uv(defaults)
-                anim.frames.append(dff.UVFrame(time - time_offset, list(prev_uv), prev_idx))
+                anim.frames.append(dff.UVFrame(next_t, flipped_current, prev_idx))
                 prev_idx = len(anim.frames) - 1
-                
-                # Second frame: use NEXT keyframe's value (or wrap to initial if last)
-                if is_last:
-                    next_uv = flip_uv(defaults)
-                else:
-                    next_time = sorted_times[i + 1]
-                    next_uv = time_values[next_time]
-                
-                anim.frames.append(dff.UVFrame(time - time_offset, list(next_uv), prev_idx))
-                
-            else:  # LINEAR or BEZIER
-                current_uv = time_values[time]
-                anim.frames.append(dff.UVFrame(time - time_offset, list(current_uv), prev_idx))
 
         if anim.frames:
-            anim.duration = sorted_times[-1] - time_offset
+            anim.duration = shifted_times[-1]
 
-        for i, frame in enumerate(anim.frames):
-            interp_info = ""
-            if i > 0 or not has_constant:
-                for ki, kt in enumerate(sorted_times):
-                    if abs(frame.time - (kt - time_offset)) < 0.001:
-                        interp_info = f" [{keyframe_data[kt]}]"
-                        break
+        is_fully_constant = len(shifted_times) >= 2 and all(v == 'CONSTANT' for v in interp_data.values())
+
+        if is_fully_constant:
+            num_intervals = len(shifted_times) - 1
+            mean_delta = shifted_times[-1] / num_intervals
+            extra_t = shifted_times[-1] + mean_delta
+            last_uv = anim.frames[-1].uv
+            anim.frames.append(dff.UVFrame(extra_t, list(last_uv), prev_idx))
+            anim.duration = extra_t
 
         return anim
 

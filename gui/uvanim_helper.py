@@ -62,7 +62,7 @@ class UV_OT_AnimateSpriteSheet(Operator):
                 actual_col = col if props.horizontal_order == 'LEFT_TO_RIGHT' else (props.columns - 1 - col)
                 actual_row = row if props.vertical_order == 'TOP_TO_BOTTOM' else (props.rows - 1 - row)
                 x_offset = actual_col * scale_x
-                y_offset = (props.rows - 1 - actual_row) * scale_y if props.vertical_order == 'TOP_TO_BOTTOM' else actual_row * scale_y
+                y_offset = (props.rows - 1 - actual_row) * scale_y
                 frame_positions.append((x_offset, y_offset))
 
         start_frame = context.scene.frame_start
