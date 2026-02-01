@@ -81,9 +81,9 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     export_version      : bpy.props.EnumProperty(
         items =
         (
-            ('0x33002', "GTA 3 (v3.3.0.2)", "Grand Theft Auto 3 PC (v3.3.0.2)"),
-            ('0x34003', "GTA VC (v3.4.0.3)", "Grand Theft Auto VC PC (v3.4.0.3)"),
             ('0x36003', "GTA SA (v3.6.0.3)", "Grand Theft Auto SA PC (v3.6.0.3)"),
+            ('0x34003', "GTA VC (v3.4.0.3)", "Grand Theft Auto VC PC (v3.4.0.3)"),
+            ('0x33002', "GTA 3 (v3.3.0.2)", "Grand Theft Auto 3 PC (v3.3.0.2)"),
             ('custom', "Custom", "Custom RW Version")
         ),
         name = "Version Export"
@@ -312,6 +312,12 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         default     = False
     )
 
+    hide_damage_parts   : bpy.props.BoolProperty(
+        name            = "Hide Damage Parts",
+        description     = "Hide objects ending with '_dam'",
+        default         = False
+    )
+
     group_materials :  bpy.props.BoolProperty(
         name        = "Group Similar Materials",
         default     = True
@@ -329,7 +335,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
 
     import_normals  :  bpy.props.BoolProperty(
         name        = "Import Custom Normals",
-        default     = False
+        default     = True
     )
     
     image_ext : bpy.props.EnumProperty(
@@ -371,6 +377,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         box_dff.prop(self, "remove_doubles")
         box_dff.prop(self, "create_backfaces")
         box_dff.prop(self, "import_normals")
+        box_dff.prop(self, "hide_damage_parts")
         box_dff.prop(self, "group_materials")
         box_dff.prop(self, "materials_naming")
 
@@ -441,6 +448,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'group_materials'  : self.group_materials,
                         'import_normals'   : self.import_normals,
                         'materials_naming' : self.materials_naming,
+                        'hide_damage_parts': self.hide_damage_parts,
                     }
                 )
 

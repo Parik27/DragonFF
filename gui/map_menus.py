@@ -113,7 +113,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     txd_pack : bpy.props.BoolProperty(
         name        = "Pack Images",
         description = "Pack images as embedded data into the .blend file",
-        default     = False
+        default     = True
     )
 
     read_mat_split  :  bpy.props.BoolProperty(
