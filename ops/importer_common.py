@@ -186,14 +186,14 @@ class material_helper:
     #######################################################
     def set_uv_animation(self, uv_anim):
         anim_data = self.material.node_tree.animation_data_create()
-        
+       
         if self.principled:
             mapping = self.principled.base_color_texture.node_mapping_get()
             mapping.vector_type = 'POINT'
             fps = bpy.context.scene.render.fps
             action = bpy.data.actions.new(uv_anim.name)
             anim_data.action = action
-            
+           
             if bpy.app.version < (4, 4, 0):
                 action_fcurves = action.fcurves
             else:
@@ -203,68 +203,55 @@ class material_helper:
                 strip = layer.strips.new(type='KEYFRAME')
                 channelbag = strip.channelbag(slot, ensure=True)
                 action_fcurves = channelbag.fcurves
-            
+           
             fcurves = [
-                None,
+                action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[2].default_value', index=2),
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=0),
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[3].default_value', index=1),
                 None,
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=0),
                 action_fcurves.new(data_path=f'nodes["{mapping.name}"].inputs[1].default_value', index=1),
             ]
-            
-            # Check if we should skip the last frame(s) for looping animations
+           
             frames_to_import = uv_anim.frames
-            if len(uv_anim.frames) > 2:
-                # Check if last two frames are a CONSTANT pair (same time)
-                if uv_anim.frames[-1].time == uv_anim.frames[-2].time:
-                    # Check if this CONSTANT pair wraps to the first frame
-                    if uv_anim.frames[-1].uv == uv_anim.frames[0].uv:
-                        # Skip both frames of the CONSTANT pair
-                        frames_to_import = uv_anim.frames[:-2]
-                # Otherwise check if just the last frame wraps
-                elif uv_anim.frames[-1].uv == uv_anim.frames[0].uv:
+            if len(frames_to_import) > 1:
+                last = frames_to_import[-1]
+                prev = frames_to_import[-2]
+                if last.time > prev.time and last.uv == prev.uv:
                     frames_to_import = uv_anim.frames[:-1]
-            
+           
             for frame_idx, frame in enumerate(frames_to_import):
                 for fc_idx, fc in enumerate(fcurves):
                     if not fc:
                         continue
-                    
+                   
                     should_add_kp = True
-                    
-                    # Try to add constant interpolation
+                   
                     if frame_idx > 0 and frame.time == frames_to_import[frame_idx-1].time:
-                        # We can overwrite the very first one keyframe
                         if len(fc.keyframe_points) < 2:
                             should_add_kp = False
                         else:
                             prev_kp, kp = fc.keyframe_points[-2:]
-                            # We can overwrite the previous keyframe with constant interpolation
                             if prev_kp.interpolation == 'CONSTANT':
                                 should_add_kp = False
-                            # The values of the previous keyframes are equal,
-                            # so we can use constant interpolation and overwrite the last one
                             elif prev_kp.co[1] == kp.co[1]:
                                 should_add_kp = False
                                 prev_kp.interpolation = 'CONSTANT'
-                    
+                   
                     if should_add_kp:
                         fc.keyframe_points.add(1)
-                    
+                   
                     kp = fc.keyframe_points[-1]
                     val = frame.uv[fc_idx]
-                    
-                    # Y coords are flipped in Blender
+                   
                     if fc_idx == 5:
                         scale_y = frame.uv[2]
                         val = 1 - (val + scale_y)
-                    
-                    # Could also use round here perhaps. I don't know what's better
+                   
                     kp.co = frame.time * fps + 1, val
                     kp.interpolation = 'LINEAR'
-        
-        self.material.dff.animation_name   = uv_anim.name
+       
+        self.material.dff.animation_name = uv_anim.name
         self.material.dff.export_animation = True
 
     #######################################################
