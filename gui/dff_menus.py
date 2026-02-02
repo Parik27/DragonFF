@@ -11,6 +11,7 @@ from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 from .map_ot import EXPORT_OT_ipl_cull
 from .cull_menus import CULLObjectProps, CULLMenus
 from ..gtaLib.data import presets
+from ..gtaLib.data.col_materials import COL_PRESET_SA, COL_PRESET_VC, COL_PRESET_GROUP
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -71,17 +72,29 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box = layout.box()
         box.label(text="Collision properties")
 
-        props = [
-            ["col_mat_index", "Material"],
-            ["col_flags", "Flags"],
-            ["col_brightness", "Brightness"],
-            ["col_day_light", "Day Light"],
-            ["col_night_light", "Night Light"],
-        ]
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Material")
+        split.prop(settings, "col_mat_index", text="")
 
-        for prop in props:
-            self.draw_labelled_prop(box.row(), settings, [prop[0]], prop[1])
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Flags")
+        split.prop(settings, "col_flags", text="")
 
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Brightness")
+        split.prop(settings, "col_brightness", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Light")
+        prop_row = split.row(align=True)
+        prop_row.prop(settings, "col_day_light", text="Day")
+        prop_row.prop(settings, "col_night_light", text="Night")
+
+        draw_col_preset_helper(layout, context)
 
     #######################################################
     def draw_labelled_prop(self, row, settings, props, label, text=""):
@@ -320,6 +333,113 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
         self.draw_mesh_menu(context)
 
+
+#######################################################
+class COLMaterialProps(bpy.types.PropertyGroup):
+    name: bpy.props.StringProperty()
+    mat_id: bpy.props.IntProperty()
+    flag_id: bpy.props.IntProperty()
+
+
+#######################################################
+class DFF_UL_CollisionMaterials(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.label(text=item.name)
+
+
+#######################################################
+def draw_col_preset_helper(layout, context):
+    box = layout.box()
+    box.label(text="Collision Presets")
+
+    split = box.split(factor=0.4)
+    split.label(text="Game")
+    split.prop(context.scene, "col_game_vers", text="")
+
+    split = box.split(factor=0.4)
+    split.label(text="Group")
+    split.prop(context.scene, "col_mat_group", text="")
+
+    row = box.row(align=True)
+    row.prop(context.scene, "col_mat_norm", toggle=True)
+    row.prop(context.scene, "col_mat_proc", toggle=True)
+
+    box.template_list(
+        "DFF_UL_CollisionMaterials", "",
+        context.scene, "col_mat_list",
+        context.scene, "col_mat_click",
+        rows=3
+    )
+
+
+#######################################################
+def update_mat_list(self, context):
+    scn = context.scene
+    scn.col_mat_list.clear()
+
+    mats = COL_PRESET_SA if scn.col_game_vers == "SA" else COL_PRESET_VC
+
+    for gid, mat_id, flag_id, name, is_proc in mats:
+        if gid != int(scn.col_mat_group):
+            continue
+
+        if scn.col_game_vers == "VC" and scn.col_mat_proc:
+            continue
+
+        if scn.col_game_vers == "SA":
+            if scn.col_mat_norm and is_proc:
+                continue
+
+            if scn.col_mat_proc and not is_proc:
+                continue
+
+        item = scn.col_mat_list.add()
+        item.name    = name
+        item.mat_id  = mat_id
+        item.flag_id = flag_id
+
+
+#######################################################
+def update_type(self, context, changed):
+    if changed == "normal" and self.col_mat_norm:
+        self.col_mat_proc = False
+
+    elif changed == "proc" and self.col_mat_proc:
+        self.col_mat_norm = False
+
+    if not self.col_mat_norm and not self.col_mat_proc:
+        if changed == "normal":
+            self.col_mat_norm = True
+        else:
+            self.col_mat_proc = True
+
+    update_mat_list(self, context)
+
+
+#######################################################
+def assign_and_clear(self, context):
+    if self.col_mat_click != -1:
+        item = self.col_mat_list[self.col_mat_click]
+        
+        # Assign to material or object based on active context
+        if context.object:
+            obj = context.object
+            mat = context.material
+            
+            # If it's a mesh with a material (material context)
+            if mat and obj.type == 'MESH':
+                mat.dff.col_mat_index = item.mat_id
+                # Note: flags are stored differently for materials
+                mat.dff.col_flags = item.flag_id
+            
+            # If it's an empty object (object context)
+            elif obj.type == 'EMPTY' and obj.dff.type == 'COL':
+                obj.dff.col_material = item.mat_id
+                obj.dff.col_flags = item.flag_id
+        
+        self.col_mat_click = -1
+
+
 #######################################################@
 class DFF_MT_ExportChoice(bpy.types.Menu):
     bl_label = "DragonFF"
@@ -490,12 +610,30 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Material Surface")
-        
-        box.prop(settings, "col_material", text="Material")
-        box.prop(settings, "col_flags", text="Flags")
-        box.prop(settings, "col_brightness", text="Brightness")
-        box.prop(settings, "col_day_light", text="Day Light")
-        box.prop(settings, "col_night_light", text="Night Light")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Material")
+        split.prop(settings, "col_material", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Flags")
+        split.prop(settings, "col_flags", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Brightness")
+        split.prop(settings, "col_brightness", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Light")
+        prop_row = split.row(align=True)
+        prop_row.prop(settings, "col_day_light", text="Day")
+        prop_row.prop(settings, "col_night_light", text="Night")
+
+        draw_col_preset_helper(layout, context)
 
     #######################################################
     def draw_2dfx_menu(self, context):

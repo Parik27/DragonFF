@@ -57,6 +57,8 @@ _classes = [
     gui.OBJECT_OT_dff_add_2dfx_cover_point,
     gui.OBJECT_OT_dff_add_2dfx_escalator,
     gui.OBJECT_OT_dff_add_cull,
+    gui.COLMaterialProps,
+    gui.DFF_UL_CollisionMaterials,
     gui.MATERIAL_PT_dffMaterials,
     gui.OBJECT_PT_dffObjects,
     gui.OBJECT_PT_dffCollections,
@@ -120,6 +122,32 @@ def register():
     bpy.types.VIEW3D_MT_pose.append(gui.pose_dff_func)
     bpy.types.VIEW3D_MT_add.append(gui.add_object_dff_func)
 
+    # Collision Presets Properties
+    bpy.types.Scene.col_game_vers = bpy.props.EnumProperty(
+        items=[("SA", "San Andreas", ""), ("VC", "Vice City", "")],
+        default="SA",
+        update=gui.update_mat_list
+    )
+    bpy.types.Scene.col_mat_group = bpy.props.EnumProperty(
+        items=[(str(k), v[0], "", v[1], k) for k, v in gui.COL_PRESET_GROUP.items()],
+        update=gui.update_mat_list
+    )
+    bpy.types.Scene.col_mat_norm = bpy.props.BoolProperty(
+        name="Normal",
+        default=True,
+        update=lambda self, context: gui.update_type(self, context, "normal")
+    )
+    bpy.types.Scene.col_mat_proc = bpy.props.BoolProperty(
+        name="Procedural",
+        default=False,
+        update=lambda self, context: gui.update_type(self, context, "proc")
+    )
+    bpy.types.Scene.col_mat_list = bpy.props.CollectionProperty(type=gui.COLMaterialProps)
+    bpy.types.Scene.col_mat_click = bpy.props.IntProperty(
+        default=-1,
+        update=gui.assign_and_clear
+    )
+
     gui.State.hook_events()
 
 #######################################################
@@ -132,6 +160,14 @@ def unregister():
     del bpy.types.Object.dff
     del bpy.types.Collection.dff
     del bpy.types.Scene.dff_uv_animator_props
+
+    # Collision Presets Properties
+    del bpy.types.Scene.col_game_vers
+    del bpy.types.Scene.col_mat_click
+    del bpy.types.Scene.col_mat_group
+    del bpy.types.Scene.col_mat_norm
+    del bpy.types.Scene.col_mat_proc
+    del bpy.types.Scene.col_mat_list
 
     bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
     bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)

@@ -53,6 +53,18 @@ class col_importer:
         for index, entity in enumerate(array):
             name = collection.name + ".ColSphere.%d" % index
         
+            # Check if this is a vehicle sphere
+            if entity.surface.material in (6, 7, 45, 63, 64, 65):
+
+                presets = mats.COL_PRESET_SA if col.Sections.version == 3 else mats.COL_PRESET_VC
+
+                for preset in presets:
+                    if (preset[0] == 13 and
+                        preset[1] == entity.surface.material and
+                        preset[2] == entity.surface.flags):
+                        name = collection.name + "." + preset[3].replace(" ", "_")
+                        break
+
             obj = bpy.data.objects.new(name, None)
 
             obj.location = entity.center
