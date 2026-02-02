@@ -31,7 +31,21 @@ def clear_extension(string):
     
     k = string.rfind('.')
     return string if k < 0 else string[:k]
-    
+
+#######################################################
+def calculate_uv_addressing(u_addr, v_addr):
+    return int(u_addr) << 4 | int(v_addr)
+
+#######################################################
+def get_ext_texture(settings):
+
+    texture = dff.Texture()
+    texture.name = settings.name
+    texture.filters = int(settings.filters)
+    texture.uv_addressing = calculate_uv_addressing(settings.u_addr,
+                                                    settings.v_addr)
+    return texture
+
 #######################################################
 class material_helper:
 
@@ -55,7 +69,8 @@ class material_helper:
 
         texture = dff.Texture()
         texture.filters = int(self.material.dff.tex_filters)
-        texture.uv_addressing = int(self.material.dff.tex_u_addr) << 4 | int(self.material.dff.tex_v_addr)
+        texture.uv_addressing = calculate_uv_addressing(self.material.dff.tex_u_addr,
+                                                        self.material.dff.tex_v_addr)
 
         # 2.8         
         if self.principled:
@@ -97,29 +112,18 @@ class material_helper:
     #######################################################
     def get_bump_map(self):
 
-        bump_texture = None
-        height_texture = None
-
         if not self.material.dff.export_bump_map:
             return None
 
-        bump_texture_name = self.material.dff.bump_map_tex
         intensity = self.material.dff.bump_map_intensity
         bump_dif_alpha = self.material.dff.bump_dif_alpha
 
-        base_color_texture = None
-        if bump_dif_alpha:
-            base_color_texture = self.get_texture()
-
         # Create bump texture (may have empty name when use diffuse alpha is set)
-        bump_texture = dff.Texture()
-        bump_texture.name = bump_texture_name
-        
+        bump_texture = get_ext_texture(self.material.dff.bump_map_tex)
+
         # If diffuse alpha is checked use material texture as heightmap
-        if bump_dif_alpha and base_color_texture:
-            height_texture = dff.Texture()
-            height_texture.name = base_color_texture.name
-        
+        height_texture = self.get_texture() if bump_dif_alpha else None
+
         return dff.BumpMapFX(intensity, height_texture, bump_texture)
 
     #######################################################
@@ -128,14 +132,10 @@ class material_helper:
         if not self.material.dff.export_env_map:
             return None
 
-        texture_name = self.material.dff.env_map_tex
-        coef         = self.material.dff.env_map_coef
-        use_fb_alpha  = self.material.dff.env_map_fb_alpha
+        coef            = self.material.dff.env_map_coef
+        use_fb_alpha    = self.material.dff.env_map_fb_alpha
+        texture         = get_ext_texture(self.material.dff.env_map_tex)
 
-        texture = dff.Texture()
-        texture.name = texture_name
-        texture.filters = 0
-        
         return dff.EnvMapFX(coef, use_fb_alpha, texture)
 
     #######################################################
@@ -144,14 +144,10 @@ class material_helper:
         if not self.material.dff.export_dual_tex:
             return None
 
-        texture_name = self.material.dff.dual_tex
-        src_blend    = int(self.material.dff.dual_src_blend)
-        dst_blend    = int(self.material.dff.dual_dst_blend)
+        src_blend   = int(self.material.dff.dual_src_blend)
+        dst_blend   = int(self.material.dff.dual_dst_blend)
+        texture     = get_ext_texture(self.material.dff.dual_tex)
 
-        texture = dff.Texture()
-        texture.name = texture_name
-        texture.filters = 0
-        
         return dff.DualFX(src_blend, dst_blend, texture)
 
     #######################################################
@@ -496,7 +492,7 @@ class dff_exporter:
                 self.dff.uvanim_dict.append(anim)
 
             # Create a dummy uv anim to apply to the second uv channel to force dual pass blending
-            if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
+            if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex.name:
                 dummy_anim = dff.UVAnim()
                 dummy_anim.name = "DragonFF"
                 dummy_anim.node_to_uv[0] = 1

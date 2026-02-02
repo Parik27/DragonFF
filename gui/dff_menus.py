@@ -108,6 +108,22 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         prop_row.prop(settings, "tex_v_addr", text="")
 
     #######################################################
+    def draw_ext_texture_prop_box(self, settings, box):
+        box.prop(settings, "name", text="Texture")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Filtering")
+        split.prop(settings, "filters", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Addressing")
+        prop_row = split.row(align=True)
+        prop_row.prop(settings, "u_addr", text="")
+        prop_row.prop(settings, "v_addr", text="")
+
+    #######################################################
     def draw_material_prop_box(self, context, box):
         settings = context.material.dff
         box.label(text="Material properties")
@@ -150,57 +166,48 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
     def draw_bump_map_box(self, context, box):
         settings = context.material.dff
         box.row().prop(settings, "export_bump_map")
-        
+
         if settings.export_bump_map:
-            split = box.row().split(factor=0.4)
-            split.alignment = 'LEFT'
-            split.label(text="Texture")
-            split.prop(settings, "bump_map_tex", text="")
-            
             split = box.row().split(factor=0.4)
             split.alignment = 'LEFT'
             split.label(text="Intensity")
             split.prop(settings, "bump_map_intensity", text="")
-            
+
             self.draw_labelled_prop(
                 box.row(), settings, ["bump_dif_alpha"], "Use Diffuse Alpha")
+
+            self.draw_ext_texture_prop_box(settings.bump_map_tex, box.box())
 
     #######################################################
     def draw_env_map_box(self, context, box):
         settings = context.material.dff
         box.row().prop(context.material.dff, "export_env_map")
-        
-        if settings.export_env_map:
-            split = box.row().split(factor=0.4)
-            split.alignment = 'LEFT'
-            split.label(text="Texture")
-            split.prop(settings, "env_map_tex", text="")
 
+        if settings.export_env_map:
             split = box.row().split(factor=0.4)
             split.alignment = 'LEFT'
             split.label(text="Coefficient")
             split.prop(settings, "env_map_coef", text="")
-            
+
             self.draw_labelled_prop(
                 box.row(), settings, ["env_map_fb_alpha"], "Use Framebuffer Alpha")
+
+            self.draw_ext_texture_prop_box(settings.env_map_tex, box.box())
 
     #######################################################
     def draw_dual_tex_box(self, context, box):
         settings = context.material.dff
         box.row().prop(settings, "export_dual_tex")
-        
+
         if settings.export_dual_tex:
-            split = box.row().split(factor=0.4)
-            split.alignment = 'LEFT'
-            split.label(text="Texture")
-            split.prop(settings, "dual_tex", text="")
-            
             split = box.row().split(factor=0.4)
             split.alignment = 'LEFT'
             split.label(text="Blending")
             prop_row = split.row(align=True)
             prop_row.prop(settings, "dual_src_blend", text="")
             prop_row.prop(settings, "dual_dst_blend", text="")
+
+            self.draw_ext_texture_prop_box(settings.dual_tex, box.box())
 
     #######################################################
     def draw_uv_anim_box(self, context, box):
@@ -613,6 +620,13 @@ class OBJECT_PT_dffCollections(bpy.types.Panel):
 
 # Custom properties
 #######################################################
+class DFFTextureProps(bpy.types.PropertyGroup):
+    name        : bpy.props.StringProperty()
+    filters : bpy.props.EnumProperty  (items=texture_filters_items, default="0")
+    u_addr  : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
+    v_addr  : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
+
+#######################################################
 class DFFMaterialProps(bpy.types.PropertyGroup):
 
     ambient            : bpy.props.FloatProperty  (name="Ambient Shading",   default=0.5)
@@ -624,20 +638,20 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
 
     # Environment Map
     export_env_map     : bpy.props.BoolProperty   (name="Environment Map")
-    env_map_tex        : bpy.props.StringProperty ()
+    env_map_tex        : bpy.props.PointerProperty(type=DFFTextureProps)
     env_map_coef       : bpy.props.FloatProperty  (default=1.0)
     env_map_fb_alpha   : bpy.props.BoolProperty   ()
 
     # Bump Map
     export_bump_map    : bpy.props.BoolProperty   (name="Bump Map")
     bump_map_intensity : bpy.props.FloatProperty  (default=1.0)
-    bump_map_tex       : bpy.props.StringProperty ()
+    bump_map_tex       : bpy.props.PointerProperty(type=DFFTextureProps)
     height_map_tex     : bpy.props.StringProperty ()  # Store internally just in case
     bump_dif_alpha     : bpy.props.BoolProperty   (name="Use Diffuse Alpha")
-    
+
     # Dual Texture
     export_dual_tex    : bpy.props.BoolProperty   (name="Dual Texture")
-    dual_tex           : bpy.props.StringProperty ()
+    dual_tex           : bpy.props.PointerProperty(type=DFFTextureProps)
     dual_src_blend     : bpy.props.EnumProperty  (name="", items=texture_blend_items, default="5")
     dual_dst_blend     : bpy.props.EnumProperty  (name="", items=texture_blend_items, default="6")
 
@@ -701,7 +715,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
         description = "Preset material colours",
         update = MATERIAL_PT_dffMaterials.set_preset_color
     )
-        
+
 #######################################################
 class DFFObjectProps(bpy.types.PropertyGroup):
 

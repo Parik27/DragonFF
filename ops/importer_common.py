@@ -64,6 +64,18 @@ def redraw_viewport():
             area.tag_redraw()
 
 #######################################################
+def parse_uv_addressing(uv_addressing):
+    return ((uv_addressing >> 4) & 0xF), (uv_addressing & 0xF)
+
+#######################################################
+def set_ext_texture(texture, settings):
+    u_addr, v_addr = parse_uv_addressing(texture.uv_addressing)
+    settings.name = texture.name
+    settings.filters = str(texture.filters)
+    settings.u_addr  = str(u_addr)
+    settings.v_addr  = str(v_addr)
+
+#######################################################
 class material_helper:
 
     """ Material Helper for Blender 2.7x and Blender 2.8 compatibility"""
@@ -114,9 +126,10 @@ class material_helper:
             )
             slot.texture.image = image
 
+        u_addr, v_addr = parse_uv_addressing(uv_addressing)
         self.material.dff.tex_filters = str(filters)
-        self.material.dff.tex_u_addr  = str((uv_addressing >> 4) & 0xF)
-        self.material.dff.tex_v_addr  = str(uv_addressing & 0xF)
+        self.material.dff.tex_u_addr  = str(u_addr)
+        self.material.dff.tex_v_addr  = str(v_addr)
 
     #######################################################
     def set_surface_properties(self, props):
@@ -129,17 +142,17 @@ class material_helper:
     def set_environment_map(self, plugin):
 
         if plugin.env_map:
-            self.material.dff.env_map_tex      = plugin.env_map.name
+            set_ext_texture(plugin.env_map, self.material.dff.env_map_tex)
 
         self.material.dff.export_env_map       = True
         self.material.dff.env_map_coef         = plugin.coefficient
-        self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha        
+        self.material.dff.env_map_fb_alpha     = plugin.use_fb_alpha
 
     #######################################################
     def set_dual_texture(self, plugin):
 
         if plugin.texture:
-            self.material.dff.dual_tex         = plugin.texture.name
+            set_ext_texture(plugin.texture, self.material.dff.dual_tex)
 
         self.material.dff.export_dual_tex      = True
         self.material.dff.dual_src_blend       = str(plugin.src_blend)

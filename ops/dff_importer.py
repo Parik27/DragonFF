@@ -26,7 +26,8 @@ from ..gtaLib import dff
 from .importer_common import (
     link_object, create_collection,
     material_helper, set_object_mode,
-    hide_object, invert_matrix_safe)
+    hide_object, invert_matrix_safe,
+    set_ext_texture)
 from .col_importer import import_col_mem
 from ..ops.ext_2dfx_importer import ext_2dfx_importer
 from ..ops.state import State
@@ -506,21 +507,21 @@ class dff_importer:
             # Bump Map
             if 'bump_map' in material.plugins:
                 mat.dff.export_bump_map = True
-                
+
                 for bump_fx in material.plugins['bump_map']:
 
                     if bump_fx.height_map is not None:
                         # Store height map texture name internally
                         mat.dff.height_map_tex = bump_fx.height_map.name
-                        
+
                         if bump_fx.bump_map is not None:
                             # Both height and bump maps present - use diffuse alpha
-                            mat.dff.bump_map_tex = bump_fx.bump_map.name
+                            set_ext_texture(bump_fx.bump_map, mat.dff.bump_map_tex)
                             mat.dff.bump_dif_alpha = True
                             mat.dff.bump_map_intensity = bump_fx.intensity
 
                     elif bump_fx.bump_map is not None:
-                        mat.dff.bump_map_tex = bump_fx.bump_map.name
+                        set_ext_texture(bump_fx.bump_map, mat.dff.bump_map_tex)
                         mat.dff.bump_map_intensity = bump_fx.intensity
 
             # Surface Properties
