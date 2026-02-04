@@ -80,6 +80,7 @@ def update_type(self, context, changed):
         else:
             self.col_mat_proc = True
 
+
 #######################################################
 def draw_col_preset_helper(layout, context):
 
@@ -100,32 +101,41 @@ def draw_col_preset_helper(layout, context):
 
     box.prop(context.object.dff.col_mat, "col_mat_enum", expand=True)
 
+
+#######################################################
+def reset_col_mat_enum(self, context):
+    obj = context.object
+    if obj and hasattr(obj.dff, "col_mat"):
+        obj.dff.col_mat.col_mat_enum = "NONE"
+
+
 #######################################################
 class COLSceneProps(bpy.types.PropertyGroup):
     col_game_vers: bpy.props.EnumProperty(
         items=[("SA", "San Andreas", ""), ("VC", "Vice City", "")],
         default="SA",
-        update=lambda self, context: setattr(self, "col_mat_enum", "NONE")
+        update=reset_col_mat_enum
     )
-   
+  
     col_mat_group: bpy.props.EnumProperty(
         items=[(str(k), v[0], "", v[1], k) for k, v in COL_PRESET_GROUP.items()],
-        update=lambda self, context: setattr(self, "col_mat_enum", "NONE")
+        update=reset_col_mat_enum
     )
-   
+  
     col_mat_norm: bpy.props.BoolProperty(
         name="Normal",
         default=True,
-        update=lambda self, context: (update_type(self, context, "normal"), setattr(self, "col_mat_enum", "NONE"))
+        update=lambda self, context: (update_type(self, context, "normal"), reset_col_mat_enum(self, context))
     )
-   
+  
     col_mat_proc: bpy.props.BoolProperty(
         name="Procedural",
         default=False,
-        update=lambda self, context: (update_type(self, context, "proc"), setattr(self, "col_mat_enum", "NONE"))
+        update=lambda self, context: (update_type(self, context, "proc"), reset_col_mat_enum(self, context))
     )
 
 
+########################################################
 class COLMaterialEnumProps(bpy.types.PropertyGroup):  
     col_mat_enum: bpy.props.EnumProperty(  
         name="Material",  
