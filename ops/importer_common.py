@@ -118,6 +118,9 @@ class material_helper:
         self.material.dff.tex_u_addr  = str((uv_addressing >> 4) & 0xF)
         self.material.dff.tex_v_addr  = str(uv_addressing & 0xF)
 
+        if image:
+            self.material.dff.tex_name = image.name
+
     #######################################################
     def set_surface_properties(self, props):
 
