@@ -269,6 +269,9 @@ class material_helper:
         self.principled = PrincipledBSDFWrapper(self.material,
                                                 is_readonly=False)
 
+        self.principled.specular    = 0
+        self.principled.roughness   = 1
+
 #######################################################
 class object_helper:
 
