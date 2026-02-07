@@ -29,6 +29,7 @@ class txd_exporter:
 
     mass_export = False
     only_used_textures = True
+    has_mipmaps = False
     version = None
     file_name = ""
     path = ""
@@ -61,10 +62,10 @@ class txd_exporter:
         
         # Raster format flags for RGBA8888: format type (8888=5) at bit 8-11, no mipmaps, no palette
         texture_native.raster_format_flags = txd.RasterFormat.RASTER_8888 << 8
-        texture_native.d3d_format = txd.D3DFormat.D3D_8888
+        texture_native.d3d_format = txd_exporter.get_d3d_from_raster(texture_native.get_raster_format_type())
         texture_native.width = width
         texture_native.height = height
-        texture_native.depth = 32
+        texture_native.depth = txd_exporter.get_depth_from_raster(texture_native.get_raster_format_type())
         texture_native.num_levels = 1
         texture_native.raster_type = 4  # Texture
         
@@ -77,12 +78,134 @@ class txd_exporter:
         
         # No palette for RGBA8888 format
         texture_native.palette = b''
-        
-        # Convert RGBA to BGRA8888 format
-        pixel_data = ImageEncoder.rgba_to_bgra8888(rgba_data)
-        texture_native.pixels = [pixel_data]
-        
+
+        # Generate mipmaps
+        if txd_exporter.has_mipmaps:
+            mip_levels = txd_exporter.generate_mipmaps(rgba_data, width, height)
+            texture_native.raster_format_flags |= (1 << 15)  # has_mipmaps
+        else:
+            mip_levels = [(width, height, rgba_data)]
+
+        texture_native.num_levels = len(mip_levels)
+
+        encoder = txd_exporter.get_encoder_from_raster(texture_native.get_raster_format_type())
+
+        # Convert and pad each level
+        texture_native.pixels = [
+            txd_exporter.pad_mipmap_level(
+                encoder(level_data),
+                mip_width,
+                mip_height,
+                texture_native.depth
+            )
+            for mip_width, mip_height, level_data in mip_levels
+        ]
+
         return texture_native
+
+    ########################################################
+    @staticmethod
+    def get_encoder_from_raster(raster_format):
+        return {
+            txd.RasterFormat.RASTER_8888: ImageEncoder.rgba_to_bgra8888,
+            txd.RasterFormat.RASTER_888:  ImageEncoder.rgba_to_bgra888,
+            txd.RasterFormat.RASTER_4444: ImageEncoder.rgba_to_rgba4444,
+            txd.RasterFormat.RASTER_1555: ImageEncoder.rgba_to_rgba1555,
+            txd.RasterFormat.RASTER_565:  ImageEncoder.rgba_to_rgb565,
+            txd.RasterFormat.RASTER_555:  ImageEncoder.rgba_to_rgb555,
+            txd.RasterFormat.RASTER_LUM:  ImageEncoder.rgba_to_lum8,
+        }.get(raster_format, None)
+
+    #######################################################
+    @staticmethod
+    def get_depth_from_raster(raster_format):
+        return {
+            txd.RasterFormat.RASTER_8888: 32,
+            txd.RasterFormat.RASTER_888:  24,
+            txd.RasterFormat.RASTER_4444: 16,
+            txd.RasterFormat.RASTER_1555: 16,
+            txd.RasterFormat.RASTER_565:  16,
+            txd.RasterFormat.RASTER_555:  16,
+            txd.RasterFormat.RASTER_LUM:   8,
+        }.get(raster_format, 0)
+
+    #######################################################
+    @staticmethod
+    def get_d3d_from_raster(raster_format):
+        return {
+            txd.RasterFormat.RASTER_8888: txd.D3DFormat.D3D_8888,
+            txd.RasterFormat.RASTER_888:  txd.D3DFormat.D3D_888,
+            txd.RasterFormat.RASTER_4444: txd.D3DFormat.D3D_4444,
+            txd.RasterFormat.RASTER_1555: txd.D3DFormat.D3D_1555,
+            txd.RasterFormat.RASTER_565:  txd.D3DFormat.D3D_565,
+            txd.RasterFormat.RASTER_555:  txd.D3DFormat.D3D_555,
+            txd.RasterFormat.RASTER_LUM:  txd.D3DFormat.D3DFMT_L8,
+        }.get(raster_format, 0)
+
+    #######################################################
+    @staticmethod
+    def pad_mipmap_level(pixel_data, width, height, depth):
+        # Calculate D3D9-aligned row size
+        row_bytes = (width * depth + 7) // 8
+        row_size = ((row_bytes + 3) // 4) * 4
+        aligned_size = row_size * height
+        
+        if len(pixel_data) < aligned_size:
+            padded = bytearray(pixel_data)
+            padded.extend(b'\x00' * (aligned_size - len(pixel_data)))
+            return bytes(padded)
+        
+        return pixel_data
+
+    #######################################################
+    @staticmethod
+    def generate_mipmaps(rgba_data, width, height):
+        # Generates full mipmap chain including 1x1 similar to how magictxd does it with 2x2 box filter, edge clamp, float averaging + round to nearest
+        mipmaps = [(width, height, rgba_data)]
+      
+        current_width = width
+        current_height = height
+        current_data = rgba_data
+      
+        while current_width > 1 or current_height > 1:
+            new_width = max(1, current_width // 2)
+            new_height = max(1, current_height // 2)
+          
+            new_data = bytearray(new_width * new_height * 4)
+          
+            for y in range(new_height):
+                for x in range(new_width):
+                    r_sum = g_sum = b_sum = a_sum = 0.0
+                    for dy in range(2):
+                        sy = min(y * 2 + dy, current_height - 1)
+                        row_offset = sy * current_width * 4
+                        for dx in range(2):
+                            sx = min(x * 2 + dx, current_width - 1)
+                            offset = row_offset + sx * 4
+                          
+                            r_sum += current_data[offset]
+                            g_sum += current_data[offset + 1]
+                            b_sum += current_data[offset + 2]
+                            a_sum += current_data[offset + 3]
+                    avg_r = round(r_sum / 4.0)
+                    avg_g = round(g_sum / 4.0)
+                    avg_b = round(b_sum / 4.0)
+                    avg_a = round(a_sum / 4.0)
+                  
+                    out_offset = (y * new_width + x) * 4
+                    new_data[out_offset] = int(avg_r)
+                    new_data[out_offset + 1] = int(avg_g)
+                    new_data[out_offset + 2] = int(avg_b)
+                    new_data[out_offset + 3] = int(avg_a)
+          
+            mip_data = bytes(new_data)
+            mipmaps.append((new_width, new_height, mip_data))
+          
+            current_width = new_width
+            current_height = new_height
+            current_data = mip_data
+      
+        return mipmaps
 
     #######################################################
     @staticmethod

@@ -95,9 +95,80 @@ class ImageEncoder:
     def rgba_to_bgra888(rgba_data):
         ret = bytearray()
         for i in range(0, len(rgba_data), 4):
-            r, g, b = rgba_data[i:i+3]
-            ret.extend([b, g, r])
+            r = rgba_data[i]
+            g = rgba_data[i + 1]
+            b = rgba_data[i + 2]
+            ret.extend([b, g, r, 0xFF])
         return bytes(ret)
+
+    @staticmethod
+    def rgba_to_rgb565(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b = rgba_data[i:i+3]
+            r5 = (r * 31) // 255
+            g6 = (g * 63) // 255
+            b5 = (b * 31) // 255
+            rgb565 = (r5 << 11) | (g6 << 5) | b5
+            ret.extend(rgb565.to_bytes(2, 'little'))
+        return bytes(ret)
+
+    @staticmethod
+    def rgba_to_rgba1555(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b, a = rgba_data[i:i+4]
+            a1 = 1 if a > 127 else 0
+            r5 = (r * 31) // 255
+            g5 = (g * 31) // 255
+            b5 = (b * 31) // 255
+            rgba1555 = (a1 << 15) | (r5 << 10) | (g5 << 5) | b5
+            ret.extend(rgba1555.to_bytes(2, 'little'))
+        return bytes(ret)
+
+    @staticmethod
+    def rgba_to_rgba4444(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b, a = rgba_data[i:i+4]
+            a4 = (a * 15) // 255
+            r4 = (r * 15) // 255
+            g4 = (g * 15) // 255
+            b4 = (b * 15) // 255
+            rgba4444 = (a4 << 12) | (r4 << 8) | (g4 << 4) | b4
+            ret.extend(rgba4444.to_bytes(2, 'little'))
+        return bytes(ret)
+
+    @staticmethod
+    def rgba_to_rgb555(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b = rgba_data[i:i+3]
+            r5 = (r * 31) // 255
+            g5 = (g * 31) // 255
+            b5 = (b * 31) // 255
+            rgb555 = (r5 << 10) | (g5 << 5) | b5
+            ret.extend(rgb555.to_bytes(2, 'little'))
+        return bytes(ret)
+
+    @staticmethod
+    def rgba_to_lum8(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b = rgba_data[i:i+3]
+            lum = int(0.299 * r + 0.587 * g + 0.114 * b)
+            ret.append(lum)
+        return bytes(ret)
+
+    @staticmethod
+    def rgba_to_lum8a8(rgba_data):
+        ret = bytearray()
+        for i in range(0, len(rgba_data), 4):
+            r, g, b, a = rgba_data[i:i+4]
+            lum = int(0.299 * r + 0.587 * g + 0.114 * b)
+            ret.extend([lum, a])
+        return bytes(ret)
+
 
 #######################################################
 class ImageDecoder:
