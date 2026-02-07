@@ -1,212 +1,271 @@
+from enum import IntEnum
+
+
+# --------------------------------------------------
+# GROUPS
+# --------------------------------------------------
+
+class COL_GROUP(IntEnum):
+    ROAD     =  0
+    CONCRETE =  1
+    GRAVEL   =  2
+    GRASS    =  3
+    DIRT     =  4
+    SAND     =  5
+    GLASS    =  6
+    WOOD     =  7
+    METAL    =  8
+    ROCK     =  9
+    BUSHES   = 10
+    WATER    = 11
+    MISC     = 12
+    VEHICLE  = 13
+
+COL_PRESET_GROUP = {
+     0 : ["Road",     "303030"],
+     1 : ["Concrete", "909090"],
+     2 : ["Gravel",   "645E53"],
+     3 : ["Grass",    "92C032"],
+     4 : ["Dirt",     "775F40"],
+     5 : ["Sand",     "E7E17E"],
+     6 : ["Glass",    "A7E9FC"],
+     7 : ["Wood",     "936944"],
+     8 : ["Metal",    "BFC8D5"],
+     9 : ["Rock",     "AFAAA0"],
+    10 : ["Bushes",   "2EA563"],
+    11 : ["Water",    "6493E1"],
+    12 : ["Misc",     "F1AB07"],
+    13 : ["Vehicle",  "FFD4FD"]
+}
+
+
 # --------------------------------------------------
 # SAN ANDREAS
 # --------------------------------------------------
 
+class COL_FLAG_SA(IntEnum):
+    NONE    =  0
+
+    BODY    =  0
+    HOOD    =  1
+    BOOT    =  2
+    BUMP_F  =  3
+    BUMP_R  =  4
+    DOOR_FL =  5
+    DOOR_FR =  6
+    DOOR_RL =  7
+    DOOR_RR =  8
+    WING_FL =  9
+    WING_FR = 10
+    WING_RL = 11
+    WING_RR = 12
+    WIND_SH = 19
+
 COL_PRESET_SA = [
-    # group, material, flag, name, procedural
+    # group, flag, material, name, procedural
 
     # Normal Materials (0-73)
-    (  0,   0,  0, "Default",               False ),
-    (  0,   1,  0, "Tarmac",                False ),
-    (  0,   2,  0, "Tarmac (worn)",         False ),
-    (  0,   3,  0, "Tarmac (very worn)",    False ),
-    (  1,   4,  0, "Pavement",              False ),
-    (  1,   5,  0, "Pavement (cracked)",    False ),
-    (  2,   6,  0, "Gravel",                False ),
-    (  1,   7,  0, "Concrete (cracked)",    False ),
-    (  1,   8,  0, "Painted Ground",        False ),
-    (  3,   9,  0, "Grass (short, lush)",   False ),
-    (  3,  10,  0, "Grass (medium, lush)",  False ),
-    (  3,  11,  0, "Grass (long, lush)",    False ),
-    (  3,  12,  0, "Grass (short, dry)",    False ),
-    (  3,  13,  0, "Grass (medium, dry)",   False ),
-    (  3,  14,  0, "Grass (long, dry)",     False ),
-    (  3,  15,  0, "Golf Grass (rough)",    False ),
-    (  3,  16,  0, "Golf Grass (smooth)",   False ),
-    (  3,  17,  0, "Steep Slidy Grass",     False ),
-    (  9,  18,  0, "Steep Cliff",           False ),
-    (  4,  19,  0, "Flower Bed",            False ),
-    (  3,  20,  0, "Meadow",                False ),
-    (  4,  21,  0, "Waste Ground",          False ),
-    (  4,  22,  0, "Woodland Ground",       False ),
-    ( 10,  23,  0, "Vegetation",            False ),
-    (  4,  24,  0, "Mud (wet)",             False ),
-    (  4,  25,  0, "Mud (dry)",             False ),
-    (  4,  26,  0, "Dirt",                  False ),
-    (  4,  27,  0, "Dirt Track",            False ),
-    (  5,  28,  0, "Sand (deep)",           False ),
-    (  5,  29,  0, "Sand (medium)",         False ),
-    (  5,  30,  0, "Sand (compact)",        False ),
-    (  5,  31,  0, "Sand (arid)",           False ),
-    (  5,  32,  0, "Sand (more)",           False ),
-    (  5,  33,  0, "Sand (beach)",          False ),
-    (  1,  34,  0, "Concrete (beach)",      False ),
-    (  9,  35,  0, "Rock (dry)",            False ),
-    (  9,  36,  0, "Rock (wet)",            False ),
-    (  9,  37,  0, "Rock (cliff)",          False ),
-    ( 11,  38,  0, "Water (riverbed)",      False ),
-    ( 11,  39,  0, "Water (shallow)",       False ),
-    (  4,  40,  0, "Corn Field",            False ),
-    ( 10,  41,  0, "Hedge",                 False ),
-    (  7,  42,  0, "Wood (crates)",         False ),
-    (  7,  43,  0, "Wood (solid)",          False ),
-    (  7,  44,  0, "Wood (thin)",           False ),
-    (  6,  45,  0, "Glass",                 False ),
-    (  6,  46,  0, "Glass Window (large)",  False ),
-    (  6,  47,  0, "Glass Window (small)",  False ),
-    ( 12,  48,  0, "Empty 1",               False ),
-    ( 12,  49,  0, "Empty 2",               False ),
-    (  8,  50,  0, "Garage Door",           False ),
-    (  8,  51,  0, "Thick Metal Plate",     False ),
-    (  8,  52,  0, "Scaffold Pole",         False ),
-    (  8,  53,  0, "Lamp Post",             False ),
-    (  8,  54,  0, "Metal Gate",            False ),
-    (  8,  55,  0, "Metal Chain fence",     False ),
-    (  8,  56,  0, "Girder",                False ),
-    (  8,  57,  0, "Fire Hydrant",          False ),
-    (  8,  58,  0, "Container",             False ),
-    (  8,  59,  0, "News Vendor",           False ),
-    ( 12,  60,  0, "Wheelbase",             False ),
-    ( 12,  61,  0, "Cardboard Box",         False ),
-    ( 12,  62,  0, "Ped",                   False ),
-    (  8,  63,  0, "Car (body)",            False ),
-    (  8,  64,  0, "Car (panel)",           False ),
-    (  8,  65,  0, "Car (moving)",          False ),
-    ( 12,  66,  0, "Transparent Cloth",     False ),
-    ( 12,  67,  0, "Rubber",                False ),
-    ( 12,  68,  0, "Plastic",               False ),
-    (  9,  69,  0, "Transparent Stone",     False ),
-    (  7,  70,  0, "Wood (bench)",          False ),
-    ( 12,  71,  0, "Carpet",                False ),
-    (  7,  72,  0, "Floorboard",            False ),
-    (  7,  73,  0, "Stairs (wood)",         False ),
+    ( COL_GROUP.ROAD,     COL_FLAG_SA.NONE,      0, "Default",              False ),
+    ( COL_GROUP.ROAD,     COL_FLAG_SA.NONE,      1, "Tarmac",               False ),
+    ( COL_GROUP.ROAD,     COL_FLAG_SA.NONE,      2, "Tarmac (worn)",        False ),
+    ( COL_GROUP.ROAD,     COL_FLAG_SA.NONE,      3, "Tarmac (very worn)",   False ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,      4, "Pavement",             False ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,      5, "Pavement (cracked)",   False ),
+    ( COL_GROUP.GRAVEL,   COL_FLAG_SA.NONE,      6, "Gravel",               False ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,      7, "Concrete (cracked)",   False ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,      8, "Painted Ground",       False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,      9, "Grass (short, lush)",  False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     10, "Grass (medium, lush)", False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     11, "Grass (long, lush)",   False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     12, "Grass (short, dry)",   False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     13, "Grass (medium, dry)",  False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     14, "Grass (long, dry)",    False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     15, "Golf Grass (rough)",   False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     16, "Golf Grass (smooth)",  False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     17, "Steep Slidy Grass",    False ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,     18, "Steep Cliff",          False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     19, "Flower Bed",           False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     20, "Meadow",               False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     21, "Waste Ground",         False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     22, "Woodland Ground",      False ),
+    ( COL_GROUP.BUSHES,   COL_FLAG_SA.NONE,     23, "Vegetation",           False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     24, "Mud (wet)",            False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     25, "Mud (dry)",            False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     26, "Dirt",                 False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     27, "Dirt Track",           False ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     28, "Sand (deep)",          False ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     29, "Sand (medium)",        False ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     30, "Sand (compact)",       False ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     31, "Sand (arid)",          False ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     32, "Sand (more)",          False ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     33, "Sand (beach)",         False ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,     34, "Concrete (beach)",     False ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,     35, "Rock (dry)",           False ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,     36, "Rock (wet)",           False ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,     37, "Rock (cliff)",         False ),
+    ( COL_GROUP.WATER,    COL_FLAG_SA.NONE,     38, "Water (riverbed)",     False ),
+    ( COL_GROUP.WATER,    COL_FLAG_SA.NONE,     39, "Water (shallow)",      False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     40, "Corn Field",           False ),
+    ( COL_GROUP.BUSHES,   COL_FLAG_SA.NONE,     41, "Hedge",                False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,     42, "Wood (crates)",        False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,     43, "Wood (solid)",         False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,     44, "Wood (thin)",          False ),
+    ( COL_GROUP.GLASS,    COL_FLAG_SA.NONE,     45, "Glass",                False ),
+    ( COL_GROUP.GLASS,    COL_FLAG_SA.NONE,     46, "Glass Window (large)", False ),
+    ( COL_GROUP.GLASS,    COL_FLAG_SA.NONE,     47, "Glass Window (small)", False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     48, "Empty 1",              False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     49, "Empty 2",              False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     50, "Garage Door",          False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     51, "Thick Metal Plate",    False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     52, "Scaffold Pole",        False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     53, "Lamp Post",            False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     54, "Metal Gate",           False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     55, "Metal Chain fence",    False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     56, "Girder",               False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     57, "Fire Hydrant",         False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     58, "Container",            False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     59, "News Vendor",          False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     60, "Wheelbase",            False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     61, "Cardboard Box",        False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     62, "Ped",                  False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     63, "Car (body)",           False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     64, "Car (panel)",          False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,     65, "Car (moving)",         False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     66, "Transparent Cloth",    False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     67, "Rubber",               False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     68, "Plastic",              False ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,     69, "Transparent Stone",    False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,     70, "Wood (bench)",         False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     71, "Carpet",               False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,     72, "Floorboard",           False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,     73, "Stairs (wood)",        False ),
 
     # Procedural Materials (74-157)
-    (  5,  74,  0, "Sand",                  True  ),
-    (  5,  75,  0, "Sand (dense)",          True  ),
-    (  5,  76,  0, "Sand (arid)",           True  ),
-    (  5,  77,  0, "Sand (compact)",        True  ),
-    (  5,  78,  0, "Sand (rocky)",          True  ),
-    (  5,  79,  0, "Sand (beach)",          True  ),
-    (  3,  80,  0, "Grass (short)",         True  ),
-    (  3,  81,  0, "Grass (meadow)",        True  ),
-    (  3,  82,  0, "Grass (dry)",           True  ),
-    (  4,  83,  0, "Woodland",              True  ),
-    (  4,  84,  0, "Wood Dense",            True  ),
-    (  2,  85,  0, "Roadside",              True  ),
-    (  5,  86,  0, "Roadside Desert",       True  ),
-    (  4,  87,  0, "Flowerbed",             True  ),
-    (  4,  88,  0, "Waste Ground",          True  ),
-    (  1,  89,  0, "Concrete",              True  ),
-    ( 12,  90,  0, "Office Desk",           True  ),
-    ( 12,  91,  0, "Shelf 711 1",           True  ),
-    ( 12,  92,  0, "Shelf 711 2",           True  ),
-    ( 12,  93,  0, "Shelf 711 3",           True  ),
-    ( 12,  94,  0, "Restuarant Table",      True  ),
-    ( 12,  95,  0, "Bar Table",             True  ),
-    (  5,  96,  0, "Underwater (lush)",     True  ),
-    (  5,  97,  0, "Underwater (barren)",   True  ),
-    (  5,  98,  0, "Underwater (coral)",    True  ),
-    (  5,  99,  0, "Underwater (deep)",     True  ),
-    (  4, 100,  0, "Riverbed",              True  ),
-    (  2, 101,  0, "Rubble",                True  ),
-    ( 12, 102,  0, "Bedroom Floor",         True  ),
-    ( 12, 103,  0, "Kitchen Floor",         True  ),
-    ( 12, 104,  0, "Livingroom Floor",      True  ),
-    ( 12, 105,  0, "Corridor Floor",        True  ),
-    ( 12, 106,  0, "711 Floor",             True  ),
-    ( 12, 107,  0, "Fast Food Floor",       True  ),
-    ( 12, 108,  0, "Skanky Floor",          True  ),
-    (  9, 109,  0, "Mountain",              True  ),
-    (  4, 110,  0, "Marsh",                 True  ),
-    ( 10, 111,  0, "Bushy",                 True  ),
-    ( 10, 112,  0, "Bushy (mix)",           True  ),
-    ( 10, 113,  0, "Bushy (dry)",           True  ),
-    ( 10, 114,  0, "Bushy (mid)",           True  ),
-    (  3, 115,  0, "Grass (wee flowers)",   True  ),
-    (  3, 116,  0, "Grass (dry, tall)",     True  ),
-    (  3, 117,  0, "Grass (lush, tall)",    True  ),
-    (  3, 118,  0, "Grass (green, mix)",    True  ),
-    (  3, 119,  0, "Grass (brown, mix)",    True  ),
-    (  3, 120,  0, "Grass (low)",           True  ),
-    (  3, 121,  0, "Grass (rocky)",         True  ),
-    (  3, 122,  0, "Grass (small trees)",   True  ),
-    (  4, 123,  0, "Dirt (rocky)",          True  ),
-    (  4, 124,  0, "Dirt (weeds)",          True  ),
-    (  3, 125,  0, "Grass (weeds)",         True  ),
-    (  4, 126,  0, "River Edge",            True  ),
-    (  1, 127,  0, "Poolside",              True  ),
-    (  4, 128,  0, "Forest (stumps)",       True  ),
-    (  4, 129,  0, "Forest (sticks)",       True  ),
-    (  4, 130,  0, "Forest (leaves)",       True  ),
-    (  5, 131,  0, "Desert Rocks",          True  ),
-    (  4, 132,  0, "Forest (dry)",          True  ),
-    (  4, 133,  0, "Sparse Flowers",        True  ),
-    (  2, 134,  0, "Building Site",         True  ),
-    (  1, 135,  0, "Docklands",             True  ),
-    (  1, 136,  0, "Industrial",            True  ),
-    (  1, 137,  0, "Industrial Jetty",      True  ),
-    (  1, 138,  0, "Concrete (litter)",     True  ),
-    (  1, 139,  0, "Alley Rubbish",         True  ),
-    (  2, 140,  0, "Junkyard Piles",        True  ),
-    (  4, 141,  0, "Junkyard Ground",       True  ),
-    (  4, 142,  0, "Dump",                  True  ),
-    (  5, 143,  0, "Cactus Dense",          True  ),
-    (  1, 144,  0, "Airport Ground",        True  ),
-    (  4, 145,  0, "Cornfield",             True  ),
-    (  3, 146,  0, "Grass (light)",         True  ),
-    (  3, 147,  0, "Grass (lighter)",       True  ),
-    (  3, 148,  0, "Grass (lighter 2)",     True  ),
-    (  3, 149,  0, "Grass (mid 1)",         True  ),
-    (  3, 150,  0, "Grass (mid 2)",         True  ),
-    (  3, 151,  0, "Grass (dark)",          True  ),
-    (  3, 152,  0, "Grass (dark 2)",        True  ),
-    (  3, 153,  0, "Grass (dirt mix)",      True  ),
-    (  9, 154,  0, "Riverbed (stone)",      True  ),
-    (  4, 155,  0, "Riverbed (shallow)",    True  ),
-    (  4, 156,  0, "Riverbed (weeds)",      True  ),
-    (  5, 157,  0, "Seaweed",               True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     74, "Sand",                 True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     75, "Sand (dense)",         True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     76, "Sand (arid)",          True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     77, "Sand (compact)",       True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     78, "Sand (rocky)",         True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     79, "Sand (beach)",         True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     80, "Grass (short)",        True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     81, "Grass (meadow)",       True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,     82, "Grass (dry)",          True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     83, "Woodland",             True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     84, "Wood Dense",           True  ),
+    ( COL_GROUP.GRAVEL,   COL_FLAG_SA.NONE,     85, "Roadside",             True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     86, "Roadside Desert",      True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     87, "Flowerbed",            True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,     88, "Waste Ground",         True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,     89, "Concrete",             True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     90, "Office Desk",          True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     91, "Shelf 711 1",          True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     92, "Shelf 711 2",          True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     93, "Shelf 711 3",          True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     94, "Restuarant Table",     True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,     95, "Bar Table",            True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     96, "Underwater (lush)",    True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     97, "Underwater (barren)",  True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     98, "Underwater (coral)",   True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,     99, "Underwater (deep)",    True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    100, "Riverbed",             True  ),
+    ( COL_GROUP.GRAVEL,   COL_FLAG_SA.NONE,    101, "Rubble",               True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    102, "Bedroom Floor",        True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    103, "Kitchen Floor",        True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    104, "Livingroom Floor",     True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    105, "Corridor Floor",       True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    106, "711 Floor",            True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    107, "Fast Food Floor",      True  ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    108, "Skanky Floor",         True  ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,    109, "Mountain",             True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    110, "Marsh",                True  ),
+    ( COL_GROUP.BUSHES,   COL_FLAG_SA.NONE,    111, "Bushy",                True  ),
+    ( COL_GROUP.BUSHES,   COL_FLAG_SA.NONE,    112, "Bushy (mix)",          True  ),
+    ( COL_GROUP.BUSHES,   COL_FLAG_SA.NONE,    113, "Bushy (dry)",          True  ),
+    ( COL_GROUP.BUSHES,   COL_FLAG_SA.NONE,    114, "Bushy (mid)",          True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    115, "Grass (wee flowers)",  True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    116, "Grass (dry, tall)",    True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    117, "Grass (lush, tall)",   True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    118, "Grass (green, mix)",   True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    119, "Grass (brown, mix)",   True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    120, "Grass (low)",          True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    121, "Grass (rocky)",        True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    122, "Grass (small trees)",  True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    123, "Dirt (rocky)",         True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    124, "Dirt (weeds)",         True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    125, "Grass (weeds)",        True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    126, "River Edge",           True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    127, "Poolside",             True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    128, "Forest (stumps)",      True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    129, "Forest (sticks)",      True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    130, "Forest (leaves)",      True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,    131, "Desert Rocks",         True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    132, "Forest (dry)",         True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    133, "Sparse Flowers",       True  ),
+    ( COL_GROUP.GRAVEL,   COL_FLAG_SA.NONE,    134, "Building Site",        True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    135, "Docklands",            True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    136, "Industrial",           True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    137, "Industrial Jetty",     True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    138, "Concrete (litter)",    True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    139, "Alley Rubbish",        True  ),
+    ( COL_GROUP.GRAVEL,   COL_FLAG_SA.NONE,    140, "Junkyard Piles",       True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    141, "Junkyard Ground",      True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    142, "Dump",                 True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,    143, "Cactus Dense",         True  ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    144, "Airport Ground",       True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    145, "Cornfield",            True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    146, "Grass (light)",        True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    147, "Grass (lighter)",      True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    148, "Grass (lighter 2)",    True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    149, "Grass (mid 1)",        True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    150, "Grass (mid 2)",        True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    151, "Grass (dark)",         True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    152, "Grass (dark 2)",       True  ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    153, "Grass (dirt mix)",     True  ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,    154, "Riverbed (stone)",     True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    155, "Riverbed (shallow)",   True  ),
+    ( COL_GROUP.DIRT,     COL_FLAG_SA.NONE,    156, "Riverbed (weeds)",     True  ),
+    ( COL_GROUP.SAND,     COL_FLAG_SA.NONE,    157, "Seaweed",              True  ),
 
     # Normal Materials (158-178)
-    ( 12, 158,  0, "Door",                  False ),
-    ( 12, 159,  0, "Plastic Barrier",       False ),
-    (  3, 160,  0, "Park Grass",            False ),
-    (  9, 161,  0, "Stairs (stone)",        False ),
-    (  8, 162,  0, "Stairs (metal)",        False ),
-    ( 12, 163,  0, "Stairs (carpet)",       False ),
-    (  8, 164,  0, "Floor (metal)",         False ),
-    (  1, 165,  0, "Floor (concrete)",      False ),
-    ( 12, 166,  0, "Bin Bag",               False ),
-    (  8, 167,  0, "Thin Metal Sheet",      False ),
-    (  8, 168,  0, "Metal Barrel",          False ),
-    ( 12, 169,  0, "Plastic Cone",          False ),
-    ( 12, 170,  0, "Plastic Dumpster",      False ),
-    (  8, 171,  0, "Metal Dumpster",        False ),
-    (  7, 172,  0, "Wood Picket Fence",     False ),
-    (  7, 173,  0, "Wood Slatted Fence",    False ),
-    (  7, 174,  0, "Wood Ranch Fence",      False ),
-    (  6, 175,  0, "Unbreakable Glass",     False ),
-    ( 12, 176,  0, "Hay Bale",              False ),
-    ( 12, 177,  0, "Gore",                  False ),
-    ( 12, 178,  0, "Rail Track",            False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    158, "Door",                 False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    159, "Plastic Barrier",      False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_SA.NONE,    160, "Park Grass",           False ),
+    ( COL_GROUP.ROCK,     COL_FLAG_SA.NONE,    161, "Stairs (stone)",       False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,    162, "Stairs (metal)",       False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    163, "Stairs (carpet)",      False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,    164, "Floor (metal)",        False ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_SA.NONE,    165, "Floor (concrete)",     False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    166, "Bin Bag",              False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,    167, "Thin Metal Sheet",     False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,    168, "Metal Barrel",         False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    169, "Plastic Cone",         False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    170, "Plastic Dumpster",     False ),
+    ( COL_GROUP.METAL,    COL_FLAG_SA.NONE,    171, "Metal Dumpster",       False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,    172, "Wood Picket Fence",    False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,    173, "Wood Slatted Fence",   False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_SA.NONE,    174, "Wood Ranch Fence",     False ),
+    ( COL_GROUP.GLASS,    COL_FLAG_SA.NONE,    175, "Unbreakable Glass",    False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    176, "Hay Bale",             False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    177, "Gore",                 False ),
+    ( COL_GROUP.MISC,     COL_FLAG_SA.NONE,    178, "Rail Track",           False ),
 
     # Vehicle Presets
-    ( 13,  63,  0, "Body",                  False ),
-    ( 13,  63,  2, "Boot",                  False ),
-    ( 13,  63,  1, "Bonnet",                False ),
-    ( 13,  45, 19, "Windshield",            False ),
-    ( 13,  63,  3, "Bumper Front",          False ),
-    ( 13,  63,  4, "Bumper Rear",           False ),
-    ( 13,  63,  5, "Door Front Left",       False ),
-    ( 13,  63,  6, "Door Front Right",      False ),
-    ( 13,  63,  7, "Door Rear Left",        False ),
-    ( 13,  63,  8, "Door Rear Right",       False ),
-    ( 13,  63,  9, "Wing Front Left",       False ),
-    ( 13,  63, 10, "Wing Front Right",      False ),
-    ( 13,  63, 11, "Wing Rear Left",        False ),
-    ( 13,  63, 12, "Wing Rear Right",       False ),
-    ( 13,  64,  0, "Flying Part",           False ),
-    ( 13,  65,  0, "Moving Part",           False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.BODY,     63, "Body",                 False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.BOOT,     63, "Boot",                 False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.HOOD,     63, "Bonnet",               False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.WIND_SH,  45, "Windshield",           False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.BUMP_F,   63, "Bumper Front",         False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.BUMP_R,   63, "Bumper Rear",          False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.DOOR_FL,  63, "Door Front Left",      False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.DOOR_FR,  63, "Door Front Right",     False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.DOOR_RL,  63, "Door Rear Left",       False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.DOOR_RR,  63, "Door Rear Right",      False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.WING_FL,  63, "Wing Front Left",      False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.WING_FR,  63, "Wing Front Right",     False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.WING_RL,  63, "Wing Rear Left",       False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.WING_RR,  63, "Wing Rear Right",      False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.NONE,     64, "Flying Part",          False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_SA.NONE,     65, "Moving Part",          False ),
 ]
 
 
@@ -214,84 +273,80 @@ COL_PRESET_SA = [
 # VICE CITY
 # --------------------------------------------------
 
+class COL_FLAG_VC(IntEnum):
+    NONE    =  0
+
+    BODY    =  0
+    HOOD    =  1
+    BOOT    =  2
+    BUMP_F  =  3
+    BUMP_R  =  4
+    DOOR_FL =  5
+    DOOR_FR =  6
+    DOOR_RL =  7
+    DOOR_RR =  8
+    WING_FL =  9
+    WING_FR = 10
+    WING_RL = 11
+    WING_RR = 12
+    WIND_SH = 17
+
 COL_PRESET_VC = [
-    # group, material, flag, name, procedural
+    # group, flag, material, name, procedural
 
     # Normal Materials (0-34)
-    (  0,   0,  0, "Default",               False ),
-    (  0,   1,  0, "Street",                False ),
-    (  3,   2,  0, "Grass",                 False ),
-    (  4,   3,  0, "Mud",                   False ),
-    (  4,   4,  0, "Dirt",                  False ),
-    (  1,   5,  0, "Concrete",              False ),
-    (  8,   6,  0, "Aluminum",              False ),
-    (  6,   7,  0, "Glass",                 False ),
-    (  8,   8,  0, "Metal Pole",            False ),
-    ( 12,   9,  0, "Door",                  False ),
-    (  8,  10,  0, "Metal Sheet",           False ),
-    (  8,  11,  0, "Metal",                 False ),
-    (  8,  12,  0, "Small Metal Post",      False ),
-    (  8,  13,  0, "Large Metal Post",      False ),
-    (  8,  14,  0, "Medium Metal Post",     False ),
-    (  8,  15,  0, "Steel",                 False ),
-    (  8,  16,  0, "Fence",                 False ),
-    ( 12,  17,  0, "Unknown",               False ),
-    (  5,  18,  0, "Sand",                  False ),
-    ( 11,  19,  0, "Water",                 False ),
-    (  7,  20,  0, "Wooden Box",            False ),
-    (  7,  21,  0, "Wooden Lathes",         False ),
-    (  7,  22,  0, "Wood",                  False ),
-    (  8,  23,  0, "Metal Box 1",           False ),
-    (  8,  24,  0, "Metal Box 2",           False ),
-    ( 10,  25,  0, "Hedge",                 False ),
-    (  9,  26,  0, "Rock",                  False ),
-    (  8,  27,  0, "Metal Container",       False ),
-    (  8,  28,  0, "Metal Barrel",          False ),
-    ( 12,  29,  0, "Unknown",               False ),
-    (  8,  30,  0, "Metal Card Box",        False ),
-    ( 12,  31,  0, "Unknown",               False ),
-    (  8,  32,  0, "Gate/Bars",             False ),
-    (  5,  33,  0, "Sand 2",                False ),
-    (  3,  34,  0, "Grass 2",               False ),
+    ( COL_GROUP.ROAD,     COL_FLAG_VC.NONE,      0, "Default",              False ),
+    ( COL_GROUP.ROAD,     COL_FLAG_VC.NONE,      1, "Street",               False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_VC.NONE,      2, "Grass",                False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_VC.NONE,      3, "Mud",                  False ),
+    ( COL_GROUP.DIRT,     COL_FLAG_VC.NONE,      4, "Dirt",                 False ),
+    ( COL_GROUP.CONCRETE, COL_FLAG_VC.NONE,      5, "Concrete",             False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,      6, "Aluminum",             False ),
+    ( COL_GROUP.GLASS,    COL_FLAG_VC.NONE,      7, "Glass",                False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,      8, "Metal Pole",           False ),
+    ( COL_GROUP.MISC,     COL_FLAG_VC.NONE,      9, "Door",                 False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     10, "Metal Sheet",          False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     11, "Metal",                False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     12, "Small Metal Post",     False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     13, "Large Metal Post",     False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     14, "Medium Metal Post",    False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     15, "Steel",                False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     16, "Fence",                False ),
+    ( COL_GROUP.MISC,     COL_FLAG_VC.NONE,     17, "Unknown",              False ),
+    ( COL_GROUP.SAND,     COL_FLAG_VC.NONE,     18, "Sand",                 False ),
+    ( COL_GROUP.WATER,    COL_FLAG_VC.NONE,     19, "Water",                False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_VC.NONE,     20, "Wooden Box",           False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_VC.NONE,     21, "Wooden Lathes",        False ),
+    ( COL_GROUP.WOOD,     COL_FLAG_VC.NONE,     22, "Wood",                 False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     23, "Metal Box 1",          False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     24, "Metal Box 2",          False ),
+    ( COL_GROUP.BUSHES,   COL_FLAG_VC.NONE,     25, "Hedge",                False ),
+    ( COL_GROUP.ROCK,     COL_FLAG_VC.NONE,     26, "Rock",                 False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     27, "Metal Container",      False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     28, "Metal Barrel",         False ),
+    ( COL_GROUP.MISC,     COL_FLAG_VC.NONE,     29, "Unknown",              False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     30, "Metal Card Box",       False ),
+    ( COL_GROUP.MISC,     COL_FLAG_VC.NONE,     31, "Unknown",              False ),
+    ( COL_GROUP.METAL,    COL_FLAG_VC.NONE,     32, "Gate/Bars",            False ),
+    ( COL_GROUP.SAND,     COL_FLAG_VC.NONE,     33, "Sand 2",               False ),
+    ( COL_GROUP.GRASS,    COL_FLAG_VC.NONE,     34, "Grass 2",              False ),
 
     # Vehicle Presets
-    ( 13,   6,  0, "Body",                  False ),
-    ( 13,   6,  2, "Boot",                  False ),
-    ( 13,   6,  1, "Bonnet",                False ),
-    ( 13,   7, 17, "Windshield",            False ),
-    ( 13,   6,  3, "Bumper Front",          False ),
-    ( 13,   6,  4, "Bumper Rear",           False ),
-    ( 13,   6,  5, "Door Front Left",       False ),
-    ( 13,   6,  6, "Door Front Right",      False ),
-    ( 13,   6,  7, "Door Rear Left",        False ),
-    ( 13,   6,  8, "Door Rear Right",       False ),
-    ( 13,   6,  9, "Wing Front Left",       False ),
-    ( 13,   6, 10, "Wing Front Right",      False ),
-    ( 13,   6, 11, "Wing Rear Left",        False ),
-    ( 13,   6, 12, "Wing Rear Right",       False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.BODY,      6, "Body",                 False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.BOOT,      6, "Boot",                 False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.HOOD,      6, "Bonnet",               False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.WIND_SH,   7, "Windshield",           False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.BUMP_F,    6, "Bumper Front",         False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.BUMP_R,    6, "Bumper Rear",          False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.DOOR_FL,   6, "Door Front Left",      False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.DOOR_FR,   6, "Door Front Right",     False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.DOOR_RL,   6, "Door Rear Left",       False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.DOOR_RR,   6, "Door Rear Right",      False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.WING_FL,   6, "Wing Front Left",      False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.WING_FR,   6, "Wing Front Right",     False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.WING_RL,   6, "Wing Rear Left",       False ),
+    ( COL_GROUP.VEHICLE,  COL_FLAG_VC.WING_RR,   6, "Wing Rear Right",      False ),
 ]
-
-
-# --------------------------------------------------
-# GROUPS
-# --------------------------------------------------
-
-COL_PRESET_GROUP = {
-    0:  ["Road",     "303030"],
-    1:  ["Concrete", "909090"],
-    2:  ["Gravel",   "645E53"],
-    3:  ["Grass",    "92C032"],
-    4:  ["Dirt",     "775F40"],
-    5:  ["Sand",     "E7E17E"],
-    6:  ["Glass",    "A7E9FC"],
-    7:  ["Wood",     "936944"],
-    8:  ["Metal",    "BFC8D5"],
-    9:  ["Rock",     "AFAAA0"],
-    10: ["Bushes",   "2EA563"],
-    11: ["Water",    "6493E1"],
-    12: ["Misc",     "F1AB07"],
-    13: ["Vehicle",  "FFD4FD"]
-}
 
 
 # --------------------------------------------------
@@ -300,9 +355,8 @@ COL_PRESET_GROUP = {
 
 def _generate_sa_mats():
     result = {}
-    for group_id, mat_id, flag_id, name, is_proc in COL_PRESET_SA:
-        # Skip vehicle presets (group 13)
-        if group_id == 13:
+    for group_id, flag_id, mat_id, name, is_proc in COL_PRESET_SA:
+        if group_id == COL_GROUP.VEHICLE:
             continue
 
         result[mat_id] = [group_id, name]
@@ -311,9 +365,8 @@ def _generate_sa_mats():
 
 def _generate_vc_mats():
     result = {}
-    for group_id, mat_id, flag_id, name, is_proc in COL_PRESET_VC:
-        # Skip vehicle presets (group 13)
-        if group_id == 13:
+    for group_id, flag_id, mat_id, name, is_proc in COL_PRESET_VC:
+        if group_id == COL_GROUP.VEHICLE:
             continue
 
         result[mat_id] = [group_id, name]
