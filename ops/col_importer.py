@@ -136,6 +136,7 @@ class col_importer:
 
             mat = bpy.data.materials.new(name)
             mat.dff.col_mat_index   = surface.material
+            mat.dff.col_flags       = surface.flags
             mat.dff.col_brightness  = surface.brightness
             mat.dff.col_day_light   = surface.light & 0xf
             mat.dff.col_night_light = (surface.light >> 4) & 0xf
