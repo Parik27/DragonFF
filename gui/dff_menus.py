@@ -10,7 +10,11 @@ from .col_ot import EXPORT_OT_col, \
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 from .map_ot import EXPORT_OT_ipl_cull
 from .cull_menus import CULLObjectProps, CULLMenus
+from .col_menus import draw_col_preset_helper
+from .col_menus import COLMaterialEnumProps
 from ..gtaLib.data import presets
+from ..ops.exporter_common import (
+    clear_extension, extract_texture_info_from_name)
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -58,10 +62,48 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
     bl_region_type = "WINDOW"
     bl_context     = "material"
 
-    ambient     :  bpy.props.BoolProperty(
-        name        = "Export Material",
-        default     = False
-    )
+    ########################################################
+    def update_texture(self, context):
+        if not hasattr(context, 'material'):
+            return
+
+        mat = context.material
+        if not mat or not mat.node_tree:
+            return
+
+        principled = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+        if not principled:
+            return
+
+        image_node = None
+        for link in mat.node_tree.links:
+            if link.to_node == principled and link.to_socket.name == 'Base Color':
+                if link.from_node.type == 'TEX_IMAGE':
+                    image_node = link.from_node
+                    break
+
+        tex_name = mat.dff.tex_name
+
+        if tex_name:
+            image = bpy.data.images.get(tex_name)
+            if image:
+                if not image_node:
+                    image_node = mat.node_tree.nodes.new(type='ShaderNodeTexImage')
+                    mat.node_tree.links.new(image_node.outputs['Color'], principled.inputs['Base Color'])
+                    mat.node_tree.links.new(image_node.outputs['Alpha'], principled.inputs['Alpha'])
+
+                image_node.image = image
+
+                tex_label, _ = extract_texture_info_from_name(tex_name)
+                image_node.label = clear_extension(tex_label)
+        else:
+            if image_node:
+
+                for link in list(mat.node_tree.links):
+                    if link.from_node == image_node:
+                        mat.node_tree.links.remove(link)
+
+                mat.node_tree.nodes.remove(image_node)
 
     #######################################################
     def draw_col_menu(self, context):
@@ -71,17 +113,29 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         box = layout.box()
         box.label(text="Collision properties")
 
-        props = [
-            ["col_mat_index", "Material"],
-            ["col_flags", "Flags"],
-            ["col_brightness", "Brightness"],
-            ["col_day_light", "Day Light"],
-            ["col_night_light", "Night Light"],
-        ]
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Material")
+        split.prop(settings, "col_mat_index", text="")
 
-        for prop in props:
-            self.draw_labelled_prop(box.row(), settings, [prop[0]], prop[1])
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Flags")
+        split.prop(settings, "col_flags", text="")
 
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Brightness")
+        split.prop(settings, "col_brightness", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Light")
+        prop_row = split.row(align=True)
+        prop_row.prop(settings, "col_day_light", text="Day")
+        prop_row.prop(settings, "col_night_light", text="Night")
+
+        draw_col_preset_helper(layout, context)
 
     #######################################################
     def draw_labelled_prop(self, row, settings, props, label, text=""):
@@ -93,24 +147,31 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
     #######################################################
     def draw_texture_prop_box(self, context, box):
         settings = context.material.dff
-        box.label(text="Texture properties")
-        
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Texture")
+
+        prop_row = split.row(align=True)
+        prop_row.prop_search(settings, "tex_name", bpy.data, "images", text="", icon='IMAGE_DATA')
+        prop_row.operator("image.open", text="", icon='FILEBROWSER')
+
         split = box.row().split(factor=0.4)
         split.alignment = 'LEFT'
         split.label(text="Filtering")
         split.prop(settings, "tex_filters", text="")
-        
+
         split = box.row().split(factor=0.4)
         split.alignment = 'LEFT'
         split.label(text="Addressing")
-        prop_row = split.row(align=True)
+
+        prop_row = split.row(align=True)  
         prop_row.prop(settings, "tex_u_addr", text="")
         prop_row.prop(settings, "tex_v_addr", text="")
 
     #######################################################
     def draw_material_prop_box(self, context, box):
         settings = context.material.dff
-        box.label(text="Material properties")
 
         # This is for conveniently setting the base colour from the settings
         # without removing the texture node
@@ -265,14 +326,22 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
         layout = self.layout
         settings = context.material.dff
 
-        self.draw_material_prop_box (context, layout.box())
-        self.draw_texture_prop_box  (context, layout.box())
-        self.draw_bump_map_box      (context, layout.box())
-        self.draw_env_map_box       (context, layout.box())
-        self.draw_dual_tex_box      (context, layout.box())
-        self.draw_uv_anim_box       (context, layout.box())
-        self.draw_specl_box         (context, layout.box())
-        self.draw_refl_box          (context, layout.box())
+        box = layout.box()
+        box.label(text="Material Properties")
+        self.draw_material_prop_box (context, box.box())
+        self.draw_texture_prop_box  (context, box.box())
+
+        box = layout.box()
+        box.label(text="Material Effects")
+        self.draw_bump_map_box      (context, box.box())
+        self.draw_env_map_box       (context, box.box())
+        self.draw_dual_tex_box      (context, box.box())
+        self.draw_uv_anim_box       (context, box.box())
+
+        box = layout.box()
+        box.label(text="Rockstar Extensions")
+        self.draw_refl_box          (context, box.box())
+        self.draw_specl_box         (context, box.box())
 
     #######################################################
     # Callback function from preset_mat_cols enum
@@ -319,6 +388,7 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
             return
 
         self.draw_mesh_menu(context)
+
 
 #######################################################@
 class DFF_MT_ExportChoice(bpy.types.Menu):
@@ -490,12 +560,30 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Material Surface")
-        
-        box.prop(settings, "col_material", text="Material")
-        box.prop(settings, "col_flags", text="Flags")
-        box.prop(settings, "col_brightness", text="Brightness")
-        box.prop(settings, "col_day_light", text="Day Light")
-        box.prop(settings, "col_night_light", text="Night Light")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Material")
+        split.prop(settings, "col_material", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Flags")
+        split.prop(settings, "col_flags", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Brightness")
+        split.prop(settings, "col_brightness", text="")
+
+        split = box.row().split(factor=0.4)
+        split.alignment = 'LEFT'
+        split.label(text="Light")
+        prop_row = split.row(align=True)
+        prop_row.prop(settings, "col_day_light", text="Day")
+        prop_row.prop(settings, "col_night_light", text="Night")
+
+        draw_col_preset_helper(layout, context)
 
     #######################################################
     def draw_2dfx_menu(self, context):
@@ -618,6 +706,7 @@ class DFFMaterialProps(bpy.types.PropertyGroup):
     ambient            : bpy.props.FloatProperty  (name="Ambient Shading",   default=0.5)
     specular           : bpy.props.FloatProperty  (name="Specular Lighting", default=0.5)
     diffuse            : bpy.props.FloatProperty  (name="Diffuse Intensity", default=0.5)
+    tex_name           : bpy.props.StringProperty (name="Texture", update=MATERIAL_PT_dffMaterials.update_texture)
     tex_filters        : bpy.props.EnumProperty  (items=texture_filters_items, default="0")
     tex_u_addr         : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
     tex_v_addr         : bpy.props.EnumProperty  (name="", items=texture_uv_addressing_items, default="0")
@@ -880,6 +969,9 @@ compatibiility with DFF Viewers"
 
     # CULL properties
     cull: bpy.props.PointerProperty(type=CULLObjectProps)
+
+    # COL properties
+    col_mat: bpy.props.PointerProperty(type=COLMaterialEnumProps)
 
     # Miscellaneous properties
     is_frame_locked : bpy.props.BoolProperty()

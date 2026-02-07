@@ -308,6 +308,9 @@ class OBJECT_OT_dff_add_collision_sphere(bpy.types.Operator, AddCollisionHelper)
 class FaceGroupsDrawer:
 
     _draw_3d_handler = None
+    _cached_batch = None  
+    _cached_mesh_id = None  
+    _cached_attr_hash = None
 
     #######################################################
     def get_draw_enabled(self):
@@ -339,68 +342,105 @@ class FaceGroupsDrawer:
             redraw_viewport()
 
     #######################################################
-    @staticmethod
-    def draw():
-        o = bpy.context.active_object
-        if o and o.select_get() and o.type == 'MESH' and o.data.attributes.get('face group'):
-            mesh = bpy.context.active_object.data
-            attr = mesh.attributes['face group'].data
-            if len(attr) == 0:
-                return
-            mesh.calc_loop_triangles()
-
-            # As the face groups are stored as face attributes, we'll generate unique vertices across the whole overlay
-            # because the colors of different faces can't be shared across vertices
-            size = 3 * len(mesh.loop_triangles)
-            vertices = [[0.0,0.0,0.0]] * size
-            vertex_colors = [(0.0,0.0,0.0,0.0)] * size
-            indices = list(range(size))
-            indices = [(i, i+1, i+2) for i in range(0, size, 3)]
-
-            # Each face group gets a random color, but set an explicit seed so the resulting color array remains
-            # deterministic across redraws
-            random.seed(10)
-            color = (0.0, 0.0, 0.0, 0.0)
-            grp = -1
-            idx = 0
-            for i, face in enumerate(mesh.loop_triangles):
-                vertices[idx  ] = mesh.vertices[face.vertices[0]].co
-                vertices[idx+1] = mesh.vertices[face.vertices[1]].co
-                vertices[idx+2] = mesh.vertices[face.vertices[2]].co
-                if grp != attr[i].value:
-                    color = random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), 1.0
-                    grp = attr[i].value
-                vertex_colors[idx  ] = color
-                vertex_colors[idx+1] = color
-                vertex_colors[idx+2] = color
-                idx += 3
-
-            if bpy.app.version < (4, 0, 0):
-                shader = gpu.shader.from_builtin("3D_FLAT_COLOR")
-            else:
-                shader = gpu.shader.from_builtin("FLAT_COLOR")
-            batch = batch_for_shader(
-                shader, 'TRIS',
-                {"pos": vertices, "color": vertex_colors},
-                indices=indices,
-            )
-
-            # Draw the overlay over the existing collision object faces. There will be z-fighting as the object
-            # location falls further from the origin, which it especially does for map objects. Unfortunate, but
-            # probably fine for a simple visualization of the face groups.
-            if bpy.app.version < (3, 4, 0):
-                bgl.glEnable(bgl.GL_DEPTH_TEST)
-                bgl.glDepthFunc(bgl.GL_LEQUAL)
-            else:
-                gpu.state.depth_test_set('LESS_EQUAL')
-                gpu.state.depth_mask_set(True)
-
-            gpu.matrix.push()
-            gpu.matrix.multiply_matrix(bpy.context.active_object.matrix_local)
-            batch.draw(shader)
-            gpu.matrix.pop()
-
-            if bpy.app.version < (3, 4, 0):
-                bgl.glDisable(bgl.GL_DEPTH_TEST)
-            else:
-                gpu.state.depth_mask_set(False)
+    @staticmethod  
+    def draw():  
+        o = bpy.context.active_object  
+        if not (o and o.select_get() and o.type == 'MESH' and o.data.attributes.get('face group')):  
+            # Clear cache when not drawing  
+            FaceGroupsDrawer._cached_batch = None  
+            FaceGroupsDrawer._cached_mesh_id = None  
+            FaceGroupsDrawer._cached_attr_hash = None  
+            return  
+        
+        mesh = o.data  
+        attr = mesh.attributes['face group'].data  
+        if len(attr) == 0:  
+            return  
+        
+        # Check if we can use cached batch  
+        current_mesh_id = id(mesh)  
+        current_attr_hash = hash(tuple(f.value for f in attr))  
+        
+        if (FaceGroupsDrawer._cached_batch and   
+            FaceGroupsDrawer._cached_mesh_id == current_mesh_id and  
+            FaceGroupsDrawer._cached_attr_hash == current_attr_hash):  
+            
+            # Use cached batch  
+            if bpy.app.version < (4, 0, 0):  
+                shader = gpu.shader.from_builtin("3D_FLAT_COLOR")  
+            else:  
+                shader = gpu.shader.from_builtin("FLAT_COLOR")  
+            
+            # Set up depth test and draw  
+            if bpy.app.version < (3, 4, 0):  
+                bgl.glEnable(bgl.GL_DEPTH_TEST)  
+                bgl.glDepthFunc(bgl.GL_LEQUAL)  
+            else:  
+                gpu.state.depth_test_set('LESS_EQUAL')  
+                gpu.state.depth_mask_set(True)  
+            
+            gpu.matrix.push()  
+            gpu.matrix.multiply_matrix(o.matrix_local)  
+            FaceGroupsDrawer._cached_batch.draw(shader)  
+            gpu.matrix.pop()  
+            
+            if bpy.app.version < (3, 4, 0):  
+                bgl.glDisable(bgl.GL_DEPTH_TEST)  
+            else:  
+                gpu.state.depth_mask_set(False)  
+            return  
+        
+        # Rebuild cache
+        mesh.calc_loop_triangles()  
+        size = 3 * len(mesh.loop_triangles)  
+        vertices = [[0.0,0.0,0.0]] * size  
+        vertex_colors = [(0.0,0.0,0.0,0.0)] * size  
+        indices = [(i, i+1, i+2) for i in range(0, size, 3)]  
+        
+        random.seed(10)  
+        color = (0.0, 0.0, 0.0, 0.0)  
+        grp = -1  
+        idx = 0  
+        for i, face in enumerate(mesh.loop_triangles):  
+            vertices[idx  ] = mesh.vertices[face.vertices[0]].co  
+            vertices[idx+1] = mesh.vertices[face.vertices[1]].co  
+            vertices[idx+2] = mesh.vertices[face.vertices[2]].co  
+            if grp != attr[i].value:  
+                color = random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), random.uniform(0.2, 1.0), 1.0  
+                grp = attr[i].value  
+            vertex_colors[idx  ] = color  
+            vertex_colors[idx+1] = color  
+            vertex_colors[idx+2] = color  
+            idx += 3  
+        
+        if bpy.app.version < (4, 0, 0):  
+            shader = gpu.shader.from_builtin("3D_FLAT_COLOR")  
+        else:  
+            shader = gpu.shader.from_builtin("FLAT_COLOR")  
+        
+        # Cache the batch  
+        FaceGroupsDrawer._cached_batch = batch_for_shader(  
+            shader, 'TRIS',  
+            {"pos": vertices, "color": vertex_colors},  
+            indices=indices,  
+        )  
+        FaceGroupsDrawer._cached_mesh_id = current_mesh_id  
+        FaceGroupsDrawer._cached_attr_hash = current_attr_hash  
+        
+        # Draw
+        if bpy.app.version < (3, 4, 0):  
+            bgl.glEnable(bgl.GL_DEPTH_TEST)  
+            bgl.glDepthFunc(bgl.GL_LEQUAL)  
+        else:  
+            gpu.state.depth_test_set('LESS_EQUAL')  
+            gpu.state.depth_mask_set(True)  
+        
+        gpu.matrix.push()  
+        gpu.matrix.multiply_matrix(o.matrix_local)  
+        FaceGroupsDrawer._cached_batch.draw(shader)  
+        gpu.matrix.pop()  
+        
+        if bpy.app.version < (3, 4, 0):  
+            bgl.glDisable(bgl.GL_DEPTH_TEST)  
+        else:  
+            gpu.state.depth_mask_set(False)

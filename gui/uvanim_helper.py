@@ -1,4 +1,3 @@
-import bpy
 from bpy.types import Panel, Operator, PropertyGroup
 from bpy.props import IntProperty, EnumProperty, FloatProperty
 

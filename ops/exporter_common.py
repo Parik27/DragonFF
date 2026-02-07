@@ -14,13 +14,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from .col_ot import *
-from .dff_menus import *
-from .ext_2dfx_ot import *
-from .ext_2dfx_menus import *
-from .dff_ot import *
-from .map_ot import *
-from .map_menus import *
-from .gizmos import *
-from .uvanim_helper import *
-from .col_menus import *
+import re
+
+#######################################################
+def clear_extension(string):
+    k = string.rfind('.')
+    return string if k < 0 else string[:k]
+
+#######################################################
+def extract_texture_info_from_name(name):
+    """Extract texture info from TXD import naming pattern"""
+    pattern = r'^[^/]+\.txd/([^/]+)/(\d+)$'
+    match = re.match(pattern, name)
+    if match:
+        return match.group(1), int(match.group(2))
+    else:
+        return name, 0
