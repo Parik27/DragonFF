@@ -19,19 +19,15 @@ import bmesh
 import mathutils
 
 from bpy_extras import anim_utils
-from collections import OrderedDict
+
+from .exporter_common import (
+    clear_extension, extract_texture_info_from_name)
+from .col_exporter import export_col
 
 from ..gtaLib import dff
 from ..ops.ext_2dfx_exporter import ext_2dfx_exporter
 from ..ops.state import State
-from .col_exporter import export_col
 
-#######################################################
-def clear_extension(string):
-    
-    k = string.rfind('.')
-    return string if k < 0 else string[:k]
-    
 #######################################################
 class material_helper:
 
@@ -57,7 +53,7 @@ class material_helper:
         texture.filters = int(self.material.dff.tex_filters)
         texture.uv_addressing = int(self.material.dff.tex_u_addr) << 4 | int(self.material.dff.tex_v_addr)
 
-        # 2.8         
+        # 2.8
         if self.principled:
             if self.principled.base_color_texture.image is not None:
 
@@ -66,20 +62,19 @@ class material_helper:
 
                 # Use node label if it is a substring of image name, else
                 # use image name
-                
-                texture.name = clear_extension(
-                    node_label
-                    if node_label in image_name and node_label != ""
-                    else image_name
-                )
+                if node_label in image_name and node_label != "":
+                    image_name = node_label
+
+                texture_name, _ = extract_texture_info_from_name(image_name)
+                texture.name = clear_extension(texture_name)
                 return texture
             return None
 
         # Blender Internal
         try:
-            texture.name = clear_extension(
-                self.material.texture_slots[0].texture.image.name
-            )
+            image_name = self.material.texture_slots[0].texture.image.name
+            texture_name, _ = extract_texture_info_from_name(image_name)
+            texture.name = clear_extension(texture_name)
             return texture
 
         except BaseException:

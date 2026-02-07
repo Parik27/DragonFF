@@ -16,16 +16,13 @@
 
 import bpy
 import os
-import re
+
+from .exporter_common import (
+    clear_extension, extract_texture_info_from_name)
 
 from ..gtaLib import txd
 from ..gtaLib.txd import ImageEncoder
 from ..gtaLib.dff import NativePlatformType
-
-#######################################################
-def clear_extension(string):
-    k = string.rfind('.')
-    return string if k < 0 else string[:k]
 
 #######################################################
 class txd_exporter:
@@ -89,17 +86,6 @@ class txd_exporter:
 
     #######################################################
     @staticmethod
-    def extract_texture_info_from_name(name):
-        """Extract texture info from TXD import naming pattern"""
-        pattern = r'^[^/]+\.txd/([^/]+)/(\d+)$'
-        match = re.match(pattern, name)
-        if match:
-            return match.group(1), int(match.group(2))
-        else:
-            return name, 0
-
-    #######################################################
-    @staticmethod
     def get_used_textures(objects_to_scan=None):
         """Collect textures that are used in scene materials"""
         used_textures = set()
@@ -150,7 +136,7 @@ class txd_exporter:
                     continue
 
                 # Extract texture name from node.label (in case it follows TXD naming pattern)
-                texture_name, mipmap_level = self.extract_texture_info_from_name(image.name)
+                texture_name, mipmap_level = extract_texture_info_from_name(image.name)
 
                 # Skip mipmaps
                 if mipmap_level > 0:

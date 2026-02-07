@@ -382,6 +382,6 @@ groups = COL_PRESET_GROUP
 
 # Fallback material
 default = {
-    "group": 12,
+    "group": COL_GROUP.MISC,
     "material": 0
 }

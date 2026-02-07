@@ -10,9 +10,11 @@ from .col_ot import EXPORT_OT_col, \
 from .ext_2dfx_menus import EXT2DFXObjectProps, EXT2DFXMenus
 from .map_ot import EXPORT_OT_ipl_cull
 from .cull_menus import CULLObjectProps, CULLMenus
-from ..gtaLib.data import presets
 from .col_menus import draw_col_preset_helper
 from .col_menus import COLMaterialEnumProps
+from ..gtaLib.data import presets
+from ..ops.exporter_common import (
+    clear_extension, extract_texture_info_from_name)
 
 texture_filters_items = (
     ("0", "Disabled", ""),
@@ -62,6 +64,9 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
 
     ########################################################
     def update_texture(self, context):
+        if not hasattr(context, 'material'):
+            return
+
         mat = context.material
         if not mat or not mat.node_tree:
             return
@@ -88,7 +93,9 @@ class MATERIAL_PT_dffMaterials(bpy.types.Panel):
                     mat.node_tree.links.new(image_node.outputs['Alpha'], principled.inputs['Alpha'])
 
                 image_node.image = image
-                image_node.label = tex_name
+
+                tex_label, _ = extract_texture_info_from_name(tex_name)
+                image_node.label = clear_extension(tex_label)
         else:
             if image_node:
 
