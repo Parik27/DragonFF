@@ -51,7 +51,8 @@ class DffFileImporter:
                  image_ext = "png", materials_naming = "DEF",
                  connect_bones = False, use_mat_split = False,
                  remove_doubles = False, create_backfaces = False,
-                 import_normals = False, group_materials = False):
+                 import_normals = False, group_materials = False,
+                 import_breakable = True):
 
         # Variables
         self.dff = dff_file
@@ -78,6 +79,31 @@ class DffFileImporter:
         self.create_backfaces = create_backfaces
         self.import_normals = import_normals
         self.group_materials = group_materials
+        self.import_breakable = import_breakable
+
+    #######################################################
+    def find_texture_image(name):
+        self = dff_importer
+        from bpy_extras.image_utils import load_image
+
+        if name in self.txd_images:
+            return self.txd_images[name][0]
+
+        if self.image_ext:
+            path = os.path.dirname(self.file_name)
+            image_name = "%s.%s" % (name, self.image_ext)
+
+            # see name.None note above / Share loaded images among imported materials
+            if (image_name in bpy.data.images and
+                    path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
+                return bpy.data.images[image_name]
+
+            return load_image(image_name,
+                            path,
+                            recursive=False,
+                            place_holder=True,
+                            check_existing=True
+                            )
 
     #######################################################
     # TODO: Cyclomatic Complexity too high
@@ -140,22 +166,46 @@ class DffFileImporter:
             else:
                 faces = geom.triangles
 
+            has_normals = geom.has_normals
             use_face_loops = geom.native_platform_type == dff.NativePlatformType.GC
-            use_custom_normals = geom.has_normals and self.import_normals
+            use_custom_normals = has_normals and self.import_normals
+
             last_face_index = len(faces) - 1
-            vert_index = -1
-            skipped_backfaces_num = 0
+            skipped_double_faces_num = 0
+            face_map = {}
+            double_faces = set()
+
+            if self.create_backfaces and not has_normals:
+                if bpy.app.version >= (4, 4, 0):
+                    backface_layer = bm.faces.layers.bool.new("backface")
+                else:
+                    backface_layer = None
 
             for fi, f in enumerate(faces):
+                vert_indices = (f.a, f.b, f.c)
+
+                # Skip a face with less than 3 vertices
+                if len(set(vert_indices)) < 3:
+                    continue
 
                 # Skip double face (keep the last one)
-                if fi < last_face_index:
+                # has_normals only
+                if has_normals and fi < last_face_index:
                     next_face = faces[fi + 1]
-                    if set((f.a, f.b, f.c)) == set((next_face.a, next_face.b, next_face.c)):
-                        vert_index += 3
+                    if set(vert_indices) == set((next_face.a, next_face.b, next_face.c)):
+                        skipped_double_faces_num += 1
                         continue
 
-                face_vertices = (f.a, f.b, f.c)
+                # Skip already created face
+                face_key = tuple(sorted(vert_indices))
+                if face_key in face_map:
+
+                    # Store double faces for normal calculation
+                    if not has_normals:
+                        double_faces.add(face_map[face_key])
+
+                    skipped_double_faces_num += 1
+                    continue
 
                 try:
                     face = bm.faces.new(
@@ -165,38 +215,22 @@ class DffFileImporter:
                             bm.verts[f.c]
                         ])
 
-                except ValueError:
+                except ValueError as e:
+                    print(e)
+                    continue
 
-                    # Skip a face with less than 3 vertices
-                    if len(set(face_vertices)) < 3:
-                        vert_index += 3
-                        continue
-
-                    # Create backface
-                    if self.create_backfaces:
-                        bm.verts.new(geom.vertices[f.a])
-                        bm.verts.new(geom.vertices[f.b])
-                        bm.verts.new(geom.vertices[f.c])
-
-                        bm.verts.ensure_lookup_table()
-                        bm.verts.index_update()
-
-                        face = bm.faces.new(bm.verts[-3:])
-
-                    else:
-                        skipped_backfaces_num += 1
-                        vert_index += 3
-                        continue
+                face_map[face_key] = face
 
                 if len(mat_indices) > 0:
                     face.material_index = mat_indices[f.material]
 
+                if use_face_loops:
+                    vert_index = fi * 3
+                    vert_indices = (vert_index, vert_index + 1, vert_index + 2)
+
                 # Setting UV coordinates
                 for loop_index, loop in enumerate(face.loops):
-                    if use_face_loops:
-                        vert_index += 1
-                    else:
-                        vert_index = face_vertices[loop_index]
+                    vert_index = vert_indices[loop_index]
                     for i, layer in enumerate(geom.uv_layers):
 
                         bl_layer = uv_layers[i]
@@ -227,10 +261,39 @@ class DffFileImporter:
 
                 face.smooth = True
 
-            bm.to_mesh(mesh)
+            if double_faces:
+                double_faces = list(double_faces)
 
-            if skipped_backfaces_num:
-                print('Skipped %d backfaces for atomic %d' % (skipped_backfaces_num, atomic_index))
+                # Calculate normals
+                bmesh.ops.recalc_face_normals(bm, faces=double_faces)
+
+                bm_welded = bm.copy()
+                bm_welded.faces.ensure_lookup_table()
+                face_pairs = [(face, bm_welded.faces[face.index]) for face in double_faces]
+
+                bmesh.ops.remove_doubles(bm_welded, verts=bm_welded.verts, dist=0.0001)
+                bmesh.ops.recalc_face_normals(bm_welded, faces=bm_welded.faces)
+
+                for face, welded_face in face_pairs:
+                    if welded_face.is_valid and face.normal.dot(welded_face.normal) < 0.0:
+                        face.normal_flip()
+
+                bm_welded.free()
+
+                # Create backfaces
+                if self.create_backfaces:
+                    bmesh.ops.duplicate(bm, geom=double_faces)
+                    bmesh.ops.reverse_faces(bm, faces=double_faces)
+                    if backface_layer is not None:
+                        for face in double_faces:
+                            face[backface_layer] = True
+                    skipped_double_faces_num = 0
+
+            if skipped_double_faces_num:
+                print('Skipped %d double faces for atomic %d' % (skipped_double_faces_num, atomic_index))
+
+            bm.to_mesh(mesh)
+            bm.free()
 
             # Set loop normals
             if normals:
@@ -240,7 +303,7 @@ class DffFileImporter:
                 if bpy.app.version < (4, 1, 0):
                     mesh.use_auto_smooth = True
 
-            mesh['dragon_normals'] = geom.has_normals
+            mesh['dragon_normals'] = has_normals
             mesh.update()
 
             # Import materials and add the mesh to the meshes list
@@ -296,7 +359,21 @@ class DffFileImporter:
                 self.meshes[atomic.frame] = [obj]
                 self.delta_morph[atomic.frame] = [geom.extensions.get('delta_morph')]
 
-                
+            # Create breakable model
+            if self.import_breakable and 'breakable_model' in geom.extensions:
+                breakable_obj = self.create_breakable_model_object(geom.extensions['breakable_model'])
+
+                if breakable_obj:
+                    breakable_obj.name = f'{frame.name}_breakable'
+                    breakable_obj.parent = obj
+
+                    breakable_collection = bpy.data.collections.get('Breakable') or create_collection('Breakable')
+                    link_object(breakable_obj, breakable_collection)
+                    hide_object(breakable_obj)
+
+                obj.dff.export_breakable = True
+                obj.dff.breakable_object = breakable_obj
+
     #######################################################
     def set_empty_draw_properties(self, empty):
         empty.empty_display_type = 'CUBE'
@@ -327,29 +404,56 @@ class DffFileImporter:
             name = "glass"
 
         colors = {
-            (255, 60, 0, 255): "right rear light",
-            (185, 255, 0, 255): "left rear light",
-            (0, 255, 200, 255): "right front light",
-            (255, 175, 0, 255): "left front light",
-            (255, 0, 255, 255): "fourth",
-            (0, 255, 255, 255): "third",
-            (255, 0, 175, 255): "secondary",
-            (60, 255, 0, 255): "primary",
-            (184, 255, 0, 255): "breaklight l",
-            (255, 59, 0, 255): "breaklight r",
-            (255, 173, 0, 255): "revlight L",
-            (0, 255, 198, 255): "revlight r",
-            (255, 174, 0, 255): "foglight l",
-            (0, 255, 199, 255): "foglight r",
-            (183, 255, 0, 255): "indicator lf",
-            (255, 58, 0, 255): "indicator rf",
-            (182, 255, 0, 255): "indicator lm",
-            (255, 57, 0, 255): "indicator rm",
-            (181, 255, 0, 255): "indicator lr",
-            (255, 56, 0, 255): "indicator rr",
-            (0, 16, 255, 255): "light night",
-            (0, 17, 255, 255): "light all-day",
-            (0, 18, 255, 255): "default day"
+            ( 60, 255,   0, 255) : "primary",
+            (255,   0, 175, 255) : "secondary",
+            (  0, 255, 255, 255) : "tertiary",
+            (255,   0, 255, 255) : "quaternary",
+            (255, 175,   0, 255) : "headlight lf",
+            (  0, 255, 200, 255) : "headlight rf",
+            (185, 255,   0, 255) : "taillight lr",
+            (255,  60,   0, 255) : "taillight rr",
+            (  0,  18, 255, 255) : "light constant",
+            (  0,  16, 255, 255) : "light night",
+            (  0,  17, 255, 255) : "light day",
+            (184, 255,   0, 255) : "brake l",
+            (255,  59,   0, 255) : "brake r",
+            (255, 200,   5, 255) : "brake l na",
+            (255, 200,   6, 255) : "brake r na",
+            (255, 173,   0, 255) : "reverse l",
+            (  0, 255, 198, 255) : "reverse r",
+            (255, 174,   0, 255) : "foglight l",
+            (  0, 255, 199, 255) : "foglight r",
+            (255, 200,   1, 255) : "side l",
+            (255, 200,   2, 255) : "side r",
+            (255, 200,   3, 255) : "stt l",
+            (255, 200,   4, 255) : "stt r",
+            (255, 200,   7, 255) : "spotlight",
+            (183, 255,   0, 255) : "indicator lf",
+            (255,  58,   0, 255) : "indicator rf",
+            (182, 255,   0, 255) : "indicator lm",
+            (255,  57,   0, 255) : "indicator rm",
+            (181, 255,   0, 255) : "indicator lr",
+            (255,  56,   0, 255) : "indicator rr",
+            (255, 199,   1, 255) : "strobelight 1",
+            (255, 199,   2, 255) : "strobelight 2",
+            (255, 199,   3, 255) : "strobelight 3",
+            (255, 199,   4, 255) : "strobelight 4",
+            (255, 199,   5, 255) : "strobelight 5",
+            (255, 199,   6, 255) : "strobelight 6",
+            (255, 199,   7, 255) : "strobelight 7",
+            (255, 199,   8, 255) : "strobelight 8",
+            (255, 200, 100, 255) : "dash engine on",
+            (255, 200, 101, 255) : "dash engine broken",
+            (255, 200, 102, 255) : "dash fog light",
+            (255, 200, 103, 255) : "dash high beam",
+            (255, 200, 104, 255) : "dash low beam",
+            (255, 200, 105, 255) : "dash turn left",
+            (255, 200, 106, 255) : "dash turn right",
+            (255, 200, 107, 255) : "dash siren",
+            (255, 200, 108, 255) : "dash boot",
+            (255, 200, 109, 255) : "dash bonnet",
+            (255, 200, 110, 255) : "dash door",
+            (255, 200, 111, 255) : "dash roof"
         }
 
         for color in colors:
@@ -359,9 +463,12 @@ class DffFileImporter:
         return name if name else fallback
         
     ##################################################################
-    # TODO: MatFX: Dual Textures
+
     def import_materials(self, geometry, frame, mesh, mat_order):
         from bpy_extras.image_utils import load_image
+
+        if not geometry.materials:
+            return
 
         # Refactored
         for index, mat_idx in enumerate(mat_order):
@@ -385,69 +492,28 @@ class DffFileImporter:
             # Loading Texture
             if material.is_textured == 1:
                 texture = material.textures[0]
-                image   = None
-
-                if texture.name in self.txd_images:
-                    image = self.txd_images[texture.name][0]
-
-                elif self.image_ext:
-                    path    = os.path.dirname(self.image_search_dir)
-                    image_name = "%s.%s" % (texture.name, self.image_ext)
-
-                    # name.None shouldn't exist, lol / Share loaded images among imported materials
-                    if (image_name in bpy.data.images and
-                            path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                        image = bpy.data.images[image_name]
-                    else:
-                        image = load_image(image_name,
-                                        path,
-                                        recursive=False,
-                                        place_holder=True,
-                                        check_existing=True
-                                        )
+                image = self.find_texture_image(texture.name)
                 helper.set_texture(image, texture.name, texture.filters, texture.uv_addressing)
 
-            # Normal Map
+            # Bump Map
             if 'bump_map' in material.plugins:
                 mat.dff.export_bump_map = True
                 
                 for bump_fx in material.plugins['bump_map']:
 
-                    texture = None
                     if bump_fx.height_map is not None:
-                        texture = bump_fx.height_map
+                        # Store height map texture name internally
+                        mat.dff.height_map_tex = bump_fx.height_map.name
+                        
                         if bump_fx.bump_map is not None:
+                            # Both height and bump maps present - use diffuse alpha
                             mat.dff.bump_map_tex = bump_fx.bump_map.name
+                            mat.dff.bump_dif_alpha = True
+                            mat.dff.bump_map_intensity = bump_fx.intensity
 
                     elif bump_fx.bump_map is not None:
-                        texture = bump_fx.bump_map
-
-                    if texture:
-                        image = None
-
-                        if texture.name in self.txd_images:
-                            image = self.txd_images[texture.name][0]
-
-                        else:
-                            path = os.path.dirname(self.image_search_dir)
-                            image_name = "%s.%s" % (texture.name, self.image_ext)
-
-                            # see name.None note above / Share loaded images among imported materials
-                            if (image_name in bpy.data.images and
-                                    path == bpy.path.abspath(bpy.data.images[image_name].filepath)):
-                                image = bpy.data.images[image_name]
-                            else:
-                                image = load_image(image_name,
-                                                path,
-                                                recursive=False,
-                                                place_holder=True,
-                                                check_existing=True
-                                               )
-
-                        helper.set_normal_map(image,
-                                              texture.name,
-                                              bump_fx.intensity
-                        )
+                        mat.dff.bump_map_tex = bump_fx.bump_map.name
+                        mat.dff.bump_map_intensity = bump_fx.intensity
 
             # Surface Properties
             props = None
@@ -464,6 +530,11 @@ class DffFileImporter:
             if 'env_map' in material.plugins:
                 plugin = material.plugins['env_map'][0]
                 helper.set_environment_map(plugin)
+
+            # Dual Texture
+            if 'dual' in material.plugins:
+                plugin = material.plugins['dual'][0]
+                helper.set_dual_texture(plugin)
 
             # Specular Material
             if 'spec' in material.plugins:
@@ -488,6 +559,16 @@ class DffFileImporter:
                     if uv_anim.name == plugin:
                         helper.set_uv_animation(uv_anim)
                         break
+                
+                # Detect if a dummy animation to force dual pass was used on export
+                if len(material.plugins['uv_anim']) > 1:  
+                    second_anim_name = material.plugins['uv_anim'][1]  
+                    for uv_anim in self.dff.uvanim_dict:  
+                        if (uv_anim.name == second_anim_name and   
+                            uv_anim.name == "DragonFF" and   
+                            uv_anim.node_to_uv[0] == 1):  
+                            helper.material.dff.force_dual_pass = True  
+                            break
                 
             # Add imported material to the object
             mesh.materials.append(helper.material)
@@ -668,6 +749,89 @@ class DffFileImporter:
                 obj.vertex_groups[bone].add([i], weight, 'ADD')
 
     #######################################################
+    def create_breakable_model_object(self, breakable_model):
+        if breakable_model.magic == 0:
+            return None
+
+        mesh = bpy.data.meshes.new("breakable")
+        bm = bmesh.new()
+
+        # Vertices
+        for v in breakable_model.positions:
+            bm.verts.new(v)
+
+        bm.verts.ensure_lookup_table()
+        bm.verts.index_update()
+
+        # Add UV Layer
+        uv_layer = bm.loops.layers.uv.new()
+
+        # Add Vertex Colors
+        if breakable_model.prelits:
+            vertex_color = bm.loops.layers.color.new()
+
+        # Faces
+        for f in breakable_model.triangles:
+            face_vertices = (f.a, f.b, f.c)
+
+            try:
+                face = bm.faces.new(
+                    [
+                        bm.verts[f.a],
+                        bm.verts[f.b],
+                        bm.verts[f.c]
+                    ])
+
+            except ValueError:
+                continue
+
+            face.material_index = f.material
+
+            # Setting UV coordinates
+            for loop_index, loop in enumerate(face.loops):
+                vert_index = face_vertices[loop_index]
+                uv_coords = breakable_model.uvs[vert_index]
+
+                loop[uv_layer].uv = (
+                    uv_coords.u,
+                    1 - uv_coords.v # Y coords are flipped in Blender
+                )
+
+                # Vertex colors
+                if breakable_model.prelits:
+                    loop[vertex_color] = [
+                        c / 255.0 for c in
+                        breakable_model.prelits[vert_index]
+                    ]
+
+        bm.to_mesh(mesh)
+        bm.free()
+
+        mesh.update()
+
+        # Create materials
+        for mat_idx, tex_name in enumerate(breakable_model.texture_names):
+            ambient_color = breakable_model.ambient_colors[mat_idx]
+
+            name = "%s.%d" % (self.clean_object_name(tex_name), mat_idx)
+            mat = bpy.data.materials.new(name)
+            mat.blend_method = 'CLIP'
+
+            helper = material_helper(mat)
+            helper.principled.base_color = ambient_color
+
+            image = self.find_texture_image(tex_name)
+            helper.set_texture(image, tex_name)
+
+            mesh.materials.append(helper.material)
+
+        breakable_obj = bpy.data.objects.new(mesh.name, mesh)
+        breakable_obj.dff.type = 'BRK'
+        breakable_obj.dff.breakable_pos_rule = str(breakable_model.pos_rule)
+
+        return breakable_obj
+
+    #######################################################
     def remove_object_doubles(self):
         for frame in self.meshes:
             for mesh in self.meshes[frame]:
@@ -687,6 +851,7 @@ class DffFileImporter:
                     modifier.use_edge_angle = False
                 
                 bm.to_mesh(mesh.data)
+                bm.free()
 
     #######################################################
     def link_obj_to_frame_bone(self, obj, frame_index):
@@ -721,6 +886,7 @@ class DffFileImporter:
                     for dm in delta_morph.entries:
                         sk = mesh.shape_key_add(name=dm.name)
                         sk.interpolation = 'KEY_LINEAR'
+                        sk.value = 0.0
 
                         positions, normals, prelits, uvs = dm.positions, dm.normals, dm.prelits, dm.uvs
                         for i, vi in enumerate(dm.indices):
@@ -838,9 +1004,14 @@ class DffFileImporter:
         self.import_frames()
         self.import_2dfx()
 
+        if dff_importer.hide_damage_parts:
+            for obj in self.objects.values():
+                if obj.name.lower().endswith(('_dam', '_vlo')):
+                    hide_object(obj)
+
         # Set imported version
         self.version = "0x%05x" % self.dff.rw_version
-        
+
         # Add collisions
         for collision in self.dff.collisions:
             col = import_col_mem(collision.data, self.collection_name, False)

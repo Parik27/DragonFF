@@ -129,12 +129,12 @@ class NativeWDGLGeometry:
             geometry.prelit_colors = self.prelits
 
         if self.bone_weights:
-            skin = geometry.extensions.get("skin") or SkinPLG()
+            skin = geometry.extensions.get("skin", SkinPLG())
             skin.vertex_bone_weights = self.bone_weights
             geometry.extensions["skin"] = skin
 
         if self.bone_indices:
-            skin = geometry.extensions.get("skin") or SkinPLG()
+            skin = geometry.extensions.get("skin", SkinPLG())
             skin.vertex_bone_indices = self.bone_indices
             geometry.extensions["skin"] = skin
 

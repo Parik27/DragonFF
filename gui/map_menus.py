@@ -294,7 +294,7 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     txd_pack : bpy.props.BoolProperty(
         name        = "Pack Images",
         description = "Pack images as embedded data into the .blend file",
-        default     = False
+        default     = True
     )
 
     read_mat_split  :  bpy.props.BoolProperty(
@@ -306,6 +306,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     create_backfaces:  bpy.props.BoolProperty(
         name        = "Create Backfaces",
         description = "Create backfaces by duplicating existing faces. Incompatible with Use Edge Split",
+        default     = False
+    )
+
+    import_breakable:  bpy.props.BoolProperty(
+        name        = "Import Breakable",
+        description = "Import Breakable Extension from the Geometry section",
         default     = False
     )
 
@@ -444,6 +450,7 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "skip_lod")
         col.prop(settings, "read_mat_split")
         col.prop(settings, "create_backfaces")
+        col.prop(settings, "import_breakable")
         col.prop(settings, "load_collisions")
         col.prop(settings, "load_cull")
 

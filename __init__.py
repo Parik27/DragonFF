@@ -68,6 +68,7 @@ _classes = [
     gui.CULLObjectProps,
     gui.IMPORT_OT_ParticleTXDNames,
     gui.DFFMaterialProps,
+    gui.COLMaterialEnumProps,
     gui.DFFObjectProps,
     gui.DFFCollectionProps,
     gui.MapImportPanel,
@@ -93,6 +94,10 @@ _classes = [
     gui.PedAttractor2DFXGizmoGroup,
     gui.RoadSign2DFXGizmoGroup,
     gui.Escalator2DFXGizmoGroup,
+    gui.UVAnimatorProperties,
+    gui.UV_OT_AnimateSpriteSheet,
+    gui.NODE_PT_UVAnimator,
+    gui.COLSceneProps
 ]
 
 #######################################################
@@ -109,6 +114,8 @@ def register():
     bpy.types.Material.dff = bpy.props.PointerProperty(type=gui.DFFMaterialProps)
     bpy.types.Object.dff = bpy.props.PointerProperty(type=gui.DFFObjectProps)
     bpy.types.Collection.dff = bpy.props.PointerProperty(type=gui.DFFCollectionProps)
+    bpy.types.Scene.dff_uv_animator_props = bpy.props.PointerProperty(type=gui.UVAnimatorProperties)
+    bpy.types.Scene.dff_col = bpy.props.PointerProperty(type=gui.COLSceneProps)
 
     bpy.types.TOPBAR_MT_file_import.append(gui.import_dff_func)
     bpy.types.TOPBAR_MT_file_export.append(gui.export_dff_func)
@@ -129,6 +136,8 @@ def unregister():
     del bpy.types.Material.dff
     del bpy.types.Object.dff
     del bpy.types.Collection.dff
+    del bpy.types.Scene.dff_uv_animator_props
+    del bpy.types.Scene.dff_col
 
     bpy.types.TOPBAR_MT_file_import.remove(gui.import_dff_func)
     bpy.types.TOPBAR_MT_file_export.remove(gui.export_dff_func)

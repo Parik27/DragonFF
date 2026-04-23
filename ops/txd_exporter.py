@@ -16,16 +16,13 @@
 
 import bpy
 import os
-import re
+
+from .exporter_common import (
+    clear_extension, extract_texture_info_from_name)
 
 from ..gtaLib import txd
 from ..gtaLib.txd import ImageEncoder
 from ..gtaLib.dff import NativePlatformType
-
-#######################################################
-def clear_extension(string):
-    k = string.rfind('.')
-    return string if k < 0 else string[:k]
 
 #######################################################
 class txd_exporter:
@@ -63,7 +60,7 @@ class txd_exporter:
         texture_native.mask = ""
         
         # Raster format flags for RGBA8888: format type (8888=5) at bit 8-11, no mipmaps, no palette
-        texture_native.raster_format_flags = (txd.RasterFormat.RASTER_8888 << 8) | 0x05
+        texture_native.raster_format_flags = txd.RasterFormat.RASTER_8888 << 8
         texture_native.d3d_format = txd.D3DFormat.D3D_8888
         texture_native.width = width
         texture_native.height = height
@@ -86,17 +83,6 @@ class txd_exporter:
         texture_native.pixels = [pixel_data]
         
         return texture_native
-
-    #######################################################
-    @staticmethod
-    def extract_texture_info_from_name(name):
-        """Extract texture info from TXD import naming pattern"""
-        pattern = r'^[^/]+\.txd/([^/]+)/(\d+)$'
-        match = re.match(pattern, name)
-        if match:
-            return match.group(1), int(match.group(2))
-        else:
-            return name, 0
 
     #######################################################
     @staticmethod
@@ -150,7 +136,7 @@ class txd_exporter:
                     continue
 
                 # Extract texture name from node.label (in case it follows TXD naming pattern)
-                texture_name, mipmap_level = self.extract_texture_info_from_name(image.name)
+                texture_name, mipmap_level = extract_texture_info_from_name(image.name)
 
                 # Skip mipmaps
                 if mipmap_level > 0:
@@ -209,7 +195,7 @@ class txd_exporter:
                 print(f"Exporting textures for object '{obj.name}' to {file_name}")
 
                 # Export textures used by this specific object only
-                self.export_txd([obj], file_name)
+                self.export_textures([obj], file_name)
                 selected_objects_num += 1
 
             print(f"Mass export completed for {selected_objects_num} objects")

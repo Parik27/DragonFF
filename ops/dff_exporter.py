@@ -18,19 +18,16 @@ import bpy
 import bmesh
 import mathutils
 
-from collections import OrderedDict
+from bpy_extras import anim_utils
+
+from .exporter_common import (
+    clear_extension, extract_texture_info_from_name)
+from .col_exporter import export_col
 
 from ..gtaLib import dff
 from ..ops.ext_2dfx_exporter import ext_2dfx_exporter
 from ..ops.state import State
-from .col_exporter import export_col
 
-#######################################################
-def clear_extension(string):
-    
-    k = string.rfind('.')
-    return string if k < 0 else string[:k]
-    
 #######################################################
 class material_helper:
 
@@ -56,7 +53,7 @@ class material_helper:
         texture.filters = int(self.material.dff.tex_filters)
         texture.uv_addressing = int(self.material.dff.tex_u_addr) << 4 | int(self.material.dff.tex_v_addr)
 
-        # 2.8         
+        # 2.8
         if self.principled:
             if self.principled.base_color_texture.image is not None:
 
@@ -65,20 +62,19 @@ class material_helper:
 
                 # Use node label if it is a substring of image name, else
                 # use image name
-                
-                texture.name = clear_extension(
-                    node_label
-                    if node_label in image_name and node_label != ""
-                    else image_name
-                )
+                if node_label in image_name and node_label != "":
+                    image_name = node_label
+
+                texture_name, _ = extract_texture_info_from_name(image_name)
+                texture.name = clear_extension(texture_name)
                 return texture
             return None
 
         # Blender Internal
         try:
-            texture.name = clear_extension(
-                self.material.texture_slots[0].texture.image.name
-            )
+            image_name = self.material.texture_slots[0].texture.image.name
+            texture_name, _ = extract_texture_info_from_name(image_name)
+            texture.name = clear_extension(texture_name)
             return texture
 
         except BaseException:
@@ -87,53 +83,39 @@ class material_helper:
     #######################################################
     def get_surface_properties(self):
 
-        if self.principled:
-            specular = self.principled.specular
-            diffuse = self.principled.roughness
-            ambient = self.material.dff.ambient
-            
-        else:
+        ambient  = self.material.dff.ambient
+        specular = self.material.dff.specular
+        diffuse  = self.material.dff.diffuse
 
-            specular = self.material.specular_intensity
-            diffuse  = self.material.diffuse_intensity
-            ambient  = self.material.ambient
-            
         return dff.GeomSurfPro(ambient, specular, diffuse)
 
     #######################################################
-    def get_normal_map(self):
+    def get_bump_map(self):
 
         bump_texture = None
-        height_texture = dff.Texture()
+        height_texture = None
 
         if not self.material.dff.export_bump_map:
             return None
+
+        bump_texture_name = self.material.dff.bump_map_tex
+        intensity = self.material.dff.bump_map_intensity
+        bump_dif_alpha = self.material.dff.bump_dif_alpha
+
+        base_color_texture = None
+        if bump_dif_alpha:
+            base_color_texture = self.get_texture()
+
+        # Create bump texture (may have empty name when use diffuse alpha is set)
+        bump_texture = dff.Texture()
+        bump_texture.name = bump_texture_name
         
-        # 2.8
-        if self.principled:
-            
-            if self.principled.normalmap_texture.image is not None:
-
-                bump_texture = dff.Texture()
-                
-                node_label = self.principled.node_normalmap.label
-                image_name = self.principled.normalmap_texture.image.name
-
-                bump_texture.name = clear_extension(
-                    node_label
-                    if node_label in image_name and node_label != ""
-                    else image_name
-                )
-                intensity = self.principled.normalmap_strength
-
-        height_texture.name = self.material.dff.bump_map_tex
-        if height_texture.name == "":
-            height_texture = None
-
-        if bump_texture is not None:
-            return dff.BumpMapFX(intensity, height_texture, bump_texture)
-
-        return None
+        # If diffuse alpha is checked use material texture as heightmap
+        if bump_dif_alpha and base_color_texture:
+            height_texture = dff.Texture()
+            height_texture.name = base_color_texture.name
+        
+        return dff.BumpMapFX(intensity, height_texture, bump_texture)
 
     #######################################################
     def get_environment_map(self):
@@ -150,6 +132,22 @@ class material_helper:
         texture.filters = 0
         
         return dff.EnvMapFX(coef, use_fb_alpha, texture)
+
+    #######################################################
+    def get_dual_texture(self):
+
+        if not self.material.dff.export_dual_tex:
+            return None
+
+        texture_name = self.material.dff.dual_tex
+        src_blend    = int(self.material.dff.dual_src_blend)
+        dst_blend    = int(self.material.dff.dual_dst_blend)
+
+        texture = dff.Texture()
+        texture.name = texture_name
+        texture.filters = 0
+        
+        return dff.DualFX(src_blend, dst_blend, texture)
 
     #######################################################
     def get_specular_material(self):
@@ -201,146 +199,128 @@ class material_helper:
         if not anim_data:
             return None
 
+        # Check if action exists
+        action = anim_data.action
+        if not action:
+            return None
+
+        if bpy.app.version < (4, 4, 0):
+            action_fcurves = action.fcurves
+
+        else:
+            # Check if action slot exists
+            action_slot = anim_data.action_slot
+            if not action_slot:
+                return None
+
+            channelbag = anim_utils.action_get_channelbag_for_slot(action, action_slot)
+            action_fcurves = channelbag.fcurves
+
         fps = bpy.context.scene.render.fps
 
-        anim = dff.UVAnim()
-        anim.name = self.material.dff.animation_name
-
-        # Multiple keyframes may contain the same time,
-        # so time_inc is added for the key
-        keyframes_dict = {} # (time, time_inc): [(val, is_constant_interpolation)] * 4
-
         mapping = self.principled.base_color_texture.node_mapping_get()
-        default_values = (
-            mapping.inputs['Scale'].default_value[0],
-            mapping.inputs['Scale'].default_value[1],
-            mapping.inputs['Location'].default_value[0],
-            mapping.inputs['Location'].default_value[1],
-        )
-
         data_path_offset = {
-            f'nodes["{mapping.name}"].inputs[1].default_value': 2,
-            f'nodes["{mapping.name}"].inputs[3].default_value': 0,
+            f'nodes["{mapping.name}"].inputs[2].default_value': 0,  # rot z
+            f'nodes["{mapping.name}"].inputs[3].default_value': 1,  # scale x/y
+            f'nodes["{mapping.name}"].inputs[1].default_value': 4,  # pos x/y
         }
 
-        # Set keyframes_dict
-        for curve in anim_data.action.fcurves:
+        all_times = set()
+        keyframe_data = {}
 
-            # Rw doesn't support Z texture coordinate.
-            if curve.array_index > 1:
-                continue
-
+        for curve in action_fcurves:
             if curve.data_path not in data_path_offset:
                 continue
 
-            off = data_path_offset[curve.data_path]
+            offset = data_path_offset[curve.data_path]
+            if offset == 0 and curve.array_index != 2:
+                continue
 
-            for frame in curve.keyframe_points:
+            if curve.array_index > 1:
+                continue
 
-                time, val = frame.co
-                time = time / fps
-                idx = off + curve.array_index
-                is_constant = frame.interpolation == 'CONSTANT'
+            for keyframe in curve.keyframe_points:
+                time = keyframe.co[0] / fps
+                all_times.add(time)
+                interp = keyframe.interpolation
 
-                # Y coords are flipped in Blender
-                if idx == 3:
-                    val = 1 - val
+                if time not in keyframe_data or interp == 'CONSTANT':
+                    keyframe_data[time] = interp
 
-                # Find a free time_key
-                time_key = (time, 0)
-                while time_key in keyframes_dict:
-                    if keyframes_dict[time_key][idx] is None:
-                        break
-                    time_key = (time, time_key[1] + 1)
+        if not all_times:
+            return None
 
-                if time_key not in keyframes_dict:
-                    keyframes_dict[time_key] = [None] * 4
+        sorted_times = sorted(all_times)
+        time_offset = sorted_times[0]
+        shifted_times = [t - time_offset for t in sorted_times]
 
-                keyframes_dict[time_key][idx] = (val, is_constant)
-
-        keyframes_dict = OrderedDict(sorted(keyframes_dict.items()))
-
-        # Interpolate missing keyframes
-        for idx in range(4):
-            prev_kf, prev_time_key = None, None
-
-            for time_key, kf in keyframes_dict.items():
-                if kf[idx] is not None:
-                    prev_kf, prev_time_key = kf[idx], time_key
+        def get_uv_at(time):
+            frame = time * fps
+            uv = [0.0, 1.0, 1.0, 0.0, 0.0, 0.0]
+            for curve in action_fcurves:
+                if curve.data_path not in data_path_offset:
                     continue
 
-                # Find next keyframe
-                next_kf, next_time_key = None, None
-                for time_key_, kf_ in keyframes_dict.items():
-                    if time_key_ > time_key and kf_[idx] is not None:
-                        next_kf, next_time_key = kf_[idx], time_key_
-                        break
+                offset = data_path_offset[curve.data_path]
 
-                # Add the missing keyframe
-                if prev_kf is None and next_kf is None:
-                    kf_ = (default_values[idx], False)
+                if offset == 0 and curve.array_index != 2:
+                    continue
 
-                elif prev_kf is None:
-                    kf_ = (next_kf[0], False)
+                if curve.array_index > 1:
+                    continue
 
-                elif next_kf is None:
-                    kf_ = (prev_kf[0], False)
+                idx = offset + curve.array_index if offset != 0 else 0
+                uv[idx] = curve.evaluate(frame)
+            return uv
 
-                else:
-                    prev_val, next_val = prev_kf[0], next_kf[0]
-                    duration = next_time_key[0] - prev_time_key[0]
+        time_values = {}
 
-                    # Reset the constant interpolation of the previous keyframe to assign to the new one
-                    if prev_kf[1]:
-                        keyframes_dict[prev_time_key][idx] = (prev_val, False)
-                        fraction = 0.0
+        for i, shifted_t in enumerate(shifted_times):
+            original_t = sorted_times[i]
+            time_values[shifted_t] = get_uv_at(original_t)
 
-                    elif duration == 0.0:
-                        fraction = 0.0
+        interp_data = {}
 
-                    else:
-                        fraction = (time_key[0] - prev_time_key[0]) / duration
+        for i, shifted_t in enumerate(shifted_times):
+            original_t = sorted_times[i]
+            interp = keyframe_data.get(original_t, 'LINEAR')
+            interp_data[shifted_t] = 'CONSTANT' if interp == 'CONSTANT' else 'LINEAR'
 
-                    val = prev_val + (next_val - prev_val) * fraction
-                    kf_ = (val, prev_kf[1])
+        anim = dff.UVAnim()
+        anim.name = self.material.dff.animation_name
+        uv_0 = time_values[0]
+        flipped_0 = [uv_0[0], uv_0[1], uv_0[2], 0.0, uv_0[4], 1 - (uv_0[5] + uv_0[2])]
+        anim.frames.append(dff.UVFrame(0.0, flipped_0, -1))
+        prev_idx = 0
 
-                keyframes_dict[time_key][idx] = kf_
-                prev_kf, prev_time_key = kf_, time_key
+        for i in range(len(shifted_times) - 1):
+            next_t = shifted_times[i + 1]
+            interp = interp_data[shifted_times[i]]
+            prev_uv = anim.frames[-1].uv
+            current_uv = time_values[next_t]
+            flipped_current = [current_uv[0], current_uv[1], current_uv[2], 0.0, current_uv[4], 1 - (current_uv[5] + current_uv[2])]
 
-        frame_idx = 0
-        was_constant = [False] * 4
-
-        # Create UVFrames
-        for time_key, kf in keyframes_dict.items():
-
-            # Create dummy UVFrame for constant interpolation
-            if True in was_constant:
-                uv_vals = [0] * 6
-                for idx in range(4):
-                    uv_idx = (idx // 2) * 3 + (idx % 2) + 1
-                    uv_vals[uv_idx] = anim.frames[-1].uv[uv_idx] if was_constant[idx] else kf[idx][0]
-
-                frame = dff.UVFrame(time_key[0], uv_vals, frame_idx-1)
-                anim.frames.append(dff.UVFrame._make(frame))
-                frame_idx += 1
-
-                was_constant = [False] * 4
-
-            # Create a regular UVFrame
-            uv_vals = [0] * 6
-            for idx in range(4):
-                val, is_constant = kf[idx]
-                uv_idx = (idx // 2) * 3 + (idx % 2) + 1
-                uv_vals[uv_idx] = val
-                if is_constant:
-                    was_constant[idx] = True
-
-            frame = dff.UVFrame(time_key[0], uv_vals, frame_idx-1)
-            anim.frames.append(dff.UVFrame._make(frame))
-            frame_idx += 1
+            if interp == 'CONSTANT':
+                anim.frames.append(dff.UVFrame(next_t, list(prev_uv), prev_idx))
+                prev_idx = len(anim.frames) - 1
+                anim.frames.append(dff.UVFrame(next_t, flipped_current, prev_idx))
+                prev_idx = len(anim.frames) - 1
+            else:
+                anim.frames.append(dff.UVFrame(next_t, flipped_current, prev_idx))
+                prev_idx = len(anim.frames) - 1
 
         if anim.frames:
-            anim.duration = list(keyframes_dict.keys())[-1][0]
+            anim.duration = shifted_times[-1]
+
+        is_fully_constant = len(shifted_times) >= 2 and all(v == 'CONSTANT' for v in interp_data.values())
+
+        if is_fully_constant:
+            num_intervals = len(shifted_times) - 1
+            mean_delta = shifted_times[-1] / num_intervals
+            extra_t = shifted_times[-1] + mean_delta
+            last_uv = anim.frames[-1].uv
+            anim.frames.append(dff.UVFrame(extra_t, list(last_uv), prev_idx))
+            anim.duration = extra_t
 
         return anim
 
@@ -498,8 +478,9 @@ class dff_exporter:
                 material.textures.append(texture)
 
             # Materials
-            material.add_plugin('bump_map', helper.get_normal_map())
+            material.add_plugin('bump_map', helper.get_bump_map())
             material.add_plugin('env_map', helper.get_environment_map())
+            material.add_plugin('dual', helper.get_dual_texture())
             material.add_plugin('spec', helper.get_specular_material())
             material.add_plugin('refl', helper.get_reflection_material())
             material.add_plugin('udata', helper.get_user_data())
@@ -508,7 +489,21 @@ class dff_exporter:
             if anim:
                 material.add_plugin('uv_anim', anim.name)
                 self.dff.uvanim_dict.append(anim)
-                
+
+            # Create a dummy uv anim to apply to the second uv channel to force dual pass blending
+            if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
+                dummy_anim = dff.UVAnim()
+                dummy_anim.name = "DragonFF"
+                dummy_anim.node_to_uv[0] = 1
+                dummy_anim.duration = 1.0
+                dummy_anim.frames = [
+                    dff.UVFrame(0.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0], -1),
+                    dff.UVFrame(1.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0],  0)
+                ]
+
+                material.add_plugin('uv_anim', dummy_anim.name)
+                self.dff.uvanim_dict.append(dummy_anim)
+
             materials.append(material)
                 
         return materials
@@ -871,8 +866,116 @@ class dff_exporter:
             vertices_list, skin_plg, dm_entries, obj, geometry, len(vcols))
 
         self.populate_geometry_from_faces_data(faces_list, geometry)
-        
-    
+
+    #######################################################
+    @staticmethod
+    def populate_geometry_with_breakable_object(obj, geometry):
+        self = dff_exporter
+
+        breakable_model = dff.ExtensionBreakable()
+        geometry.extensions["breakable_model"] = breakable_model
+
+        if not obj or obj.type != 'MESH':
+            breakable_model.magic = 0
+            return
+
+        breakable_model.magic = 0x64646464
+        breakable_model.pos_rule = int(obj.dff.breakable_pos_rule)
+
+        mesh, _ = self.convert_to_mesh(obj)
+        self.triangulate_mesh(mesh, False)
+
+        vcols = self.get_vertex_colors(mesh)
+        verts_indices = {}
+        vertices_list = []
+        faces_list = []
+
+        # Check for vertices once before exporting to report instanstly
+        if len(mesh.vertices) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
+
+        for polygon in mesh.polygons:
+            face = {"verts": [], "mat_idx": polygon.material_index}
+
+            for loop_index in polygon.loop_indices:
+                loop = mesh.loops[loop_index]
+                vert_index = loop.vertex_index
+                vertex = mesh.vertices[vert_index]
+
+                if mesh.uv_layers:
+                    uv = mesh.uv_layers[0].data[loop_index].uv
+                    uv = (uv.x, uv.y)
+                else:
+                    uv = (0.0, 1.0)
+
+                if vcols:
+                    vert_col = vcols[0][loop_index]
+                else:
+                    vert_col = (1.0, 1.0, 1.0)
+
+                key = (vert_index, uv)
+
+                if key not in verts_indices:
+                    face['verts'].append(len(vertices_list))
+                    verts_indices[key] = len(vertices_list)
+                    vertices_list.append({"idx": vert_index,
+                                          "co": vertex.co,
+                                          "uv": uv,
+                                          "vert_col": vert_col})
+                else:
+                    face['verts'].append(verts_indices[key])
+
+            faces_list.append(face)
+
+        # Check vertices count again since duplicate vertices may have increased
+        # vertices count above the limit
+        if not self.exclude_geo_faces and len(vertices_list) > 0xFFFF:
+            raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(vertices_list)}/65535")
+
+        for vertex in vertices_list:
+            breakable_model.positions.append(dff.Vector._make(vertex['co']))
+
+            uv = vertex['uv']
+            breakable_model.uvs.append(dff.TexCoords(uv[0], 1-uv[1]))
+
+            vert_col = vertex['vert_col']
+            breakable_model.prelits.append(dff.RGBA._make(
+                int(col * 255) for col in vert_col))
+
+        triangles = [
+            dff.Triangle._make((
+                verts[1], #b
+                verts[0], #a
+                face['mat_idx'], #material
+                verts[2] #c
+            ))
+            for face in faces_list
+            for verts in [face['verts']]
+        ]
+        breakable_model.triangles.extend(triangles)
+        breakable_model.triangles.sort(key=lambda triangle: triangle.material)
+
+        for mat_slot in obj.material_slots:
+            texture_name = ""
+            mask_name = ""
+            ambient_color = (1, 1, 1)
+
+            if mat_slot.material:
+                helper = material_helper(mat_slot.material)
+
+                # Set texture name
+                texture = helper.get_texture()
+                if texture:
+                    texture_name = texture.name
+
+                # Set ambient color
+                if helper.principled:
+                    ambient_color = helper.principled.base_color[:3]
+
+            breakable_model.texture_names.append(texture_name)
+            breakable_model.texture_masks.append(mask_name)
+            breakable_model.ambient_colors.append(dff.Vector._make(ambient_color))
+
     #######################################################
     @staticmethod
     def convert_to_mesh(obj):
@@ -958,6 +1061,10 @@ class dff_exporter:
 
         geometry.surface_properties = (0,0,0)
         geometry.materials = self.generate_material_list(obj)
+
+        # Add Breakable Extension
+        if obj.dff.export_breakable:
+            self.populate_geometry_with_breakable_object(obj.dff.breakable_object, geometry)
 
         geometry.export_flags['export_normals'] = obj.dff.export_normals
         geometry.export_flags['write_mesh_plg'] = obj.dff.export_binsplit
