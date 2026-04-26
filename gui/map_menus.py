@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 from dataclasses import MISSING, Field, fields
 from typing import get_args, get_origin
 import bpy
@@ -104,7 +105,7 @@ class DFFMapPropertiesMenu:
         box = layout.box()
         box.label(text=f"{section} Properties", icon='SETTINGS')
         section_format_type = settings.get_section_format_object ()
-        for field_name, field_value in section_prop.__annotations__.items():
+        for field_name, field_value in type(section_prop).__annotations__.items():
             if (
                     settings.show_all_properties
                     or section_format_type is None
