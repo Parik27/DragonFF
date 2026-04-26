@@ -52,7 +52,7 @@ class DffFileImporter:
                  connect_bones = False, use_mat_split = False,
                  remove_doubles = False, create_backfaces = False,
                  import_normals = False, group_materials = False,
-                 import_breakable = True):
+                 import_breakable = True, hide_damage_parts = False):
 
         # Variables
         self.dff = dff_file
@@ -80,17 +80,17 @@ class DffFileImporter:
         self.import_normals = import_normals
         self.group_materials = group_materials
         self.import_breakable = import_breakable
+        self.hide_damage_parts = hide_damage_parts
 
     #######################################################
-    def find_texture_image(name):
-        self = dff_importer
+    def find_texture_image(self, name):
         from bpy_extras.image_utils import load_image
 
         if name in self.txd_images:
             return self.txd_images[name][0]
 
         if self.image_ext:
-            path = os.path.dirname(self.file_name)
+            path = self.image_search_dir
             image_name = "%s.%s" % (name, self.image_ext)
 
             # see name.None note above / Share loaded images among imported materials
@@ -1004,7 +1004,7 @@ class DffFileImporter:
         self.import_frames()
         self.import_2dfx()
 
-        if dff_importer.hide_damage_parts:
+        if self.hide_damage_parts:
             for obj in self.objects.values():
                 if obj.name.lower().endswith(('_dam', '_vlo')):
                     hide_object(obj)
