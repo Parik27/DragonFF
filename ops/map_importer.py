@@ -27,6 +27,7 @@ class map_importer:
     model_cache = {}
     object_data = []
     object_instances = []
+    object_map_sections = {}
     cull_instances = []
     col_files = []
     collision_collection = None
@@ -176,8 +177,7 @@ class map_importer:
                         obj.parent = root_objects[0]
 
             # Move dff collection to a top collection named for the file it came from
-            if not self.object_instances_collection:
-                self.create_object_instances_collection(context)
+            self.create_object_instances_collection(context, map_importer.object_map_sections[inst])
 
             context.scene.collection.children.unlink(importer.current_collection)
             self.object_instances_collection.children.link(importer.current_collection)
@@ -235,22 +235,24 @@ class map_importer:
 
     #######################################################
     @staticmethod
-    def create_object_instances_collection(context):
+    def create_object_instances_collection(context, map_section):
         self = map_importer
 
+        # Create if not found a top-level collection for all meshes
         coll_name = '%s Meshes' % self.settings.game_version_dropdown
         self.mesh_collection = bpy.data.collections.get(coll_name)
-
         if not self.mesh_collection:
             self.mesh_collection = bpy.data.collections.new(coll_name)
             context.scene.collection.children.link(self.mesh_collection)
 
-        # Create a new collection in Mesh to hold all the subsequent dffs loaded from this map section
-        coll_name = self.map_section
+        # Create if not found a new sub-collection to hold all dffs loaded from this map section
+        coll_name = map_section
         if os.path.isabs(coll_name):
             coll_name = os.path.basename(coll_name)
-        self.object_instances_collection = bpy.data.collections.new(coll_name)
-        self.mesh_collection.children.link(self.object_instances_collection)
+        self.object_instances_collection = bpy.data.collections.get(coll_name)
+        if not self.object_instances_collection:
+            self.object_instances_collection = bpy.data.collections.new(coll_name)
+            self.mesh_collection.children.link(self.object_instances_collection)
 
     #######################################################
     @staticmethod
@@ -296,26 +298,41 @@ class map_importer:
         self.collision_collection = None
         self.cull_collection = None
         self.settings = settings
+        self.cull_instances = []
+        self.object_instances = []
+        self.object_map_sections = {}
+        self.object_data = {}
 
         if self.settings.use_custom_map_section:
             self.map_section = self.settings.custom_ipl_path
         else:
             self.map_section = self.settings.map_sections
 
-        # Get all the necessary IDE and IPL data
-        map_data = map_utilites.MapDataUtility.load_map_data(
-            self.settings.game_version_dropdown,
-            self.settings.game_root,
-            self.map_section,
-            self.settings.use_custom_map_section)
-
-        self.object_instances = map_data.object_instances
-        self.object_data = map_data.object_data
-
-        if self.settings.load_cull:
-            self.cull_instances = map_data.cull_instances
+        prefix = self.settings.map_section_load_prefix.casefold()
+        if prefix and not self.settings.use_custom_map_section:
+            items = settings.update_map_sections(bpy.context)
+            if settings.map_section_load_prefix == "*":
+                map_sections_to_load = [i[0] for i in items]
+            else:
+                map_sections_to_load = [i[0] for i in items if i[1].casefold().startswith(prefix)]
         else:
-            self.cull_instances = []
+            map_sections_to_load = [self.map_section]
+
+        self.object_data = {}
+        for map_section in map_sections_to_load:
+            # Get all the necessary IDE and IPL data
+            map_data = map_utilites.MapDataUtility.load_map_data(
+                self.settings.game_version_dropdown,
+                self.settings.game_root,
+                map_section,
+                self.settings.use_custom_map_section)
+
+            self.object_instances += map_data.object_instances
+            self.object_map_sections |= map_data.object_map_sections
+            self.object_data |= map_data.object_data
+
+            if self.settings.load_cull:
+                self.cull_instances += map_data.cull_instances
 
         if self.settings.load_collisions:
 

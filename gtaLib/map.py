@@ -27,6 +27,7 @@ from .img import img
 @dataclass
 class MapData:
     object_instances: list
+    object_map_sections: dict
     object_data: dict
     cull_instances: list
 
@@ -354,6 +355,7 @@ class MapDataUtility:
         object_instances = []
         cull_instances = []
         object_data = {}
+        object_map_sections = {}
 
         # Get all insts into a flat list (array)
         # Can't be an ID keyed dictionary, because there's many ipl
@@ -361,6 +363,7 @@ class MapDataUtility:
         # the same model (lamps, benches, trees etc.)
         if 'inst' in ipl:
             for entry in ipl['inst']:
+                object_map_sections[entry] = ipl_section
                 object_instances.append(entry)
 
         # Get all culls into a flat list (array)
@@ -384,7 +387,8 @@ class MapDataUtility:
         return MapData(
             object_instances = object_instances,
             object_data = object_data,
-            cull_instances = cull_instances
+            cull_instances = cull_instances,
+            object_map_sections = object_map_sections
         )
 
     ########################################################################
