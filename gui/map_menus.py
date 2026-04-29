@@ -85,8 +85,15 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     )
 
     map_sections : bpy.props.EnumProperty(
-        name = 'Map segment',
+        name = 'Map Section',
         items = update_map_sections
+    )
+
+    map_section_load_prefix : bpy.props.StringProperty(
+        name        = "Bulk Section Load Prefix",
+        default     = '',
+        description = "Load all map sections with this prefix (Use * for all sections)",
+        options={'TEXTEDIT_UPDATE'}
     )
 
     custom_ipl_path : bpy.props.StringProperty(
@@ -258,6 +265,19 @@ class MapImportPanel(bpy.types.Panel):
             row.operator(SCENE_OT_ipl_select.bl_idname, text="", icon='FILEBROWSER')
         else:
             col.prop(settings, "map_sections")
+            col.prop(settings, "map_section_load_prefix")
+            if settings.map_section_load_prefix:
+                items = settings.update_map_sections(bpy.context)
+                if settings.map_section_load_prefix == "*":
+                    matches = [i[1] for i in items]
+                else:
+                    prefix = settings.map_section_load_prefix.casefold()
+                    matches = [i[1] for i in items if i[1].casefold().startswith(prefix)]
+                if matches:
+                    col.label(text="Will load sections: ")
+                    box = col.box()
+                    for item in matches:
+                        box.label(text=item)
         col.prop(settings, "use_custom_map_section")
         col.separator()
 
