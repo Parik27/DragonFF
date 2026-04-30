@@ -186,6 +186,9 @@ class map_importer:
             self.model_cache[inst.id] = collection_objects
             print(str(inst.id), 'loaded new')
 
+        if not self.collision_collection:
+            return
+
         # Look for collision mesh and place an instance at the display mesh so in-place collision edits are possible
         name = self.model_cache[inst.id][0].name
         # Each collection in the top-level collision collection represents an original .col file

@@ -68,22 +68,24 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
             # Import collision files if there are any left to load
             elif not self._col_loaded:
-                num_objects_at_once = 5
+
                 cols_num = len(importer.col_files)
 
-                for _ in range(num_objects_at_once):
-                    if self._col_index >= cols_num:
-                        self._col_loaded = True
-                        break
+                # Fetch next collision
+                col_file = importer.col_files[self._col_index]
 
-                    # Fetch next collision
-                    col_file = importer.col_files[self._col_index]
-                    self._col_index += 1
+                self._col_index += 1
+                if self._col_index >= cols_num:
+                    self._col_loaded = True
 
-                    importer.import_collision(context, col_file)
-                    self._progress_current += 1
+                importer.import_collision(context, col_file)
 
-            # Import objcets instances
+                # Update cursor progress indicator if something needs to be loaded
+                progress = (
+                        float(self._col_index) / float(cols_num)
+                ) if self._progress_total else 100
+
+            # Import object instances
             else:
                 # As the number of objects increases, loading performance starts to get crushed by scene updates, so
                 # we try to keep loading at least 5% of the total scene object count on each timer pulse.
@@ -106,10 +108,10 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
                     self._progress_current += 1
 
-            # Update cursor progress indicator if something needs to be loaded
-            progress = (
-                float(self._progress_current) / float(self._progress_total)
-            ) if self._progress_total else 100
+                # Update cursor progress indicator if something needs to be loaded
+                progress = (
+                    float(self._progress_current) / float(self._progress_total)
+                ) if self._progress_total else 100
 
             context.window_manager.progress_update(progress)
 
