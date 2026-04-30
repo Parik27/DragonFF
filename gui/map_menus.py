@@ -258,6 +258,30 @@ class MapImportPanel(bpy.types.Panel):
                                 align=True)
 
         col = flow.column()
+
+        col.prop(settings, 'game_root')
+        col.prop(settings, 'dff_folder')
+
+        col.separator()
+
+        col.prop(settings, "skip_lod")
+        col.prop(settings, "read_mat_split")
+        col.prop(settings, "create_backfaces")
+        col.prop(settings, "import_breakable")
+        col.prop(settings, "load_collisions")
+        col.prop(settings, "load_cull")
+
+        box = col.box()
+        box.prop(settings, "load_txd")
+        if settings.load_txd:
+            box.prop(settings, "txd_pack")
+
+        col.separator()
+        row = col.row()
+        row.operator("scene.dragonff_map_import")
+        col.separator()
+
+        col = flow.column()
         col.prop(settings, "game_version_dropdown")
         if settings.use_custom_map_section:
             row = col.row(align=True)
@@ -274,32 +298,12 @@ class MapImportPanel(bpy.types.Panel):
                     prefix = settings.map_section_load_prefix.casefold()
                     matches = [i[1] for i in items if i[1].casefold().startswith(prefix)]
                 if matches:
-                    col.label(text="Will load sections: ")
+                    col.label(text=f"Will load {len(matches)} sections:")
                     box = col.box()
                     for item in matches:
                         box.label(text=item)
+
         col.prop(settings, "use_custom_map_section")
-        col.separator()
-
-        box = col.box()
-        box.prop(settings, "load_txd")
-        if settings.load_txd:
-            box.prop(settings, "txd_pack")
-
-        col.prop(settings, "skip_lod")
-        col.prop(settings, "read_mat_split")
-        col.prop(settings, "create_backfaces")
-        col.prop(settings, "import_breakable")
-        col.prop(settings, "load_collisions")
-        col.prop(settings, "load_cull")
-
-        layout.separator()
-
-        layout.prop(settings, 'game_root')
-        layout.prop(settings, 'dff_folder')
-
-        row = layout.row()
-        row.operator("scene.dragonff_map_import")
 
 #######################################################@
 class DFF_MT_AddMapObject(bpy.types.Menu):
