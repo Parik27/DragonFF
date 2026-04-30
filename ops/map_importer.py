@@ -186,23 +186,32 @@ class map_importer:
             self.model_cache[inst.id] = collection_objects
             print(str(inst.id), 'loaded new')
 
-        # Look for collision mesh
+        # Look for collision mesh and place an instance at the display mesh so in-place collision edits are possible
         name = self.model_cache[inst.id][0].name
-        for obj in bpy.data.objects:
-            if obj.dff.type == 'COL' and obj.name.endswith("%s.ColMesh" % name):
-                new_obj = bpy.data.objects.new(obj.name, obj.data)
-                new_obj.dff.type = 'COL'
-                new_obj.location = obj.location
-                new_obj.rotation_quaternion = obj.rotation_quaternion
-                new_obj.scale = obj.scale
-                map_importer.apply_transformation_to_object(
-                    new_obj, inst
-                )
-                if '{}.dff'.format(name) in bpy.data.collections:
-                    bpy.data.collections['{}.dff'.format(name)].objects.link(
-                        new_obj
-                    )
-                hide_object(new_obj)
+        # Each collection in the top-level collision collection represents an original .col file
+        for colfile_collection in self.collision_collection.children:
+            # Look for the named collision model in each .col file
+            colmodel_collection = colfile_collection.children.get(name)
+            if colmodel_collection:
+                # Look for a collision mesh. Only meshes are instanced in-place because spheres/boxes are represented
+                # by empties, which have no data to share and so cannot be instanced
+                for obj in colmodel_collection.objects:
+                    if obj.dff.type == 'COL' and obj.name.endswith("%s.ColMesh" % name):
+                        # name the collision instance after its original col file so user can find it for later export
+                        new_obj = bpy.data.objects.new("{}.{}".format(colfile_collection.name, obj.name), obj.data)
+                        new_obj.dff.type = 'COL'
+                        new_obj.location = obj.location
+                        new_obj.rotation_quaternion = obj.rotation_quaternion
+                        new_obj.scale = obj.scale
+                        map_importer.apply_transformation_to_object(
+                            new_obj, inst
+                        )
+                        bpy.data.collections['{}.dff'.format(name)].objects.link(
+                            new_obj
+                        )
+                        hide_object(new_obj)
+                        break
+                break
 
     #######################################################
     @staticmethod
@@ -214,11 +223,11 @@ class map_importer:
 
         collection = bpy.data.collections.new(filename)
         self.collision_collection.children.link(collection)
-        col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
+        col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), False)
 
         # Move all collisions to a top collection named for the file they came from
         for c in col_list:
-            context.scene.collection.children.unlink(c)
+            #context.scene.collection.children.unlink(c)
             collection.children.link(c)
 
     #######################################################
