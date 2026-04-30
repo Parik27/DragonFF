@@ -263,13 +263,10 @@ class OBJECT_OT_dff_add_collision_box(bpy.types.Operator, AddCollisionHelper):
 
     #######################################################
     def execute(self, context):
-        ret = bpy.ops.object.empty_add(type='CUBE', radius=self.radius, location=self.location)
-        if ret != {'FINISHED'}:
-            return ret
-
-        obj = context.object
-
-        obj.name = "ColBox"
+        obj = bpy.data.objects.new("ColBox", None)
+        obj.empty_draw_type = 'CUBE'
+        obj.radius = self.radius
+        obj.location = self.location
         obj.dff.type = 'COL'
 
         obj.lock_rotation[0] = True
@@ -288,13 +285,10 @@ class OBJECT_OT_dff_add_collision_sphere(bpy.types.Operator, AddCollisionHelper)
 
     #######################################################
     def execute(self, context):
-        ret = bpy.ops.object.empty_add(type='SPHERE', radius=self.radius, location=self.location)
-        if ret != {'FINISHED'}:
-            return ret
-
-        obj = context.object
-
-        obj.name = "ColSphere"
+        obj = bpy.data.objects.new("ColSphere", None)
+        obj.empty_draw_type = 'SPHERE'
+        obj.radius = self.radius
+        obj.location = self.location
         obj.dff.type = 'COL'
 
         obj.lock_rotation[0] = True
