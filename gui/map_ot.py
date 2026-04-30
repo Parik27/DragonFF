@@ -44,12 +44,15 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
     _col_loaded = True
 
     _cull_loaded = True
+    _time_start = 0
 
     #######################################################
     def modal(self, context, event):
 
         if event.type in {'ESC'}:
             self.cancel(context)
+            elapsed = time.time() - self._time_start
+            print(f"Map Load Time Elapsed: {elapsed:.2f} (Cancelled)")
             return {'CANCELLED'}
 
         if event.type == 'TIMER' and not self._updating:
@@ -123,6 +126,8 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
         if self._inst_loaded:
             self.cancel(context)
+            elapsed = time.time() - self._time_start
+            print(f"Map Load Time Elapsed: {elapsed:.2f}")
             return {'FINISHED'}
 
         return {'PASS_THROUGH'}
@@ -159,6 +164,8 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
          # Call the "modal" function every 0.1s
         self._timer = wm.event_timer_add(0.1, window=context.window)
         wm.modal_handler_add(self)
+
+        self._time_start = time.time()
 
         return {'RUNNING_MODAL'}
 

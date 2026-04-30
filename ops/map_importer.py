@@ -230,7 +230,6 @@ class map_importer:
 
         # Move all collisions to a top collection named for the file they came from
         for c in col_list:
-            #context.scene.collection.children.unlink(c)
             collection.children.link(c)
 
     #######################################################
