@@ -29,7 +29,7 @@ from ..ops.importer_common import link_object
 class SCENE_OT_dff_import_map(bpy.types.Operator):
     """Tooltip"""
     bl_idname = "scene.dragonff_map_import"
-    bl_label = "Import map section"
+    bl_label = "Import map section(s)"
 
     _timer = None
     _updating = False
@@ -117,10 +117,6 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
                 ) if self._progress_total else 100
 
             context.window_manager.progress_update(progress)
-
-            # Update dependency graph
-            dg = context.evaluated_depsgraph_get()
-            dg.update()
 
             self._updating = False
 
