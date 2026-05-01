@@ -138,6 +138,14 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
         settings = context.scene.dff
         self._importer = map_importer.load_map(settings)
+        
+        # focus the viewport camera at the center of the map sections to be loaded
+        for area in bpy.context.screen.areas:
+            if area.type == 'VIEW_3D':
+                rv3d = area.spaces.active.region_3d
+                rv3d.view_location = self._importer.load_view_location
+                rv3d.view_distance = 1000.0
+                break
 
         self._progress_current = 0
         self._progress_total = 0
