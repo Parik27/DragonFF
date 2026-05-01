@@ -20,6 +20,7 @@ from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
 from .cull_importer import cull_importer
 from .importer_common import hide_object
+from mathutils import Vector
 
 #######################################################
 class map_importer:
@@ -36,6 +37,7 @@ class map_importer:
     cull_collection = None
     map_section = ""
     settings = None
+    load_view_location = Vector((0.0, 0.0, 0.0))
 
     #######################################################
     @staticmethod
@@ -329,6 +331,8 @@ class map_importer:
         else:
             map_sections_to_load = [self.map_section]
 
+        self.load_view_location = Vector((0.0, 0.0, 0.0))
+        i = 1.0
         self.object_data = {}
         for map_section in map_sections_to_load:
             # Get all the necessary IDE and IPL data
@@ -344,6 +348,10 @@ class map_importer:
 
             if self.settings.load_cull:
                 self.cull_instances += map_data.cull_instances
+
+            # Keep a running average of the section centroids to focus the camera before load
+            self.load_view_location += (map_data.map_objects_centroid - self.load_view_location) / i
+            i += 1.0
 
         if self.settings.load_collisions:
 
