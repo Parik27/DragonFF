@@ -27,7 +27,12 @@ from ..ops.importer_common import link_object
 
 #######################################################
 class SCENE_OT_dff_import_map(bpy.types.Operator):
-    """Tooltip"""
+    """Begin map section import process
+
+    Warning: Importing multiple map sections at once can be very slow and may appear to freeze Blender.
+    Importing with collision enabled will be even slower as first a pass is done to load all collision files.
+    Loading performance suffers the more objects get loaded into the scene. This is just a constraint in Blender.
+    It is recommended to open the system console to better observe loading progress, and to be patient."""
     bl_idname = "scene.dragonff_map_import"
     bl_label = "Import map section(s)"
 
