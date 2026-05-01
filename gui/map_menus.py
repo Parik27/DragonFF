@@ -259,6 +259,10 @@ class MapImportPanel(bpy.types.Panel):
 
         col = flow.column()
 
+        row = col.row()
+        row.operator("scene.dragonff_adjust_viewport")
+        col.separator()
+
         col.prop(settings, 'game_root')
         col.prop(settings, 'dff_folder')
 
