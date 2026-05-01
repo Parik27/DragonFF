@@ -313,3 +313,20 @@ class OBJECT_OT_dff_add_cull(bpy.types.Operator):
         obj.select_set(True)
 
         return {'FINISHED'}
+
+
+#######################################################
+class SCENE_OT_adjust_viewport(bpy.types.Operator):
+    """Adjust viewport by increasing the far clipping plane and enabling texture shading"""
+    bl_idname = "scene.dragonff_adjust_viewport"
+    bl_label = "Adjust viewport"
+
+    def execute(self, context):
+        for area in bpy.context.screen.areas:
+            if area.type == 'VIEW_3D':
+                for space in area.spaces:
+                    if space.type == 'VIEW_3D':
+                        space.clip_end = 10000.0
+                        space.shading.type = 'SOLID'
+                        space.shading.color_type = 'TEXTURE'
+        return {'FINISHED'}
