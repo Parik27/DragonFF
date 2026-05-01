@@ -322,7 +322,7 @@ class OBJECT_OT_dff_add_cull(bpy.types.Operator):
 
 #######################################################
 class SCENE_OT_adjust_viewport(bpy.types.Operator):
-    """Adjust viewport by increasing the far clipping plane and enabling texture shading"""
+    """Adjust viewport for better map display by increasing far clipping plane and enabling texture shading"""
     bl_idname = "scene.dragonff_adjust_viewport"
     bl_label = "Adjust viewport"
 
