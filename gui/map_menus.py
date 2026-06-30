@@ -76,17 +76,24 @@ class DFFSceneProps(bpy.types.PropertyGroup):
     game_version_dropdown : bpy.props.EnumProperty(
         name = 'Game',
         items = (
-            (map_data.game_version.III, 'GTA III', 'GTA III map segments'),
-            (map_data.game_version.VC, 'GTA VC', 'GTA VC map segments'),
-            (map_data.game_version.SA, 'GTA SA', 'GTA SA map segments'),
-            (map_data.game_version.LCS, 'GTA LCS', 'GTA LCS map segments'),
-            (map_data.game_version.VCS, 'GTA VCS', 'GTA VCS map segments'),
+            (map_data.game_version.III, 'GTA III', 'GTA III map sections'),
+            (map_data.game_version.VC, 'GTA VC', 'GTA VC map sections'),
+            (map_data.game_version.SA, 'GTA SA', 'GTA SA map sections'),
+            (map_data.game_version.LCS, 'GTA LCS', 'GTA LCS map sections'),
+            (map_data.game_version.VCS, 'GTA VCS', 'GTA VCS map sections'),
         )
     )
 
     map_sections : bpy.props.EnumProperty(
-        name = 'Map segment',
+        name = 'Map Section',
         items = update_map_sections
+    )
+
+    map_section_load_prefix : bpy.props.StringProperty(
+        name        = "Bulk Section Load Prefix",
+        default     = '',
+        description = "Load all map sections that start with this case-insensitive prefix (Use * for entire map)",
+        options={'TEXTEDIT_UPDATE'}
     )
 
     custom_ipl_path : bpy.props.StringProperty(
@@ -251,20 +258,15 @@ class MapImportPanel(bpy.types.Panel):
                                 align=True)
 
         col = flow.column()
-        col.prop(settings, "game_version_dropdown")
-        if settings.use_custom_map_section:
-            row = col.row(align=True)
-            row.prop(settings, "custom_ipl_path")
-            row.operator(SCENE_OT_ipl_select.bl_idname, text="", icon='FILEBROWSER')
-        else:
-            col.prop(settings, "map_sections")
-        col.prop(settings, "use_custom_map_section")
+
+        row = col.row()
+        row.operator("scene.dragonff_adjust_viewport")
         col.separator()
 
-        box = col.box()
-        box.prop(settings, "load_txd")
-        if settings.load_txd:
-            box.prop(settings, "txd_pack")
+        col.prop(settings, 'game_root')
+        col.prop(settings, 'dff_folder')
+
+        col.separator()
 
         col.prop(settings, "skip_lod")
         col.prop(settings, "read_mat_split")
@@ -273,13 +275,41 @@ class MapImportPanel(bpy.types.Panel):
         col.prop(settings, "load_collisions")
         col.prop(settings, "load_cull")
 
-        layout.separator()
+        box = col.box()
+        box.prop(settings, "load_txd")
+        if settings.load_txd:
+            box.prop(settings, "txd_pack")
 
-        layout.prop(settings, 'game_root')
-        layout.prop(settings, 'dff_folder')
-
-        row = layout.row()
+        col.separator()
+        row = col.row()
         row.operator("scene.dragonff_map_import")
+        col.separator()
+
+        col = flow.column()
+        col.prop(settings, "game_version_dropdown")
+        if settings.use_custom_map_section:
+            row = col.row(align=True)
+            row.prop(settings, "custom_ipl_path")
+            row.operator(SCENE_OT_ipl_select.bl_idname, text="", icon='FILEBROWSER')
+        else:
+            if not settings.map_section_load_prefix:
+                col.prop(settings, "map_sections")
+            col.prop(settings, "map_section_load_prefix")
+            if settings.map_section_load_prefix:
+                items = settings.update_map_sections(bpy.context)
+                if settings.map_section_load_prefix == "*":
+                    matches = [i[1] for i in items]
+                else:
+                    prefix = settings.map_section_load_prefix.casefold()
+                    matches = [i[1] for i in items if i[1].casefold().startswith(prefix)]
+                if matches:
+                    col.label(text=f"Will load {len(matches)} sections:")
+                    box = col.box()
+                    for item in matches:
+                        box.label(text=item)
+
+        if not settings.map_section_load_prefix:
+            col.prop(settings, "use_custom_map_section")
 
 #######################################################@
 class DFF_MT_AddMapObject(bpy.types.Menu):

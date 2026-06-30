@@ -1045,7 +1045,7 @@ class dff_importer:
 
         # Add collisions
         for collision in self.dff.collisions:
-            col = import_col_mem(collision.data, os.path.basename(file_name), False)
+            col = import_col_mem(collision.data, False)
 
             for collection in col:
                 self.current_collection.children.link(collection)

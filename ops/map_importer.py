@@ -20,6 +20,7 @@ from ..gtaLib import map as map_utilites
 from ..ops import dff_importer, col_importer, txd_importer
 from .cull_importer import cull_importer
 from .importer_common import hide_object
+from mathutils import Vector
 
 #######################################################
 class map_importer:
@@ -27,6 +28,7 @@ class map_importer:
     model_cache = {}
     object_data = []
     object_instances = []
+    object_map_sections = {}
     cull_instances = []
     col_files = []
     collision_collection = None
@@ -35,6 +37,7 @@ class map_importer:
     cull_collection = None
     map_section = ""
     settings = None
+    load_view_location = Vector((0.0, 0.0, 0.0))
 
     #######################################################
     @staticmethod
@@ -176,8 +179,7 @@ class map_importer:
                         obj.parent = root_objects[0]
 
             # Move dff collection to a top collection named for the file it came from
-            if not self.object_instances_collection:
-                self.create_object_instances_collection(context)
+            self.create_object_instances_collection(context, map_importer.object_map_sections[inst])
 
             context.scene.collection.children.unlink(importer.current_collection)
             self.object_instances_collection.children.link(importer.current_collection)
@@ -186,23 +188,35 @@ class map_importer:
             self.model_cache[inst.id] = collection_objects
             print(str(inst.id), 'loaded new')
 
-        # Look for collision mesh
+        if not self.collision_collection:
+            return
+
+        # Look for collision mesh and place an instance at the display mesh so in-place collision edits are possible
         name = self.model_cache[inst.id][0].name
-        for obj in bpy.data.objects:
-            if obj.dff.type == 'COL' and obj.name.endswith("%s.ColMesh" % name):
-                new_obj = bpy.data.objects.new(obj.name, obj.data)
-                new_obj.dff.type = 'COL'
-                new_obj.location = obj.location
-                new_obj.rotation_quaternion = obj.rotation_quaternion
-                new_obj.scale = obj.scale
-                map_importer.apply_transformation_to_object(
-                    new_obj, inst
-                )
-                if '{}.dff'.format(name) in bpy.data.collections:
-                    bpy.data.collections['{}.dff'.format(name)].objects.link(
-                        new_obj
-                    )
-                hide_object(new_obj)
+        # Each collection in the top-level collision collection represents an original .col file
+        for colfile_collection in self.collision_collection.children:
+            # Look for the named collision model in each .col file
+            colmodel_collection = colfile_collection.children.get(name)
+            if colmodel_collection:
+                # Look for a collision mesh. Only meshes are instanced in-place because spheres/boxes are represented
+                # by empties, which have no data to share and so cannot be instanced
+                for obj in colmodel_collection.objects:
+                    if obj.dff.type == 'COL' and obj.name.endswith("%s.ColMesh" % name):
+                        # name the collision instance after its original col file so user can find it for later export
+                        new_obj = bpy.data.objects.new("{}.{}".format(colfile_collection.name, obj.name), obj.data)
+                        new_obj.dff.type = 'COL'
+                        new_obj.location = obj.location
+                        new_obj.rotation_quaternion = obj.rotation_quaternion
+                        new_obj.scale = obj.scale
+                        map_importer.apply_transformation_to_object(
+                            new_obj, inst
+                        )
+                        bpy.data.collections['{}.dff'.format(name)].objects.link(
+                            new_obj
+                        )
+                        hide_object(new_obj)
+                        break
+                break
 
     #######################################################
     @staticmethod
@@ -214,11 +228,10 @@ class map_importer:
 
         collection = bpy.data.collections.new(filename)
         self.collision_collection.children.link(collection)
-        col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), filename)
+        col_list = col_importer.import_col_file(os.path.join(self.settings.dff_folder, filename), False)
 
         # Move all collisions to a top collection named for the file they came from
         for c in col_list:
-            context.scene.collection.children.unlink(c)
             collection.children.link(c)
 
     #######################################################
@@ -235,22 +248,24 @@ class map_importer:
 
     #######################################################
     @staticmethod
-    def create_object_instances_collection(context):
+    def create_object_instances_collection(context, map_section):
         self = map_importer
 
+        # Create if not found a top-level collection for all meshes
         coll_name = '%s Meshes' % self.settings.game_version_dropdown
         self.mesh_collection = bpy.data.collections.get(coll_name)
-
         if not self.mesh_collection:
             self.mesh_collection = bpy.data.collections.new(coll_name)
             context.scene.collection.children.link(self.mesh_collection)
 
-        # Create a new collection in Mesh to hold all the subsequent dffs loaded from this map section
-        coll_name = self.map_section
+        # Create if not found a new sub-collection to hold all dffs loaded from this map section
+        coll_name = map_section
         if os.path.isabs(coll_name):
             coll_name = os.path.basename(coll_name)
-        self.object_instances_collection = bpy.data.collections.new(coll_name)
-        self.mesh_collection.children.link(self.object_instances_collection)
+        self.object_instances_collection = bpy.data.collections.get(coll_name)
+        if not self.object_instances_collection:
+            self.object_instances_collection = bpy.data.collections.new(coll_name)
+            self.mesh_collection.children.link(self.object_instances_collection)
 
     #######################################################
     @staticmethod
@@ -296,26 +311,47 @@ class map_importer:
         self.collision_collection = None
         self.cull_collection = None
         self.settings = settings
+        self.cull_instances = []
+        self.object_instances = []
+        self.object_map_sections = {}
+        self.object_data = {}
 
         if self.settings.use_custom_map_section:
             self.map_section = self.settings.custom_ipl_path
         else:
             self.map_section = self.settings.map_sections
 
-        # Get all the necessary IDE and IPL data
-        map_data = map_utilites.MapDataUtility.load_map_data(
-            self.settings.game_version_dropdown,
-            self.settings.game_root,
-            self.map_section,
-            self.settings.use_custom_map_section)
-
-        self.object_instances = map_data.object_instances
-        self.object_data = map_data.object_data
-
-        if self.settings.load_cull:
-            self.cull_instances = map_data.cull_instances
+        prefix = self.settings.map_section_load_prefix.casefold()
+        if prefix and not self.settings.use_custom_map_section:
+            items = settings.update_map_sections(bpy.context)
+            if settings.map_section_load_prefix == "*":
+                map_sections_to_load = [i[0] for i in items]
+            else:
+                map_sections_to_load = [i[0] for i in items if i[1].casefold().startswith(prefix)]
         else:
-            self.cull_instances = []
+            map_sections_to_load = [self.map_section]
+
+        self.load_view_location = Vector((0.0, 0.0, 0.0))
+        i = 1.0
+        self.object_data = {}
+        for map_section in map_sections_to_load:
+            # Get all the necessary IDE and IPL data
+            map_data = map_utilites.MapDataUtility.load_map_data(
+                self.settings.game_version_dropdown,
+                self.settings.game_root,
+                map_section,
+                self.settings.use_custom_map_section)
+
+            self.object_instances += map_data.object_instances
+            self.object_map_sections |= map_data.object_map_sections
+            self.object_data |= map_data.object_data
+
+            if self.settings.load_cull:
+                self.cull_instances += map_data.cull_instances
+
+            # Keep a running average of the section centroids to focus the camera before load
+            self.load_view_location += (map_data.map_objects_centroid - self.load_view_location) / i
+            i += 1.0
 
         if self.settings.load_collisions:
 

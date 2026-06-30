@@ -27,9 +27,14 @@ from ..ops.importer_common import link_object
 
 #######################################################
 class SCENE_OT_dff_import_map(bpy.types.Operator):
-    """Tooltip"""
+    """Begin map section import process
+
+    Warning: Importing multiple map sections at once can be very slow and may appear to freeze Blender.
+    Importing with collision enabled will be even slower as first a pass is done to load all collision files.
+    Loading performance suffers the more objects get loaded into the scene. This is just a constraint in Blender.
+    It is recommended to open the system console to better observe loading progress, and to be patient."""
     bl_idname = "scene.dragonff_map_import"
-    bl_label = "Import map section"
+    bl_label = "Import map section(s)"
 
     _timer = None
     _updating = False
@@ -44,12 +49,15 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
     _col_loaded = True
 
     _cull_loaded = True
+    _time_start = 0
 
     #######################################################
     def modal(self, context, event):
 
         if event.type in {'ESC'}:
             self.cancel(context)
+            elapsed = time.time() - self._time_start
+            print(f"Map Load Time Elapsed: {elapsed:.2f} (Cancelled)")
             return {'CANCELLED'}
 
         if event.type == 'TIMER' and not self._updating:
@@ -68,22 +76,24 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
             # Import collision files if there are any left to load
             elif not self._col_loaded:
-                num_objects_at_once = 5
+
                 cols_num = len(importer.col_files)
 
-                for _ in range(num_objects_at_once):
-                    if self._col_index >= cols_num:
-                        self._col_loaded = True
-                        break
+                # Fetch next collision
+                col_file = importer.col_files[self._col_index]
 
-                    # Fetch next collision
-                    col_file = importer.col_files[self._col_index]
-                    self._col_index += 1
+                self._col_index += 1
+                if self._col_index >= cols_num:
+                    self._col_loaded = True
 
-                    importer.import_collision(context, col_file)
-                    self._progress_current += 1
+                importer.import_collision(context, col_file)
 
-            # Import objcets instances
+                # Update cursor progress indicator if something needs to be loaded
+                progress = (
+                        float(self._col_index) / float(cols_num)
+                ) if self._progress_total else 100
+
+            # Import object instances
             else:
                 # As the number of objects increases, loading performance starts to get crushed by scene updates, so
                 # we try to keep loading at least 5% of the total scene object count on each timer pulse.
@@ -106,21 +116,19 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
                     self._progress_current += 1
 
-            # Update cursor progress indicator if something needs to be loaded
-            progress = (
-                float(self._progress_current) / float(self._progress_total)
-            ) if self._progress_total else 100
+                # Update cursor progress indicator if something needs to be loaded
+                progress = (
+                    float(self._progress_current) / float(self._progress_total)
+                ) if self._progress_total else 100
 
             context.window_manager.progress_update(progress)
-
-            # Update dependency graph
-            dg = context.evaluated_depsgraph_get()
-            dg.update()
 
             self._updating = False
 
         if self._inst_loaded:
             self.cancel(context)
+            elapsed = time.time() - self._time_start
+            print(f"Map Load Time Elapsed: {elapsed:.2f}")
             return {'FINISHED'}
 
         return {'PASS_THROUGH'}
@@ -130,6 +138,14 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
 
         settings = context.scene.dff
         self._importer = map_importer.load_map(settings)
+        
+        # focus the viewport camera at the center of the map sections to be loaded
+        for area in bpy.context.screen.areas:
+            if area.type == 'VIEW_3D':
+                rv3d = area.spaces.active.region_3d
+                rv3d.view_location = self._importer.load_view_location
+                rv3d.view_distance = 1000.0
+                break
 
         self._progress_current = 0
         self._progress_total = 0
@@ -157,6 +173,8 @@ class SCENE_OT_dff_import_map(bpy.types.Operator):
          # Call the "modal" function every 0.1s
         self._timer = wm.event_timer_add(0.1, window=context.window)
         wm.modal_handler_add(self)
+
+        self._time_start = time.time()
 
         return {'RUNNING_MODAL'}
 
@@ -307,4 +325,21 @@ class OBJECT_OT_dff_add_cull(bpy.types.Operator):
             o.select_set(False)
         obj.select_set(True)
 
+        return {'FINISHED'}
+
+
+#######################################################
+class SCENE_OT_adjust_viewport(bpy.types.Operator):
+    """Adjust viewport for better map display by increasing far clipping plane and enabling texture shading"""
+    bl_idname = "scene.dragonff_adjust_viewport"
+    bl_label = "Adjust viewport"
+
+    def execute(self, context):
+        for area in bpy.context.screen.areas:
+            if area.type == 'VIEW_3D':
+                for space in area.spaces:
+                    if space.type == 'VIEW_3D':
+                        space.clip_end = 10000.0
+                        space.shading.type = 'SOLID'
+                        space.shading.color_type = 'TEXTURE'
         return {'FINISHED'}
