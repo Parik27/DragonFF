@@ -36,7 +36,8 @@ _classes = [
     gui.EXPORT_OT_dff,
     gui.EXPORT_OT_txd,
     gui.EXPORT_OT_col,
-    gui.EXPORT_OT_ipl_cull,
+    gui.EXPORT_OT_map,
+    gui.IO_FH_dff,
     gui.SCENE_OT_dff_frame_move,
     gui.SCENE_OT_dff_atomic_move,
     gui.SCENE_OT_dff_update,
@@ -103,6 +104,7 @@ _classes = [
 def register():
 
     # Register all the classes
+    gui.DFFMapPropertiesGenerator.generate_and_register_all ()
     for cls in _classes:
         register_class(cls)
 
@@ -150,5 +152,6 @@ def unregister():
     gui.State.unhook_events()
 
     # Unregister all the classes
+    gui.DFFMapPropertiesGenerator.unregister_all ()
     for cls in _classes:
         unregister_class(cls)

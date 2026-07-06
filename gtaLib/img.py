@@ -90,7 +90,7 @@ class img:
     #######################################################
     def find_entry_idx(self, name):
         return next(
-            (idx for idx, entry in enumerate(self.directory_entries) if entry.name == name),
+            (idx for idx, entry in enumerate(self.directory_entries) if entry.name.lower() == name.lower()),
             -1
         )
 
