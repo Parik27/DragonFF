@@ -30,6 +30,33 @@ class col_exporter:
     version = None
     apply_transformations = True
     only_selected = False
+    clean_mesh = True
+    export_face_groups = False
+
+    #######################################################
+    @staticmethod
+    def _quantize_bmesh (bm):
+        for v in bm.verts:
+            v.co.x = round(v.co.x * 128) / 128
+            v.co.y = round(v.co.y * 128) / 128
+            v.co.z = round(v.co.z * 128) / 128
+
+        bm.verts.ensure_lookup_table ()
+        bm.faces.ensure_lookup_table ()
+
+    #######################################################
+    @staticmethod
+    def _cleanup_bmesh (bm):
+        bad_faces = [face for face in bm.faces if face.calc_area() < 0.0001]
+        bmesh.ops.delete (bm, geom=bad_faces, context="FACES")
+
+        bm.verts.ensure_lookup_table ()
+        bm.faces.ensure_lookup_table ()
+
+    #######################################################
+    @staticmethod
+    def make_face_groups (bm):
+        pass
 
     #######################################################
     def _process_mesh(obj, verts, faces, face_groups=None):
@@ -48,6 +75,12 @@ class col_exporter:
         bm.transform(matrix)
 
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        bm.verts.ensure_lookup_table ()
+        bm.faces.ensure_lookup_table ()
+
+        if self.clean_mesh:
+            self._quantize_bmesh (bm)
+            self._cleanup_bmesh (bm)
 
         vert_offset = len(verts)
         
@@ -64,27 +97,28 @@ class col_exporter:
         for i, face in enumerate(bm.faces):
 
             # Face Groups
-            if layer and col.Sections.version > 1:
-                lastface = i == len(bm.faces)-1
-                idx = face[layer]
+            if self.export_face_groups:
+                if layer and col.Sections.version > 1:
+                    lastface = i == len(bm.faces)-1
+                    idx = face[layer]
 
-                # Evaluate bounds if still the same face group index or this is the last face in the list
-                if idx == fg_idx or lastface:
-                    fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[0].co)]
-                    fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[0].co)]
-                    fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[1].co)]
-                    fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[1].co)]
-                    fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[2].co)]
-                    fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[2].co)]
+                    # Evaluate bounds if still the same face group index or this is the last face in the list
+                    if idx == fg_idx or lastface:
+                        fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[0].co)]
+                        fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[0].co)]
+                        fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[1].co)]
+                        fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[1].co)]
+                        fg_min = [min(x, y) for x, y in zip(fg_min, face.verts[2].co)]
+                        fg_max = [max(x, y) for x, y in zip(fg_max, face.verts[2].co)]
 
-                # Create the face group if the face group index changed or this is the last face in the list
-                if idx != fg_idx or lastface:
-                    end_idx = i if lastface else i-1
-                    face_groups.append(col.TFaceGroup._make([fg_min, fg_max, start_idx, end_idx]))
-                    fg_min = [256] * 3
-                    fg_max = [-256] * 3
-                    start_idx = i
-                fg_idx = idx
+                    # Create the face group if the face group index changed or this is the last face in the list
+                    if idx != fg_idx or lastface:
+                        end_idx = i if lastface else i-1
+                        face_groups.append(col.TFaceGroup._make([fg_min, fg_max, start_idx, end_idx]))
+                        fg_min = [256] * 3
+                        fg_max = [-256] * 3
+                        start_idx = i
+                    fg_idx = idx
 
             bm.verts.index_update()
             surface = [0, 0, 0, 0]
@@ -100,14 +134,14 @@ class col_exporter:
 
             if col.Sections.version == 1:
                 faces.append(col.TFace._make(
-                    [vert.index + vert_offset for vert in (face.verts[0], face.verts[2], face.verts[1])] + [
+                    [vert.index + vert_offset for vert in (face.verts[0], face.verts[1], face.verts[2])] + [
                         col.TSurface(*surface)
                     ]
                 ))
 
             else:
                 faces.append(col.TFace._make(
-                    [vert.index + vert_offset for vert in (face.verts[0], face.verts[2], face.verts[1])] + [
+                    [vert.index + vert_offset for vert in (face.verts[0], face.verts[1], face.verts[2])] + [
                         surface[0], surface[3]
                     ]
                 ))
@@ -300,6 +334,8 @@ def export_col(options):
     col_exporter.collection = options['collection']
     col_exporter.apply_transformations = options['apply_transformations']
     col_exporter.only_selected = options['only_selected']
+    col_exporter.clean_mesh = options['clean_mesh']
+    col_exporter.export_face_groups = options['export_face_groups']
 
     file_name = options['file_name']
     output = b''

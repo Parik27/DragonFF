@@ -690,7 +690,7 @@ class dff_exporter:
                 while index >= len(geometry.uv_layers):
                     geometry.uv_layers.append([])
 
-                geometry.uv_layers[index].append(dff.TexCoords(uv.x, 1-uv.y))
+                geometry.uv_layers[index].append(dff.TexCoords(uv[0], 1-uv[1]))
 
             # bones
             #######################################################
@@ -812,6 +812,8 @@ class dff_exporter:
         if not self.exclude_geo_faces and len(mesh.vertices) > 0xFFFF:
             raise DffExportException(f"Too many vertices in mesh ({obj.name}): {len(mesh.vertices)}/65535")
 
+        uv_layers_data = [[uv.uv[:] for uv in layer.data] for layer in mesh.uv_layers]
+
         for polygon in mesh.polygons:
             face = {"verts": [], "mat_idx": polygon.material_index}
 
@@ -819,36 +821,24 @@ class dff_exporter:
                 loop = mesh.loops[loop_index]
                 vert_index = loop.vertex_index
                 vertex = mesh.vertices[vert_index]
-                uvs = []
-                vert_cols = []
-                bones = []
-                sk_cos = []
-
-                for uv_layer in mesh.uv_layers:
-                    uvs.append(uv_layer.data[loop_index].uv)
-
-                for vert_col in vcols:
-                    vert_cols.append(vert_col[loop_index])
-
-                for group in vertex.groups:
-                    # Only upto 4 vertices per group are supported
-                    if len(bones) >= 4:
-                        break
-
-                    if group.group in bone_groups and group.weight > 0:
-                        bones.append((bone_groups[group.group], group.weight))
-
-                if shape_keys:
-                    for kb in shape_keys.key_blocks:
-                        sk_cos.append(kb.data[vert_index].co)
+                uvs = tuple(layer[loop_index] for layer in uv_layers_data)
 
                 normal = normals[loop_index if use_loop_normals else vert_index]
 
                 key = (vert_index,
-                       tuple(normal),
-                       tuple(tuple(uv) for uv in uvs))
+                    tuple(normal),
+                    tuple(tuple(uv) for uv in uvs))
 
                 if key not in verts_indices:
+                    sk_cos = []
+                    vert_cols = [vert_col[loop_index] for vert_col in vcols]
+                    bones = [(bone_groups[group.group], group.weight)
+                     for group in vertex.groups
+                     if group.group in bone_groups and group.weight > 0][:4]
+
+                    if shape_keys:
+                        sk_cos = [kb.data[vert_index].co for kb in shape_keys.key_blocks]
+
                     face['verts'].append (len(vertices_list))
                     verts_indices[key] = len(vertices_list)
                     vertices_list.append({"idx": vert_index,
@@ -1303,7 +1293,9 @@ class dff_exporter:
                 'version'               : 3,
                 'collection'            : self.collection,
                 'apply_transformations' : self.apply_coll_trans,
-                'only_selected'         : self.selected
+                'only_selected'         : self.selected,
+                'clean_mesh'            : False,
+                'export_face_groups'    : False
             })
 
             if len(mem) != 0:

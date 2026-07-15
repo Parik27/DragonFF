@@ -67,6 +67,9 @@ class dff_importer:
     #######################################################
     @staticmethod
     def clean_object_name(name):
+        if name is None:
+            return ""
+
         if "." in name:
             return name + '.001'
         return name

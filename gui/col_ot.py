@@ -56,11 +56,23 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
         default = False
     )
 
+    clean_mesh : bpy.props.BoolProperty(
+        name = "Clean Mesh",
+        default = True
+    )
+
+    export_face_groups : bpy.props.BoolProperty(
+        name = "Export Face Groups",
+        default = False
+    )
+
     #######################################################
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "export_version")
         layout.prop(self, "apply_transformations")
+        layout.prop(self, "clean_mesh")
+        layout.prop(self, "export_face_groups")
         if not self.use_active_collection:
             layout.prop(self, "only_selected")
         return None
@@ -74,7 +86,9 @@ class EXPORT_OT_col(bpy.types.Operator, ExportHelper):
                 "version"               : int(self.export_version),
                 "collection"            : context.collection if self.use_active_collection else None,
                 "apply_transformations" : self.apply_transformations,
-                "only_selected"         : self.only_selected
+                "only_selected"         : self.only_selected,
+                "clean_mesh"            : self.clean_mesh,
+                "export_face_groups"    : self.export_face_groups
             }
         )
 

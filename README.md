@@ -30,11 +30,17 @@ The following is a list of supported features by the addon
 - [X] Multiple UV Maps
 - [X] Mass export
 - [X] Material Effects
-  - [X] Environment/Normal Maps
-  - [ ] Dual Textures
-  - [X] UV Animation
-- [X] Rockstar Specular and Reflection Extensions
-- [X] 2D Effects
+  - [X] Environment Mapping
+  - [X] Bump Mapping and Bump & Environment Mapping
+  - [X] Dual Texture Mapping
+  - [X] UV Animation and Dual Texture & UV Animation
+- [X] Rockstar Extensions 
+  - [X] Specular Material
+  - [X] Reflection Material
+  - [X] Breakable
+  - [X] Pipeline Set
+  - [X] Night Vertex Color
+  - [X] 2D Effects
 
 ## Installation
 
