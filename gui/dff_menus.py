@@ -504,6 +504,7 @@ class OBJECT_PT_dffObjects(bpy.types.Panel):
         box.prop(settings, "triangle_strip", text="Use Triangle Strip")
         box.prop(settings, "light", text="Enable Lighting")
         box.prop(settings, "modulate_color", text="Enable Modulate Material Color")
+        box.prop(settings, "sk_type")
 
         properties = [
             ["day_cols", "Day Vertex Colours"],
@@ -859,6 +860,15 @@ compatibiility with DFF Viewers"
     triangle_strip : bpy.props.BoolProperty(
         default=True,
         description="Use Triangle Strip instead of Triangle List for Bin Mesh PLG"
+    )
+
+    sk_type : bpy.props.EnumProperty(
+        items = (
+            ("DM",      "Delta Morph",  "Export Shape Keys as Delta Morph entries"),
+            ("CLUMPS",  "Clumps",       "Export Shape Keys as Clumps"),
+        ),
+        name = "Shape Keys",
+        description = "How to export Shape Keys"
     )
 
     col_material : bpy.props.IntProperty(

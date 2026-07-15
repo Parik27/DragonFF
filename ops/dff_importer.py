@@ -45,7 +45,6 @@ class dff_importer:
     import_normals     = True
     import_breakable   = True
     group_materials    = False
-    clumps_to_dm       = False
     hide_damage_parts  = False
     version            = ""
     warning            = ""
@@ -368,6 +367,11 @@ class dff_importer:
             else:
                 self.meshes[atomic.frame] = [obj]
                 self.delta_morph[atomic.frame] = [geom.extensions.get('delta_morph')]
+
+            if geom.extensions.get("_clumps_to_dm"):
+                obj.dff.sk_type = "CLUMPS"
+            else:
+                obj.dff.sk_type = "DM"
 
             # Create breakable model
             if self.import_breakable and 'breakable_model' in geom.extensions:
@@ -1030,8 +1034,7 @@ class dff_importer:
         self.dff.load_file(file_name)
         self.file_name = file_name
 
-        if self.clumps_to_dm:
-            self.convert_clumps_to_delta_morph()
+        self.convert_clumps_to_delta_morph()
 
         create_subcollections = len(self.dff.clumps) > 1
 
@@ -1102,6 +1105,9 @@ class dff_importer:
                 return False
 
             for idx, geometry in enumerate(clump.geometry_list):
+                if "delta_morph" in geometry.extensions:
+                    return False
+
                 if len(geometry.vertices) != verts_count[idx]:
                     return False
 
@@ -1136,6 +1142,7 @@ class dff_importer:
                     morph.append_entry(entry)
 
             base_geometry.extensions["delta_morph"] = morph
+            base_geometry.extensions["_clumps_to_dm"] = True
 
         del self.dff.clumps[1:]
 
@@ -1179,7 +1186,6 @@ def import_dff(options):
     dff_importer.materials_naming  = options['materials_naming']
     dff_importer.import_breakable  = options.get('import_breakable', True)
     dff_importer.hide_damage_parts = options.get('hide_damage_parts', False)
-    dff_importer.clumps_to_dm     = options['clumps_to_dm']
 
     dff_importer.import_dff(options['file_name'])
 

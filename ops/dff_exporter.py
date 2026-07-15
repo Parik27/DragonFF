@@ -375,7 +375,6 @@ class dff_exporter:
     coll_ext_type = 0
     apply_coll_trans = True
     exclude_geo_faces = False
-    dm_to_clumps = False
     from_outliner = False
 
     # Current clump specific data
@@ -717,10 +716,17 @@ class dff_exporter:
 
         if skin_plg is not None:
             geometry.extensions['skin'] = skin_plg
+
         if extra_vert:
             geometry.extensions['extra_vert_color'] = extra_vert
+
         if delta_morph_plg is not None:
-            geometry.extensions['delta_morph'] = delta_morph_plg
+            if obj.dff.sk_type == 'DM':
+                geometry.extensions['delta_morph'] = delta_morph_plg
+            elif obj.dff.sk_type == 'CLUMPS':
+                # Temporary custom extension.
+                # Will be removed during delta morph to clumps conversion
+                geometry.extensions['_clumps_dm'] = delta_morph_plg
 
     #######################################################
     @staticmethod
@@ -1028,8 +1034,8 @@ class dff_exporter:
         clump = self.dff.clumps[0]
         for atomic in clump.atomic_list:
             geom = clump.geometry_list[atomic.geometry]
-            if "delta_morph" in geom.extensions:
-                delta_morph : dff.DeltaMorphPLG = geom.extensions.pop("delta_morph")
+            if "_clumps_dm" in geom.extensions:
+                delta_morph : dff.DeltaMorphPLG = geom.extensions.pop("_clumps_dm")
 
                 if delta_morph.base_name:
                     clump.frame_list[atomic.frame].name = delta_morph.base_name
@@ -1308,8 +1314,7 @@ class dff_exporter:
         if not self.dff.clumps:
             return
 
-        if self.dm_to_clumps:
-            self.convert_delta_morphs_to_clumps()
+        self.convert_delta_morphs_to_clumps()
 
         if name is None:
             self.dff.write_file(self.file_name, self.version)
@@ -1384,7 +1389,6 @@ def export_dff(options):
     dff_exporter.selected           = options['selected']
     dff_exporter.export_frame_names = options['export_frame_names']
     dff_exporter.exclude_geo_faces  = options['exclude_geo_faces']
-    dff_exporter.dm_to_clumps       = options['dm_to_clumps']
     dff_exporter.mass_export        = options['mass_export']
     dff_exporter.preserve_positions = options['preserve_positions']
     dff_exporter.preserve_rotations = options['preserve_rotations']

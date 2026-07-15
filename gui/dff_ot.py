@@ -61,12 +61,6 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         default         = False
     )
 
-    dm_to_clumps    :  bpy.props.BoolProperty(
-        name        = "Delta Morph Multiple Clumps",
-        description = "Split Delta Morph into multiple clumps",
-        default     = True
-    )
-
     only_selected       : bpy.props.BoolProperty(
         name            = "Only Selected",
         default         = False
@@ -148,7 +142,6 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
 
         layout.prop(self, "export_frame_names")
         layout.prop(self, "exclude_geo_faces")
-        layout.prop(self, "dm_to_clumps")
         layout.prop(self, "export_version")
 
         if self.export_version == 'custom':
@@ -196,7 +189,6 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
                     "mass_export"        : False if self.from_outliner else self.mass_export,
                     "preserve_positions" : preserve_positions,
                     "preserve_rotations" : preserve_rotations,
-                    "dm_to_clumps"       : self.dm_to_clumps,
                     "version"            : self.get_selected_rw_version(),
                     "export_coll"        : self.export_coll,
                     "coll_ext_type"      : int(self.coll_ext_type),
@@ -346,12 +338,6 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         default     = True
     )
 
-    clumps_to_dm    :  bpy.props.BoolProperty(
-        name        = "Delta Morph Multiple Clumps",
-        description = "Merge multiple clumps into one using Delta Morph",
-        default     = True
-    )
-
     image_ext : bpy.props.EnumProperty(
         items =
         (
@@ -394,7 +380,6 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         box_dff.prop(self, "hide_damage_parts")
         box_dff.prop(self, "group_materials")
         box_dff.prop(self, "materials_naming")
-        box_dff.prop(self, "clumps_to_dm")
 
     #######################################################
     def execute(self, context):
@@ -463,7 +448,6 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
                         'group_materials'  : self.group_materials,
                         'import_normals'   : self.import_normals,
                         'materials_naming' : self.materials_naming,
-                        'clumps_to_dm'     : self.clumps_to_dm,
                         'hide_damage_parts': self.hide_damage_parts,
                     }
                 )
