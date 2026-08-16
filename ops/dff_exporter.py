@@ -468,48 +468,52 @@ class dff_exporter:
 
         for b_material in obj.data.materials:
 
-            if b_material is None:
-                continue
-            
             material = dff.Material()
-            helper = material_helper(b_material)
 
-            material.color             = helper.get_base_color()
-            material.surface_properties = helper.get_surface_properties()
-            
-            texture = helper.get_texture()
-            if texture:
-                material.textures.append(texture)
+            if b_material:
+                helper = material_helper(b_material)
 
-            # Materials
-            material.add_plugin('bump_map', helper.get_bump_map())
-            material.add_plugin('env_map', helper.get_environment_map())
-            material.add_plugin('dual', helper.get_dual_texture())
-            material.add_plugin('spec', helper.get_specular_material())
-            material.add_plugin('refl', helper.get_reflection_material())
-            material.add_plugin('udata', helper.get_user_data())
+                material.color              = helper.get_base_color()
+                material.surface_properties = helper.get_surface_properties()
 
-            anim = helper.get_uv_animation()
-            if anim:
-                material.add_plugin('uv_anim', anim.name)
-                self.dff.uvanim_dict.append(anim)
+                texture = helper.get_texture()
+                if texture:
+                    material.textures.append(texture)
 
-            # Create a dummy uv anim to apply to the second uv channel to force dual pass blending
-            if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
-                dummy_anim = dff.UVAnim()
-                dummy_anim.name = "DragonFF"
-                dummy_anim.node_to_uv[0] = 1
-                dummy_anim.duration = 1.0
-                dummy_anim.frames = [
-                    dff.UVFrame(0.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0], -1),
-                    dff.UVFrame(1.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0],  0)
-                ]
+                # Materials
+                material.add_plugin('bump_map', helper.get_bump_map())
+                material.add_plugin('env_map', helper.get_environment_map())
+                material.add_plugin('dual', helper.get_dual_texture())
+                material.add_plugin('spec', helper.get_specular_material())
+                material.add_plugin('refl', helper.get_reflection_material())
+                material.add_plugin('udata', helper.get_user_data())
 
-                material.add_plugin('uv_anim', dummy_anim.name)
-                self.dff.uvanim_dict.append(dummy_anim)
+                anim = helper.get_uv_animation()
+                if anim:
+                    material.add_plugin('uv_anim', anim.name)
+                    self.dff.uvanim_dict.append(anim)
+
+                # Create a dummy uv anim to apply to the second uv channel to force dual pass blending
+                if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
+                    dummy_anim = dff.UVAnim()
+                    dummy_anim.name = "DragonFF"
+                    dummy_anim.node_to_uv[0] = 1
+                    dummy_anim.duration = 1.0
+                    dummy_anim.frames = [
+                        dff.UVFrame(0.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0], -1),
+                        dff.UVFrame(1.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0],  0)
+                    ]
+
+                    material.add_plugin('uv_anim', dummy_anim.name)
+                    self.dff.uvanim_dict.append(dummy_anim)
+
+            else:
+                # Geometry faces can be assigned to empty material slot, so a basic material should be created
+                material.color              = dff.RGBA._make((255, 255, 255, 255))
+                material.surface_properties = dff.GeomSurfPro(1.0, 1.0, 1.0)
 
             materials.append(material)
-                
+
         return materials
 
     #######################################################
