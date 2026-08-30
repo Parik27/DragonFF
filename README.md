@@ -2,9 +2,9 @@
 
 [![Discord](https://img.shields.io/discord/1286221154612281405.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/QxpkwNqeTr)
 
-DragonFF is a Blender Addon for import and export of GTA files. 
+DragonFF is a Blender Addon for import and export of GTA files.
 
-At the moment, only Renderware files are supported. Support for formats other than .dff is planned. 
+At the moment, only Renderware files are supported. Support for formats other than .dff is planned.
 
 ## Supported Features
 
@@ -30,17 +30,23 @@ The following is a list of supported features by the addon
 - [X] Multiple UV Maps
 - [X] Mass export
 - [X] Material Effects
-  - [X] Environment/Normal Maps
-  - [ ] Dual Textures
-  - [X] UV Animation
-- [X] Rockstar Specular and Reflection Extensions
-- [X] 2D Effects
+  - [X] Environment Mapping
+  - [X] Bump Mapping and Bump & Environment Mapping
+  - [X] Dual Texture Mapping
+  - [X] UV Animation and Dual Texture & UV Animation
+- [X] Rockstar Extensions 
+  - [X] Specular Material
+  - [X] Reflection Material
+  - [X] Breakable
+  - [X] Pipeline Set
+  - [X] Night Vertex Color
+  - [X] 2D Effects
 
 ## Installation
 
 There are two ways to install DragonFF.
 
-### From Blender Extentensions
+### From Blender Extensions
 
 In Blender 4.2 and above, you can install DragonFF directly from within Blender.
 
@@ -77,4 +83,3 @@ The following have contributed significantly to the project:
 
 * [swift502](https://github.com/swift502) - For the map importer.
 * [Psycrow101](https://github.com/Psycrow101) - For delta morphs importer.
-

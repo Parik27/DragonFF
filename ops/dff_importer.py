@@ -51,6 +51,7 @@ class dff_importer:
 
     __slots__ = [
         'dff',
+        'current_clump',
         'meshes',
         'objects',
         'file_name',
@@ -65,6 +66,9 @@ class dff_importer:
     #######################################################
     @staticmethod
     def clean_object_name(name):
+        if name is None:
+            return ""
+
         if "." in name:
             return name + '.001'
         return name
@@ -115,10 +119,10 @@ class dff_importer:
         self = dff_importer
 
         # Import atomics (meshes)
-        for atomic_index, atomic in enumerate(self.dff.atomic_list):
+        for atomic_index, atomic in enumerate(self.current_clump.atomic_list):
 
-            frame = self.dff.frame_list[atomic.frame]
-            geom = self.dff.geometry_list[atomic.geometry]
+            frame = self.current_clump.frame_list[atomic.frame]
+            geom = self.current_clump.geometry_list[atomic.geometry]
 
             mesh = bpy.data.meshes.new(self.clean_object_name(frame.name))
             bm   = bmesh.new()
@@ -167,9 +171,9 @@ class dff_importer:
                 extra_vertex_color = bm.loops.layers.color.new()
 
             if (dff_importer.use_mat_split or not geom.triangles) and 'mat_split' in geom.extensions:
-                faces = geom.extensions['mat_split']
+                faces = sorted(geom.extensions['mat_split'])
             else:
-                faces = geom.triangles
+                faces = sorted(geom.triangles)
 
             has_normals = geom.has_normals
             use_face_loops = geom.native_platform_type == dff.NativePlatformType.GC
@@ -363,6 +367,11 @@ class dff_importer:
             else:
                 self.meshes[atomic.frame] = [obj]
                 self.delta_morph[atomic.frame] = [geom.extensions.get('delta_morph')]
+
+            if geom.extensions.get("_clumps_to_dm"):
+                obj.dff.sk_type = "CLUMPS"
+            else:
+                obj.dff.sk_type = "DM"
 
             # Create breakable model
             if self.import_breakable and 'breakable_model' in geom.extensions:
@@ -590,12 +599,12 @@ class dff_importer:
 
         bone_indices = {
             bone.id
-            for frame in self.dff.frame_list
+            for frame in self.current_clump.frame_list
             if frame.bone_data
             for bone in frame.bone_data.bones
         }
 
-        for index, frame in enumerate(self.dff.frame_list):
+        for index, frame in enumerate(self.current_clump.frame_list):
             if frame.bone_data:
                 bone_id = frame.bone_data.header.id
                 if bone_id in bone_indices:
@@ -884,7 +893,7 @@ class dff_importer:
         # Initialise bone indices for use in armature construction
         self.construct_bone_dict()
 
-        for index, frame in enumerate(self.dff.frame_list):
+        for index, frame in enumerate(self.current_clump.frame_list):
 
             # Check if the meshes for the frame has been loaded
             meshes = []
@@ -898,7 +907,9 @@ class dff_importer:
                 if delta_morph:
                     verts = mesh.data.vertices
 
-                    sk_basis = mesh.shape_key_add(name='Basis')
+                    base_name = delta_morph.base_name or "Basis"
+
+                    sk_basis = mesh.shape_key_add(name=base_name)
                     sk_basis.interpolation = 'KEY_LINEAR'
                     mesh.data.shape_keys.use_relative = True
 
@@ -991,10 +1002,24 @@ class dff_importer:
             self.remove_object_doubles()
 
     #######################################################
+    def import_collisions():
+        self = dff_importer
+
+        for collision in self.current_clump.collisions:
+            col = import_col_mem(collision.data, os.path.basename(self.file_name), False)
+
+            for collection in col:
+                self.current_collection.children.link(collection)
+
+                # Hide objects
+                for object in collection.objects:
+                    hide_object(object)
+
+    #######################################################
     def import_2dfx():
         self = dff_importer
 
-        importer = ext_2dfx_importer(self.dff.ext_2dfx)
+        importer = ext_2dfx_importer(self.current_clump.ext_2dfx)
 
         for obj in importer.get_objects():
             link_object(obj, self.current_collection)
@@ -1009,28 +1034,52 @@ class dff_importer:
         self.dff.load_file(file_name)
         self.file_name = file_name
 
-        # Create a new group/collection
-        self.current_collection = create_collection(
-            os.path.basename(file_name)
-        )
+        self.convert_clumps_to_delta_morph()
 
-        # Create a placeholder frame if there are no frames in the file
-        if len(self.dff.frame_list) == 0:
-            frame = dff.Frame()
-            frame.name            = ""
-            frame.position        = (0, 0, 0)
-            frame.rotation_matrix = dff.Matrix._make(
-                mathutils.Matrix.Identity(3).transposed()
-            )
-            self.dff.frame_list.append(frame)
+        create_subcollections = len(self.dff.clumps) > 1
 
-            # Attach the created frame to the atomics
-            for atomic in self.dff.atomic_list:
-                atomic.frame = 0
+        base_collection = create_collection(
+            os.path.basename(file_name))
 
-        self.import_atomics()
-        self.import_frames()
-        self.import_2dfx()
+        for clump_idx, clump in enumerate(self.dff.clumps):
+
+            self.meshes = {}
+            self.delta_morph = {}
+            self.objects = {}
+            self.skin_data = {}
+            self.bones = {}
+            self.frame_bones = {}
+            self.materials = {}
+            self.current_clump = clump
+
+            # Create a new group/collection
+            if create_subcollections:
+                self.current_collection = create_collection(
+                    os.path.basename(file_name) + "_clump_" + str(clump_idx), False)
+                base_collection.children.link(self.current_collection)
+                self.current_collection.dff.type = 'CLUMP'
+                self.current_collection.dff.clump_index = clump_idx
+            else:
+                self.current_collection = base_collection
+
+            # Create a placeholder frame if there are no frames in the file
+            if len(self.current_clump.frame_list) == 0:
+                frame = dff.Frame()
+                frame.name            = ""
+                frame.position        = (0, 0, 0)
+                frame.rotation_matrix = dff.Matrix._make(
+                    mathutils.Matrix.Identity(3).transposed()
+                )
+                self.current_clump.frame_list.append(frame)
+
+                # Attach the created frame to the atomics
+                for atomic in self.current_clump.atomic_list:
+                    atomic.frame = 0
+
+            self.import_atomics()
+            self.import_frames()
+            self.import_2dfx()
+            self.import_collisions()
 
         if dff_importer.hide_damage_parts:
             for obj in self.objects.values():
@@ -1040,18 +1089,62 @@ class dff_importer:
         # Set imported version
         self.version = "0x%05x" % self.dff.rw_version
 
-        # Add collisions
-        for collision in self.dff.collisions:
-            col = import_col_mem(collision.data, os.path.basename(file_name), False)
-
-            for collection in col:
-                self.current_collection.children.link(collection)
-
-                # Hide objects
-                for object in collection.objects:
-                    hide_object(object)
-
         State.update_scene()
+
+    #######################################################
+    @staticmethod
+    def can_convert_clumps_to_delta_morph(dff):
+        if len(dff.clumps) < 2:
+            return False
+
+        verts_count = list(len(geometry.vertices)
+                           for geometry in dff.clumps[0].geometry_list)
+
+        for clump in dff.clumps[1:]:
+            if len(clump.geometry_list) != len(verts_count):
+                return False
+
+            for idx, geometry in enumerate(clump.geometry_list):
+                if "delta_morph" in geometry.extensions:
+                    return False
+
+                if len(geometry.vertices) != verts_count[idx]:
+                    return False
+
+        return True
+
+    #######################################################
+    @staticmethod
+    def convert_clumps_to_delta_morph():
+        self = dff_importer
+
+        if not self.can_convert_clumps_to_delta_morph(self.dff):
+            return
+
+        for base_atomic in self.dff.clumps[0].atomic_list:
+            morph = dff.DeltaMorphPLG()
+
+            base_clump = self.dff.clumps[0]
+            base_geometry = base_clump.geometry_list[base_atomic.geometry]
+            morph.base_name = base_clump.frame_list[base_atomic.frame].name
+
+            for clump in self.dff.clumps[1:]:
+                for atomic in clump.atomic_list:
+                    entry = dff.DeltaMorph()
+                    geometry = clump.geometry_list[atomic.geometry]
+
+                    entry.name = clump.frame_list[atomic.frame].name
+                    entry.indices = list(range(len(geometry.vertices)))
+
+                    entry.positions = list(dff.Vector(a.x-b.x, a.y-b.y, a.z-b.z)
+                                           for a,b in zip(geometry.vertices,
+                                                          base_geometry.vertices))
+                    morph.append_entry(entry)
+
+            base_geometry.extensions["delta_morph"] = morph
+            base_geometry.extensions["_clumps_to_dm"] = True
+
+        del self.dff.clumps[1:]
 
 #######################################################
 def set_parent_bone(obj, armature, bone_name):

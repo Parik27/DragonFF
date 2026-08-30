@@ -92,7 +92,7 @@ class Sections:
     def compress_vertices(vertices):
         compressed_vertices = []
         for vertex in vertices:
-            compressed_vertices.append(TVertex._make(int(i*128) for i in vertex))
+            compressed_vertices.append(TVertex._make(round(i*128) for i in vertex))
 
         return compressed_vertices
             

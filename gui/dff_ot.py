@@ -60,7 +60,7 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
         description     = "Exclude faces from the Geometry section and force export Bin Mesh PLG",
         default         = False
     )
-    
+
     only_selected       : bpy.props.BoolProperty(
         name            = "Only Selected",
         default         = False
@@ -337,7 +337,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         name        = "Import Custom Normals",
         default     = True
     )
-    
+
     image_ext : bpy.props.EnumProperty(
         items =
         (

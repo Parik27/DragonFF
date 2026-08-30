@@ -16,32 +16,18 @@
 
 import bpy
 import bmesh
-import math
+import copy
 import mathutils
 
 from bpy_extras import anim_utils
-from collections import OrderedDict
+
+from .exporter_common import (
+    clear_extension, extract_texture_info_from_name, is_matrix_identity)
+from .col_exporter import export_col
 
 from ..gtaLib import dff
 from ..ops.ext_2dfx_exporter import ext_2dfx_exporter
 from ..ops.state import State
-from .col_exporter import export_col
-
-#######################################################
-def clear_extension(string):
-    
-    k = string.rfind('.')
-    return string if k < 0 else string[:k]
-
-#######################################################
-def is_matrix_identity(mat, epsilon=1e-6):
-
-    identity = mathutils.Matrix.Identity(len(mat))
-    for i in range(len(mat)):
-        for j in range(len(mat)):
-            if not math.isclose(mat[i][j], identity[i][j], abs_tol=epsilon):
-                return False
-    return True
 
 #######################################################
 class material_helper:
@@ -54,11 +40,11 @@ class material_helper:
         if self.principled:
             node = self.principled.node_principled_bsdf.inputs["Base Color"]
             return dff.RGBA._make(
-                list(int(255 * x) for x in node.default_value)
+                list(round(255 * x) for x in node.default_value)
             )
-        alpha = int(self.material.alpha * 255)
+        alpha = round(self.material.alpha * 255)
         return dff.RGBA._make(
-                    list(int(255*x) for x in self.material.diffuse_color) + [alpha]
+                    list(round(255 * x) for x in self.material.diffuse_color) + [alpha]
                 )
 
     #######################################################
@@ -68,7 +54,7 @@ class material_helper:
         texture.filters = int(self.material.dff.tex_filters)
         texture.uv_addressing = int(self.material.dff.tex_u_addr) << 4 | int(self.material.dff.tex_v_addr)
 
-        # 2.8         
+        # 2.8
         if self.principled:
             if self.principled.base_color_texture.image is not None:
 
@@ -77,20 +63,19 @@ class material_helper:
 
                 # Use node label if it is a substring of image name, else
                 # use image name
-                
-                texture.name = clear_extension(
-                    node_label
-                    if node_label in image_name and node_label != ""
-                    else image_name
-                )
+                if node_label in image_name and node_label != "":
+                    image_name = node_label
+
+                texture_name, _ = extract_texture_info_from_name(image_name)
+                texture.name = clear_extension(texture_name)
                 return texture
             return None
 
         # Blender Internal
         try:
-            texture.name = clear_extension(
-                self.material.texture_slots[0].texture.image.name
-            )
+            image_name = self.material.texture_slots[0].texture.image.name
+            texture_name, _ = extract_texture_info_from_name(image_name)
+            texture.name = clear_extension(texture_name)
             return texture
 
         except BaseException:
@@ -385,13 +370,16 @@ class dff_exporter:
     file_name = ""
     dff = None
     version = None
-    frame_objects = {}
     collection = None
     export_coll = False
     coll_ext_type = 0
     apply_coll_trans = True
     exclude_geo_faces = False
     from_outliner = False
+
+    # Current clump specific data
+    current_clump = None
+    frame_objects = {}
 
     #######################################################
     @staticmethod
@@ -414,7 +402,7 @@ class dff_exporter:
         self = dff_exporter
 
         frame       = dff.Frame()
-        frame_index = len(self.dff.frame_list)
+        frame_index = len(self.current_clump.frame_list)
 
         # Is obj a bone?
         is_bone = type(obj) is bpy.types.Bone
@@ -462,7 +450,7 @@ class dff_exporter:
             frame.parent = parent_frame_idx
 
         if append:
-            self.dff.frame_list.append(frame)
+            self.current_clump.frame_list.append(frame)
 
         self.frame_objects[obj] = frame_index
         return frame
@@ -470,7 +458,7 @@ class dff_exporter:
     #######################################################
     @staticmethod
     def get_last_frame_index():
-        return len(dff_exporter.dff.frame_list) - 1
+        return len(dff_exporter.current_clump.frame_list) - 1
 
     #######################################################
     @staticmethod
@@ -480,48 +468,52 @@ class dff_exporter:
 
         for b_material in obj.data.materials:
 
-            if b_material is None:
-                continue
-            
             material = dff.Material()
-            helper = material_helper(b_material)
 
-            material.color             = helper.get_base_color()
-            material.surface_properties = helper.get_surface_properties()
-            
-            texture = helper.get_texture()
-            if texture:
-                material.textures.append(texture)
+            if b_material:
+                helper = material_helper(b_material)
 
-            # Materials
-            material.add_plugin('bump_map', helper.get_bump_map())
-            material.add_plugin('env_map', helper.get_environment_map())
-            material.add_plugin('dual', helper.get_dual_texture())
-            material.add_plugin('spec', helper.get_specular_material())
-            material.add_plugin('refl', helper.get_reflection_material())
-            material.add_plugin('udata', helper.get_user_data())
+                material.color              = helper.get_base_color()
+                material.surface_properties = helper.get_surface_properties()
 
-            anim = helper.get_uv_animation()
-            if anim:
-                material.add_plugin('uv_anim', anim.name)
-                self.dff.uvanim_dict.append(anim)
+                texture = helper.get_texture()
+                if texture:
+                    material.textures.append(texture)
 
-            # Create a dummy uv anim to apply to the second uv channel to force dual pass blending
-            if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
-                dummy_anim = dff.UVAnim()
-                dummy_anim.name = "DragonFF"
-                dummy_anim.node_to_uv[0] = 1
-                dummy_anim.duration = 1.0
-                dummy_anim.frames = [
-                    dff.UVFrame(0.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0], -1),
-                    dff.UVFrame(1.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0],  0)
-                ]
+                # Materials
+                material.add_plugin('bump_map', helper.get_bump_map())
+                material.add_plugin('env_map', helper.get_environment_map())
+                material.add_plugin('dual', helper.get_dual_texture())
+                material.add_plugin('spec', helper.get_specular_material())
+                material.add_plugin('refl', helper.get_reflection_material())
+                material.add_plugin('udata', helper.get_user_data())
 
-                material.add_plugin('uv_anim', dummy_anim.name)
-                self.dff.uvanim_dict.append(dummy_anim)
+                anim = helper.get_uv_animation()
+                if anim:
+                    material.add_plugin('uv_anim', anim.name)
+                    self.dff.uvanim_dict.append(anim)
+
+                # Create a dummy uv anim to apply to the second uv channel to force dual pass blending
+                if b_material.dff.force_dual_pass and b_material.dff.export_dual_tex and b_material.dff.dual_tex:
+                    dummy_anim = dff.UVAnim()
+                    dummy_anim.name = "DragonFF"
+                    dummy_anim.node_to_uv[0] = 1
+                    dummy_anim.duration = 1.0
+                    dummy_anim.frames = [
+                        dff.UVFrame(0.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0], -1),
+                        dff.UVFrame(1.0, [0.0, 1.0, 1.0, 0.0, 0.0, 0.0],  0)
+                    ]
+
+                    material.add_plugin('uv_anim', dummy_anim.name)
+                    self.dff.uvanim_dict.append(dummy_anim)
+
+            else:
+                # Geometry faces can be assigned to empty material slot, so a basic material should be created
+                material.color              = dff.RGBA._make((255, 255, 255, 255))
+                material.surface_properties = dff.GeomSurfPro(1.0, 1.0, 1.0)
 
             materials.append(material)
-                
+
         return materials
 
     #######################################################
@@ -587,6 +579,7 @@ class dff_exporter:
     @staticmethod
     def get_delta_morph_entries(sks):
         dm_entries = []
+        self = dff_exporter
 
         if len(sks) > 1:
             for kb in sks[1:]:
@@ -597,6 +590,7 @@ class dff_exporter:
                 dimensions = max_corner - min_corner
 
                 sphere_center = 0.5 * (min_corner + max_corner)
+                sphere_center = self.multiply_matrix(obj.matrix_world, sphere_center)
                 sphere_radius = 1.732 * max(*dimensions) / 2
 
                 entrie = dff.DeltaMorph()
@@ -675,6 +669,7 @@ class dff_exporter:
         delta_morph_plg = None
         if dm_entries:
             delta_morph_plg = dff.DeltaMorphPLG()
+            delta_morph_plg.base_name = obj.data.shape_keys.key_blocks[0].name
             for entrie in dm_entries:
                 delta_morph_plg.append_entry(entrie)
            
@@ -686,10 +681,10 @@ class dff_exporter:
             #######################################################
             if has_prelit_colors:
                 geometry.prelit_colors.append(dff.RGBA._make(
-                    int(col * 255) for col in vertex['vert_cols'][0]))
+                    round(col * 255) for col in vertex['vert_cols'][0]))
             if has_night_colors:
                 extra_vert.colors.append(dff.RGBA._make(
-                    int(col * 255) for col in vertex['vert_cols'][1]))
+                    round(col * 255) for col in vertex['vert_cols'][1]))
 
             # uv layers
             #######################################################
@@ -700,7 +695,7 @@ class dff_exporter:
                 while index >= len(geometry.uv_layers):
                     geometry.uv_layers.append([])
 
-                geometry.uv_layers[index].append(dff.TexCoords(uv.x, 1-uv.y))
+                geometry.uv_layers[index].append(dff.TexCoords(uv[0], 1-uv[1]))
 
             # bones
             #######################################################
@@ -727,10 +722,17 @@ class dff_exporter:
 
         if skin_plg is not None:
             geometry.extensions['skin'] = skin_plg
+
         if extra_vert:
             geometry.extensions['extra_vert_color'] = extra_vert
+
         if delta_morph_plg is not None:
-            geometry.extensions['delta_morph'] = delta_morph_plg
+            if obj.dff.sk_type == 'DM':
+                geometry.extensions['delta_morph'] = delta_morph_plg
+            elif obj.dff.sk_type == 'CLUMPS':
+                # Temporary custom extension.
+                # Will be removed during delta morph to clumps conversion
+                geometry.extensions['_clumps_dm'] = delta_morph_plg
 
     #######################################################
     @staticmethod
@@ -810,7 +812,7 @@ class dff_exporter:
         if bpy.app.version < (4, 1, 0):
             mesh.calc_normals_split()
 
-        # Extract shape keys
+       # Extract shape keys
         sks = []
         if shape_keys:
             for kb in shape_keys.key_blocks:
@@ -834,6 +836,8 @@ class dff_exporter:
         if apply_trans_mat:
             apply_rot_mat = apply_trans_mat.to_3x3().normalized()
 
+        uv_layers_data = [[uv.uv[:] for uv in layer.data] for layer in mesh.uv_layers]
+
         for polygon in mesh.polygons:
             face = {"verts": [], "mat_idx": polygon.material_index}
 
@@ -841,33 +845,21 @@ class dff_exporter:
                 loop = mesh.loops[loop_index]
                 vert_index = loop.vertex_index
                 vertex = mesh.vertices[vert_index]
-                uvs = []
-                vert_cols = []
-                bones = []
-                sk_cos = [cos[vert_index] for _, cos in sks] if sks else []
-
-                for uv_layer in mesh.uv_layers:
-                    uvs.append(uv_layer.data[loop_index].uv)
-
-                for vert_col in vcols:
-                    vert_cols.append(vert_col[loop_index])
-
-                for group in vertex.groups:
-                    # Only upto 4 vertices per group are supported
-                    if len(bones) >= 4:
-                        break
-
-                    if group.group in bone_groups and group.weight > 0:
-                        bones.append((bone_groups[group.group], group.weight))
+                uvs = tuple(layer[loop_index] for layer in uv_layers_data)
 
                 co = vertex.co
                 normal = normals[loop_index if use_loop_normals else vert_index]
 
                 key = (vert_index,
-                       tuple(normal),
-                       tuple(tuple(uv) for uv in uvs))
+                    tuple(normal),
+                    tuple(tuple(uv) for uv in uvs))
 
                 if key not in verts_indices:
+                    sk_cos = [cos[vert_index] for _, cos in sks] if sks else []
+                    vert_cols = [vert_col[loop_index] for vert_col in vcols]
+                    bones = [(bone_groups[group.group], group.weight)
+                     for group in vertex.groups
+                     if group.group in bone_groups and group.weight > 0][:4]
 
                     if apply_trans_mat:
                         co = apply_trans_mat @ co
@@ -936,7 +928,6 @@ class dff_exporter:
                 loop = mesh.loops[loop_index]
                 vert_index = loop.vertex_index
                 vertex = mesh.vertices[vert_index]
-                co = vertex.co
 
                 if mesh.uv_layers:
                     uv = mesh.uv_layers[0].data[loop_index].uv
@@ -952,7 +943,7 @@ class dff_exporter:
                 key = (vert_index, uv)
 
                 if key not in verts_indices:
-
+                    co = vertex.co
                     if apply_trans_mat:
                         co = apply_trans_mat @ co
 
@@ -980,7 +971,7 @@ class dff_exporter:
 
             vert_col = vertex['vert_col']
             breakable_model.prelits.append(dff.RGBA._make(
-                int(col * 255) for col in vert_col))
+                round(col * 255) for col in vert_col))
 
         triangles = [
             dff.Triangle._make((
@@ -1061,6 +1052,39 @@ class dff_exporter:
         return mesh, object_eval.data.shape_keys
 
     #######################################################
+    @staticmethod
+    def convert_delta_morphs_to_clumps():
+        self = dff_exporter
+
+        # Won't work as intended on already-multi-clump models
+        if len(self.dff.clumps) > 1:
+            return
+
+        clump = self.dff.clumps[0]
+        for atomic in clump.atomic_list:
+            geom = clump.geometry_list[atomic.geometry]
+            if "_clumps_dm" in geom.extensions:
+                delta_morph : dff.DeltaMorphPLG = geom.extensions.pop("_clumps_dm")
+
+                if delta_morph.base_name:
+                    clump.frame_list[atomic.frame].name = delta_morph.base_name
+
+                for i, dm in enumerate(delta_morph.entries, start=1):
+                    if i <= len(self.dff.clumps):
+                        self.dff.clumps.append(copy.deepcopy(clump))
+
+                    morph_clump = self.dff.clumps[i]
+                    morph_geom = morph_clump.geometry_list[atomic.geometry]
+
+                    morph_clump.frame_list[atomic.frame].name = dm.name
+
+                    for j, vi in enumerate(dm.indices):
+                        positions = dm.positions
+                        if positions:
+                            morph_geom.vertices[vi] = \
+                            dff.Vector(*map(sum,zip(geom.vertices[vi], positions[j])))
+
+    #######################################################
     def populate_atomic(obj, frame_index=None):
         self = dff_exporter
 
@@ -1129,12 +1153,12 @@ class dff_exporter:
                 obj.data['dff_user_data'])
 
         # Add Geometry to list
-        self.dff.geometry_list.append(geometry)
+        self.current_clump.geometry_list.append(geometry)
 
         # Create Atomic from geometry and frame
         atomic          = dff.Atomic()
         atomic.frame    = frame_index
-        atomic.geometry = len(self.dff.geometry_list) - 1
+        atomic.geometry = len(self.current_clump.geometry_list) - 1
         atomic.flags    = 0x4
 
         try:
@@ -1156,7 +1180,7 @@ class dff_exporter:
         if obj.dff.sky_gfx:
             atomic.extensions['sky_gfx'] = 1
 
-        self.dff.atomic_list.append(atomic)
+        self.current_clump.atomic_list.append(atomic)
 
     #######################################################
     @staticmethod
@@ -1222,7 +1246,7 @@ class dff_exporter:
                     )
 
                 frame.bone_data = bone_data
-                self.dff.frame_list.append(frame)
+                self.current_clump.frame_list.append(frame)
                 self.frame_objects[obj] = self.get_last_frame_index()
                 continue
 
@@ -1237,7 +1261,7 @@ class dff_exporter:
                 0
             )
             frame.bone_data = bone_data
-            self.dff.frame_list.append(frame)
+            self.current_clump.frame_list.append(frame)
             self.frame_objects[bone] = self.get_last_frame_index()
 
     #######################################################
@@ -1259,47 +1283,54 @@ class dff_exporter:
 
     #######################################################
     @staticmethod
-    def export_objects(objects, name=None):
+    def export_objects(clump_objects, name=None):
         self = dff_exporter
 
         self.dff = dff.dff()
 
-        # Skip empty collections
-        if len(objects) < 1:
-            return
+        for objects in clump_objects:
 
-        atomics_data = []
-
-        for obj in objects:
-
-            # We can just ignore collision meshes here as the DFF exporter will still look for
-            # them in their own nested collection later if export_coll is true.
-            if obj.dff.type != 'OBJ':
+            # Skip empty collections
+            if len(objects) < 1:
                 continue
 
-            # create atomic in this case
-            if obj.type == "MESH":
-                frame_index = None
+            self.frame_objects = {}
+            self.current_clump = dff.Clump()
+
+            atomics_data = []
+
+            for obj in objects:
+
+                # We can just ignore collision meshes here as the DFF exporter will still look for
+                # them in their own nested collection later if export_coll is true.
+                if obj.dff.type != 'OBJ':
+                    continue
+
+                # create atomic in this case
+                if obj.type == "MESH":
+                    frame_index = None
+                    # create an empty frame
+                    if obj.dff.is_frame:
+                        self.export_empty(obj)
+                        frame_index = self.get_last_frame_index()
+                    atomics_data.append((obj, frame_index))
+
                 # create an empty frame
-                if obj.dff.is_frame:
+                elif obj.type == "EMPTY":
                     self.export_empty(obj)
-                    frame_index = self.get_last_frame_index()
-                atomics_data.append((obj, frame_index))
 
-            # create an empty frame
-            elif obj.type == "EMPTY":
-                self.export_empty(obj)
+                elif obj.type == "ARMATURE":
+                    self.export_armature(obj)
 
-            elif obj.type == "ARMATURE":
-                self.export_armature(obj)
+            atomics_data = sorted(atomics_data, key=lambda a: a[0].dff.atomic_index)
 
-        atomics_data = sorted(atomics_data, key=lambda a: a[0].dff.atomic_index)
+            for mesh, frame_index in atomics_data:
+                self.populate_atomic(mesh, frame_index)
 
-        for mesh, frame_index in atomics_data:
-            self.populate_atomic(mesh, frame_index)
+            # 2DFX
+            ext_2dfx_exporter(self.current_clump.ext_2dfx).export_objects(objects, not self.preserve_positions)
 
-        # 2DFX
-        ext_2dfx_exporter(self.dff.ext_2dfx).export_objects(objects, not self.preserve_positions)
+            self.dff.clumps.append(self.current_clump)
 
         # Collision
         if self.export_coll:
@@ -1308,15 +1339,25 @@ class dff_exporter:
                 'version'               : 3,
                 'collection'            : self.collection,
                 'apply_transformations' : self.apply_coll_trans,
-                'only_selected'         : self.selected
+                'only_selected'         : self.selected,
+                'clean_mesh'            : False,
+                'export_face_groups'    : False
             })
 
             if len(mem) != 0:
                 col = dff.ExtensionColl(self.coll_ext_type, mem)
-                self.dff.collisions = [col]
+                if not self.dff.clumps:
+                    self.dff.clumps.append(dff.Clump())
+                self.dff.clumps[0].collisions = [col]
+
+        # Skip empty clumps
+        if not self.dff.clumps:
+            return
+
+        self.convert_delta_morphs_to_clumps()
 
         if name is None:
-            self.dff.write_file(self.file_name, self.version )
+            self.dff.write_file(self.file_name, self.version)
         else:
             filename = "%s/%s" % (self.path, name)
             if not filename.endswith('.dff'):
@@ -1337,7 +1378,7 @@ class dff_exporter:
         self.frame_objects = {}
 
         State.update_scene()
-        objects = {}
+        clump_objects = [{}]
 
         # Export collections
         if self.from_outliner:
@@ -1346,26 +1387,41 @@ class dff_exporter:
             collections = [c for c in bpy.data.collections if c.dff.type != 'NON'] + [bpy.context.scene.collection]
 
         for collection in collections:
+            if len(collections) > 1 and collection.dff.type == 'CLUMP':
+                continue
+
             for obj in collection.objects:
-                    
                 if not self.selected or obj.select_get():
-                    objects[obj] = obj.dff.frame_index
+                    clump_objects[0][obj] = obj.dff.frame_index
+
+            clump_sub_collections = [ch for ch in collection.children if ch.dff.type == 'CLUMP']
+            clump_sub_collections.sort(key=lambda c: c.dff.clump_index)
+
+            for clump_idx, sub_collection in enumerate(clump_sub_collections):
+                if clump_idx == len(clump_objects):
+                    clump_objects.append({})
+
+                for obj in sub_collection.objects:
+                    if not self.selected or obj.select_get():
+                        clump_objects[clump_idx][obj] = obj.dff.frame_index
 
             if self.mass_export:
-                objects = sorted(objects, key=objects.get)
-                self.export_objects(objects,
-                                    collection.name)
-                objects            = {}
-                self.frame_objects = {}
+                for clump_idx, objects in enumerate(clump_objects):
+                    clump_objects[clump_idx] = sorted(objects, key=objects.get)
+
+                self.export_objects(clump_objects, collection.name)
+                clump_objects   = [{}]
                 self.collection = collection
 
         if not self.mass_export:
             if self.from_outliner:
                 self.collection = collections[0]
 
-            objects = sorted(objects, key=objects.get)
-            self.export_objects(objects)
-                
+            for clump_idx, objects in enumerate(clump_objects):
+                clump_objects[clump_idx] = sorted(objects, key=objects.get)
+
+            self.export_objects(clump_objects)
+
 #######################################################
 def export_dff(options):
 
