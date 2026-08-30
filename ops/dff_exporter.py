@@ -40,11 +40,11 @@ class material_helper:
         if self.principled:
             node = self.principled.node_principled_bsdf.inputs["Base Color"]
             return dff.RGBA._make(
-                list(int(255 * x) for x in node.default_value)
+                list(round(255 * x) for x in node.default_value)
             )
-        alpha = int(self.material.alpha * 255)
+        alpha = round(self.material.alpha * 255)
         return dff.RGBA._make(
-                    list(int(255*x) for x in self.material.diffuse_color) + [alpha]
+                    list(round(255 * x) for x in self.material.diffuse_color) + [alpha]
                 )
 
     #######################################################
@@ -679,10 +679,10 @@ class dff_exporter:
             #######################################################
             if has_prelit_colors:
                 geometry.prelit_colors.append(dff.RGBA._make(
-                    int(col * 255) for col in vertex['vert_cols'][0]))
+                    round(col * 255) for col in vertex['vert_cols'][0]))
             if has_night_colors:
                 extra_vert.colors.append(dff.RGBA._make(
-                    int(col * 255) for col in vertex['vert_cols'][1]))
+                    round(col * 255) for col in vertex['vert_cols'][1]))
 
             # uv layers
             #######################################################
@@ -946,7 +946,7 @@ class dff_exporter:
 
             vert_col = vertex['vert_col']
             breakable_model.prelits.append(dff.RGBA._make(
-                int(col * 255) for col in vert_col))
+                round(col * 255) for col in vert_col))
 
         triangles = [
             dff.Triangle._make((
