@@ -87,7 +87,114 @@ class dff_importer:
         self.bones = {}
         self.frame_bones = {}
         self.materials = {}
+        self.frame_world = {}
+        self.skin_frame_offset = {}
         self.warning = ""
+
+    #######################################################
+    @staticmethod
+    def _matrix_max_diff(a, b):
+        return max(abs(a[i][j] - b[i][j]) for i in range(4) for j in range(4))
+
+    #######################################################
+    @staticmethod
+    def get_frame_world_matrix(index):
+        """World (clump space) matrix of a frame, accumulated over its parents."""
+
+        self = dff_importer
+
+        if index in self.frame_world:
+            return self.frame_world[index]
+
+        frames = self.current_clump.frame_list
+        frame = frames[index]
+
+        matrix = mathutils.Matrix(
+            (
+                frame.rotation_matrix.right,
+                frame.rotation_matrix.up,
+                frame.rotation_matrix.at
+            )
+        )
+        matrix = self.multiply_matrix(
+            mathutils.Matrix.Translation(frame.position),
+            matrix.transposed().to_4x4()
+        )
+
+        # Frames are always stored in hierarchical order, so the parent is
+        # guaranteed to be resolved already.
+        if 0 <= frame.parent < index:
+            matrix = self.multiply_matrix(
+                self.get_frame_world_matrix(frame.parent), matrix)
+
+        self.frame_world[index] = matrix
+        return matrix
+
+    #######################################################
+    @staticmethod
+    def get_skin_frame_offset(frame_index, hanim_bones):
+        """Matrix the skin bone matrices have to be pre-multiplied with so that
+        the generated bones end up in clump (model) space.
+
+        RenderWare stores the skin matrices as the inverse of every bone's bind
+        matrix. Most files (all GTA ones) use the bone's *world* bind matrix for
+        that, in which case nothing has to be done here.
+
+        A number of games (e.g. 轩辕剑外传：云之遥, RW 3.7.0.2) store them
+        relative to the frame the atomic is attached to instead. In that case the
+        geometry vertices live in that frame's local space as well, so both the
+        bone matrices and the geometry have to be pre-multiplied by the frame's
+        world matrix. Which of the two conventions a file uses is detected here
+        by comparing the stored matrices against the actual frame hierarchy.
+        """
+
+        self = dff_importer
+
+        if frame_index in self.skin_frame_offset:
+            return self.skin_frame_offset[frame_index]
+
+        identity = mathutils.Matrix.Identity(4)
+        offset = identity
+
+        try:
+            frame_world = self.get_frame_world_matrix(frame_index)
+            skin = self.skin_data.get(frame_index)
+
+            # Only relevant when the atomic's frame is actually transformed
+            if skin is not None and self._matrix_max_diff(frame_world, identity) > 1e-5:
+
+                err_world = 0.0
+                err_local = 0.0
+                samples = 0
+
+                for bone in hanim_bones[:16]:
+
+                    bone_frame = self.bones.get(bone.id)
+                    if bone_frame is None or bone.index >= len(skin.bone_matrices):
+                        continue
+
+                    try:
+                        bone_world_inv = self.get_frame_world_matrix(
+                            bone_frame['index']).inverted()
+                    except ValueError:
+                        continue
+
+                    stored = mathutils.Matrix(
+                        skin.bone_matrices[bone.index]).transposed()
+
+                    err_world += self._matrix_max_diff(stored, bone_world_inv)
+                    err_local += self._matrix_max_diff(
+                        stored, self.multiply_matrix(bone_world_inv, frame_world))
+                    samples += 1
+
+                if samples and err_local < err_world:
+                    offset = frame_world.copy()
+
+        except Exception:
+            offset = identity
+
+        self.skin_frame_offset[frame_index] = offset
+        return offset
 
     #######################################################
     def find_texture_image(name):
@@ -662,9 +769,12 @@ class dff_importer:
         skinned_objs = []
 
         skinned_obj_index = self.get_skinned_obj_index(frame, frame_index)
+        skin_frame_offset = mathutils.Matrix.Identity(4)
 
         if skinned_obj_index is not None:
             skinned_obj_data = self.skin_data[skinned_obj_index]
+            skin_frame_offset = self.get_skin_frame_offset(
+                skinned_obj_index, frame.bone_data.bones)
 
             for _, index in enumerate(self.skin_data):
                 skinned_objs += self.meshes[index]
@@ -696,6 +806,9 @@ class dff_importer:
                 matrix = skinned_obj_data.bone_matrices[bone.index]
                 matrix = mathutils.Matrix(matrix).transposed()
                 invert_matrix_safe(matrix)
+
+                # Bring the bone into clump space, see get_skin_frame_offset()
+                matrix = self.multiply_matrix(skin_frame_offset, matrix)
 
                 e_bone.transform(matrix, scale=True, roll=False)
                 e_bone.roll = self.align_roll(e_bone.vector,
@@ -991,12 +1104,37 @@ class dff_importer:
                 else:
                     obj.parent = self.objects[frame.parent]
 
+                    # Armature bones are always generated in clump (model)
+                    # space, so the armature itself has to sit at the origin -
+                    # otherwise the transform of the parent frame would be
+                    # applied a second time.
+                    if obj.type == 'ARMATURE':
+                        obj.matrix_parent_inverse = \
+                            self.objects[frame.parent].matrix_world.inverted()
+
             obj.dff.frame_index = index
 
             self.objects[index] = obj
 
             if frame.user_data is not None:
                 obj["dff_user_data"] = frame.user_data.to_mem()[12:]
+
+        # Skinned meshes that were not parented to a bone still need the
+        # transform of the frame their atomic is attached to.
+        for frame_index, meshes in self.meshes.items():
+
+            offset = self.skin_frame_offset.get(frame_index)
+            if offset is None:
+                continue
+
+            for mesh in meshes:
+                if mesh.parent is not None:
+                    continue
+
+                if not any(m.type == 'ARMATURE' for m in mesh.modifiers):
+                    continue
+
+                mesh.matrix_local = offset.copy()
 
         if self.remove_doubles:
             self.remove_object_doubles()
@@ -1050,6 +1188,8 @@ class dff_importer:
             self.bones = {}
             self.frame_bones = {}
             self.materials = {}
+            self.frame_world = {}
+            self.skin_frame_offset = {}
             self.current_clump = clump
 
             # Create a new group/collection
