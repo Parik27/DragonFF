@@ -3,6 +3,7 @@ from .dff_ot import EXPORT_OT_dff, IMPORT_OT_dff, EXPORT_OT_txd, \
     OBJECT_OT_dff_generate_bone_props, \
     OBJECT_OT_dff_set_parent_bone, OBJECT_OT_dff_clear_parent_bone
 from .dff_ot import SCENE_OT_dff_frame_move, SCENE_OT_dff_atomic_move, SCENE_OT_dff_update
+from ..ops.dff_assembler import OBJECT_OT_dff_assemble_parts
 from .col_ot import EXPORT_OT_col, \
     OBJECT_OT_facegoups_col, \
     COLLECTION_OT_dff_generate_bounds, \
@@ -1150,6 +1151,28 @@ class SCENE_PT_dffAtomics(bpy.types.Panel):
         if not scene_dff.real_time_update:
             col = row.column()
             col.operator(SCENE_OT_dff_update.bl_idname, icon='FILE_REFRESH', text="")
+
+#######################################################
+class SCENE_PT_dffAssemble(bpy.types.Panel):
+
+    bl_idname      = "SCENE_PT_dffAssemble"
+    bl_label       = "DragonFF - Assemble Parts"
+    bl_space_type  = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context     = "scene"
+    bl_options     = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.label(text="Attach parts that use their own rig")
+        layout.label(text="(face / head) to the main skeleton.")
+
+        op = layout.operator(OBJECT_OT_dff_assemble_parts.bl_idname,
+                             icon='ARMATURE_DATA')
+        op.use_selection = context.scene.dff.assemble_use_selection
+
+        layout.prop(context.scene.dff, "assemble_use_selection")
 
 #######################################################@
 class DFF_MT_AddCollisionObject(bpy.types.Menu):

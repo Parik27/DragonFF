@@ -20,6 +20,27 @@ from enum import Enum, IntEnum
 
 from .pyffi.utils import tristrip
 
+#######################################################
+def decode_text(data):
+    """Decode a string stored in a DFF.
+
+    RenderWare has no notion of text encoding, so most tools simply dump
+    whatever codepage the authoring machine used.  GTA files are pure ASCII,
+    but games localised for east-asia (e.g. 轩辕剑) store Big5 / GBK strings,
+    which must not abort the whole import.
+    """
+
+    if isinstance(data, str):
+        return data
+
+    for encoding in ("ascii", "utf-8", "big5", "gbk", "latin-1"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+    return data.decode("utf-8", "replace")
+
 # Data types
 Chunk         = namedtuple("Chunk"         , "type size version")
 ClumpStruct   = namedtuple("ClumpStruct"   , "atomics lights cameras")
@@ -600,8 +621,8 @@ class UserData:
 
             # Section name
             name_len = unpack_from("<I", data, offset)[0]
-            name = unpack_from("<%ds" % (name_len), data,
-                               offset + 4)[0].decode('ascii')
+            name = decode_text(unpack_from("<%ds" % (name_len), data,
+                                           offset + 4)[0])
 
             offset += name_len + 4
 
@@ -622,7 +643,7 @@ class UserData:
                 for j in range(num_elements):
                     str_len = unpack_from("<I", data, offset)[0]
                     string = unpack_from("<%ds" % (str_len), data, offset + 4)[0]
-                    elements.append(string.decode('ascii'))
+                    elements.append(decode_text(string))
                     
                     offset += 4 + str_len
 
@@ -638,9 +659,10 @@ class UserData:
         for section in self.sections:
             section:UserDataSection
 
-            # Write name
-            data += pack("<I%ds" % (len(section.name)),
-                         len(section.name), section.name.encode("ascii"))
+            # Write name (utf-8 is identical to ascii for plain GTA names)
+            name_bytes = section.name.encode("utf-8")
+            data += pack("<I%ds" % (len(name_bytes)),
+                         len(name_bytes), name_bytes)
 
             userTypes = {
                 int: UserDataType.USERDATAINT,
@@ -661,7 +683,8 @@ class UserData:
                 data += pack("<%df" % (total_elements), *section.data)
             elif data_type == UserDataType.USERDATASTRING:
                 for string in section.data:
-                    data += pack("<I%ds" % len(string), len(string), string.encode("ascii"))
+                    str_bytes = string.encode("utf-8")
+                    data += pack("<I%ds" % len(str_bytes), len(str_bytes), str_bytes)
 
         return Sections.write_chunk(data, types["User Data PLG"])
 
@@ -2280,7 +2303,7 @@ class Clump:
                 animation_data = None
 
                 if chunk.type == types["Frame"]:
-                    name = self.raw(strlen(self.data,self.pos)).decode("utf-8")
+                    name = decode_text(self.raw(strlen(self.data, self.pos)))
                     
                 elif chunk.type == types["HAnim PLG"]:
                     bone_data = HAnimPLG.from_mem(self.raw(chunk.size))

@@ -128,6 +128,12 @@ class DFFSceneProps(bpy.types.PropertyGroup):
         default     = False
     )
 
+    assemble_use_selection : bpy.props.BoolProperty(
+        name        = "Only Selected",
+        description = "Only assemble the selected skeletons instead of the whole scene",
+        default     = True
+    )
+
     import_breakable:  bpy.props.BoolProperty(
         name        = "Import Breakable",
         description = "Import Breakable Extension from the Geometry section",
