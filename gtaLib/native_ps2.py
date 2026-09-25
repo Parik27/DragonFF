@@ -160,6 +160,12 @@ class NativePS2Geometry:
                         section_a_last = True
                         reached_end = True
                         data_a_read = True
+
+                        if chunk8[15] == 0x11:
+                            self._pos = split_end
+                            read_types = []
+                            section_b_last = True
+
                     elif chunk8[3] == 0x10:
                         reached_end = True
                         data_a_read = True
@@ -215,6 +221,10 @@ class NativePS2Geometry:
 
     #######################################################
     def _read_geometry(self, geometry, data, split_index, indices_count, split_type):
+        cmd = (split_type & 0xFF000000) >> 24
+        num = (split_type & 0xFF0000) >> 16
+        addr = split_type & 0xFFFF
+
         size = 0
         split_type &= 0xFF00FFFF
 
@@ -256,6 +266,17 @@ class NativePS2Geometry:
                     self._indices[split_index].append(self._vertex_index - 1)
                     self._indices[split_index].append(self._vertex_index - 1)
 
+                self._indices[split_index].append(self._vertex_index)
+                self._vertex_index += 1
+
+        elif split_type == 0x69008000:
+            size = 6
+
+            vertex_scale = (1.0/128.0) if (geometry.flags & rpGEOMETRYPRELIT) > 0 else (1.0/1024.0)
+            for _ in range(indices_count):
+                x, y, z = unpack_from("<3h", data, self._read(size))
+                vertex = Vector(x * vertex_scale, y * vertex_scale, z * vertex_scale)
+                geometry.vertices.append(vertex)
                 self._indices[split_index].append(self._vertex_index)
                 self._vertex_index += 1
 
@@ -335,6 +356,43 @@ class NativePS2Geometry:
                 extra_color = RGBA(colors[1], colors[3], colors[5], colors[7])
                 extension.colors.append(extra_color)
 
+        elif split_type == 0x6f00c002:
+            size = 2
+
+            for _ in range(indices_count):
+                word = unpack_from("<H", data, self._read(size))[0]
+                comp1 = (word & 0x001F)
+                comp2 = (word & 0x03E0) >> 5
+                comp3 = (word & 0x7C00) >> 10
+                comp4 = (word & 0x8000) >> 15
+                r = int((comp1 / 31.0) * 255)
+                g = int((comp2 / 31.0) * 255)
+                b = int((comp3 / 31.0) * 255)
+                a = comp4 * 255
+                prelit_color = RGBA(r, g, b, a)
+                geometry.prelit_colors.append(prelit_color)
+
+        elif split_type == 0x6f00c003:
+            size = 2
+
+            extension = geometry.extensions.get('extra_vert_color')
+            if not extension:
+                extension = ExtraVertColorExtension([])
+                geometry.extensions['extra_vert_color'] = extension
+
+            for _ in range(indices_count):
+                word = unpack_from("<H", data, self._read(size))[0]
+                comp1 = (word & 0x001F)
+                comp2 = (word & 0x03E0) >> 5
+                comp3 = (word & 0x7C00) >> 10
+                comp4 = (word & 0x8000) >> 15
+                r = int((comp1 / 31.0) * 255)
+                g = int((comp2 / 31.0) * 255)
+                b = int((comp3 / 31.0) * 255)
+                a = comp4 * 255
+                extra_color = RGBA(r, g, b, a)
+                extension.colors.append(extra_color)
+
         # Read vertex bone weights
         elif split_type in (0x6C008004, 0x6C008003, 0x6C008001):
             size = 16
@@ -346,6 +404,29 @@ class NativePS2Geometry:
         else:
             print("Unknown Native PS2 data:", hex(split_type))
 
+            if 0x60 <= cmd <= 0x63:
+                vec_len = 1
+            elif 0x64 <= cmd <= 0x67:
+                vec_len = 2
+            elif 0x68 <= cmd <= 0x6B:
+                vec_len = 3
+            else:
+                vec_len = 4
+
+            val_type = cmd & 0b11
+            if val_type == 0:
+                val_size = 4
+            elif val_type == 1:
+                val_size = 2
+            elif val_type == 2:
+                val_size = 1
+            else:
+                vec_len = 1
+                val_size = 2
+
+            size = val_size * vec_len
+            self._pos += size * num
+
         padding = indices_count * size & 0xF
         if padding:
             self._pos += 16 - padding
@@ -354,7 +435,7 @@ class NativePS2Geometry:
     def _delete_split_overlapping(self, geometry, read_types, split_index):
         for split_type in read_types:
             split_type &= 0xFF00FFFF
-            if split_type in (0x68008000, 0x6D008000, 0x6c008000):
+            if split_type in (0x68008000, 0x6D008000, 0x6c008000, 0x69008000):
                 geometry.vertices = geometry.vertices[:-2]
                 self._indices[split_index] = self._indices[split_index][:-2]
                 self._vertex_index -= 2
@@ -363,10 +444,13 @@ class NativePS2Geometry:
                     geometry.uv_layers[i] = geometry.uv_layers[i][:-2]
             elif split_type in (0x6E008002, 0x6E008003, 0x6A008002, 0x6A008003):
                 geometry.normals = geometry.normals[:-2]
-            elif split_type in (0x6E00C002,):
+            elif split_type in (0x6E00C002, 0x6f00c002):
                 geometry.prelit_colors = geometry.prelit_colors[:-2]
             elif split_type in (0x6D00C002,):
                 geometry.prelit_colors = geometry.prelit_colors[:-2]
+                extension = geometry.extensions['extra_vert_color']
+                extension.colors = extension.colors[:-2]
+            elif split_type in (0x6f00c003,):
                 extension = geometry.extensions['extra_vert_color']
                 extension.colors = extension.colors[:-2]
             elif split_type in (0x6C008004, 0x6C008003, 0x6C008001):
