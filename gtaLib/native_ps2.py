@@ -161,7 +161,7 @@ class NativePS2Geometry:
                         reached_end = True
                         data_a_read = True
 
-                        if chunk8[15] == 0x11:
+                        if chunk8[0] == 0x0:
                             self._pos = split_end
                             read_types = []
                             section_b_last = True
