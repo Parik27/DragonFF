@@ -20,6 +20,27 @@ from enum import Enum, IntEnum
 
 from .pyffi.utils import tristrip
 
+#######################################################
+def decode_text(data):
+    """Decode a string stored in a DFF.
+
+    RenderWare has no notion of text encoding, so most tools simply dump
+    whatever codepage the authoring machine used.  GTA files are pure ASCII,
+    but games localised for east-asia (e.g. 轩辕剑) store Big5 / GBK strings,
+    which must not abort the whole import.
+    """
+
+    if isinstance(data, str):
+        return data
+
+    for encoding in ("ascii", "utf-8", "big5", "gbk", "latin-1"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+    return data.decode("utf-8", "replace")
+
 # Data types
 Chunk         = namedtuple("Chunk"         , "type size version")
 ClumpStruct   = namedtuple("ClumpStruct"   , "atomics lights cameras")

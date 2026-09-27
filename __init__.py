@@ -85,6 +85,8 @@ _classes = [
     gui.DFF_UL_AtomicItems,
     gui.SCENE_PT_dffFrames,
     gui.SCENE_PT_dffAtomics,
+    gui.OBJECT_OT_dff_assemble_parts,
+    gui.SCENE_PT_dffAssemble,
     gui.Bounds3DGizmo,
     gui.Bound2DWidthGizmo,
     gui.Bound2DHeightGizmo,
