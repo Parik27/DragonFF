@@ -230,6 +230,9 @@ class EXPORT_OT_ipl_cull(bpy.types.Operator, ExportHelper):
 
     #######################################################
     def execute(self, context):
+        if self.only_selected and not context.selected_objects:
+            self.report({"WARNING"}, "No objects selected for 'Only Selected' export")
+            return {'CANCELLED'}
 
         start = time.time()
         try:
