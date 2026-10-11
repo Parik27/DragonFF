@@ -306,9 +306,10 @@ class NativePS2Geometry:
         elif split_type == 0x65008001:
             size = 4
 
+            vertex_scale = (1.0/128.0) if (geometry.flags & rpGEOMETRYPRELIT) > 0 else (1.0/4096.0)
             for _ in range(indices_count):
                 u, v = unpack_from("<2h", data, self._read(size))
-                tex_coord = TexCoords(u / 4096.0, v / 4096.0)
+                tex_coord = TexCoords(u * vertex_scale, v * vertex_scale)
                 geometry.uv_layers[0].append(tex_coord)
 
             for uv in geometry.uv_layers[1:]:
