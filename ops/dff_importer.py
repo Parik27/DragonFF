@@ -935,6 +935,7 @@ class dff_importer:
                 )
             )
             if (not all(math.isfinite(value) for row in matrix for value in row) or
+                    any(abs(value) > 1.001 for row in matrix for value in row) or
                     abs(matrix.determinant()) < 1e-8):
                 message = "Frame '%s' has an invalid rotation matrix; using identity." % frame.name
                 self.warning = "\n".join(filter(None, (self.warning, message)))
