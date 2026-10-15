@@ -2288,7 +2288,7 @@ class Clump:
 
         # read names
         i = 0
-        while self.pos < parent_end:
+        while self.pos < parent_end and i < frames_count:
 
             chunk     = self.read_chunk()
             chunk_end = self.pos + chunk.size

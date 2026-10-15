@@ -934,6 +934,12 @@ class dff_importer:
                     frame.rotation_matrix.at
                 )
             )
+            if (not all(math.isfinite(value) for row in matrix for value in row) or
+                    abs(matrix.determinant()) < 1e-8):
+                message = "Frame '%s' has an invalid rotation matrix; using identity." % frame.name
+                self.warning = "\n".join(filter(None, (self.warning, message)))
+                matrix = mathutils.Matrix.Identity(3)
+
             matrix = self.multiply_matrix(mathutils.Matrix.Translation(frame.position),
                                           matrix.transposed().to_4x4())
 
