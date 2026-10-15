@@ -207,7 +207,15 @@ class Sections:
         # unpack calls, and thus do not need any special functions
         if type in Sections.formats:
             unpacker = Sections.formats[type]
-            return type._make(unpack_from(unpacker,data,offset))
+            values = unpack_from(unpacker,data,offset)
+            if type is Chunk and values[0] in (types["Struct"], types["Texture"]):
+                lock_flag = 0x01000000
+                chunk_size = values[1]
+                unlocked_size = chunk_size & ~lock_flag
+                if (chunk_size & lock_flag and unlocked_size <= 0x00100000 and
+                        offset + 12 + unlocked_size <= len(data)):
+                    values = (values[0], unlocked_size, values[2])
+            return type._make(values)
 
         elif type is Matrix:
             return Matrix._make(
