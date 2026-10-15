@@ -994,8 +994,15 @@ class dff_importer:
                 if frame.parent in self.frame_bones:
                     self.link_obj_to_frame_bone(obj, frame.parent)
 
-                else:
+                elif frame.parent in self.objects:
                     obj.parent = self.objects[frame.parent]
+
+                else:
+                    message = "Frame '%s' has invalid parent index %d; importing it without a parent." % (
+                        frame.name,
+                        frame.parent
+                    )
+                    self.warning = "\n".join(filter(None, (self.warning, message)))
 
             obj.dff.frame_index = index
 
