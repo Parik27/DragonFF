@@ -215,6 +215,29 @@ class Sections:
                 if (chunk_size & lock_flag and unlocked_size <= 0x00100000 and
                         offset + 12 + unlocked_size <= len(data)):
                     values = (values[0], unlocked_size, values[2])
+            elif type is Chunk and values[0] == types["Atomic"] and values[1] > 1024:
+                chunk_size = values[1]
+                child_offset = offset + 12
+                chunk_end = min(offset + 12 + chunk_size, len(data))
+                child_types = {
+                    types["Struct"],
+                    types["Geometry"],
+                    types["Extension"]
+                }
+                while child_offset + 12 <= chunk_end:
+                    child_type, child_size, _ = unpack_from(
+                        "<III", data, child_offset
+                    )
+                    if child_type == types["Atomic"]:
+                        corrected_size = child_offset - (offset + 12)
+                        if (corrected_size > 0 and child_size <= len(data) -
+                                (child_offset + 12)):
+                            values = (values[0], corrected_size, values[2])
+                        break
+                    if (child_type not in child_types or child_size >
+                            len(data) - (child_offset + 12)):
+                        break
+                    child_offset += 12 + child_size
             return type._make(values)
 
         elif type is Matrix:
