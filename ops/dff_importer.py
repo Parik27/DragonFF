@@ -934,6 +934,13 @@ class dff_importer:
                     frame.rotation_matrix.at
                 )
             )
+            if (not all(math.isfinite(value) for row in matrix for value in row) or
+                    any(abs(value) > 1.001 for row in matrix for value in row) or
+                    abs(matrix.determinant()) < 1e-8):
+                message = "Frame '%s' has an invalid rotation matrix; using identity." % frame.name
+                self.warning = "\n".join(filter(None, (self.warning, message)))
+                matrix = mathutils.Matrix.Identity(3)
+
             matrix = self.multiply_matrix(mathutils.Matrix.Translation(frame.position),
                                           matrix.transposed().to_4x4())
 
@@ -988,8 +995,15 @@ class dff_importer:
                 if frame.parent in self.frame_bones:
                     self.link_obj_to_frame_bone(obj, frame.parent)
 
-                else:
+                elif frame.parent in self.objects:
                     obj.parent = self.objects[frame.parent]
+
+                else:
+                    message = "Frame '%s' has invalid parent index %d; importing it without a parent." % (
+                        frame.name,
+                        frame.parent
+                    )
+                    self.warning = "\n".join(filter(None, (self.warning, message)))
 
             obj.dff.frame_index = index
 
