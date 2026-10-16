@@ -207,38 +207,12 @@ class Sections:
         # unpack calls, and thus do not need any special functions
         if type in Sections.formats:
             unpacker = Sections.formats[type]
-            values = unpack_from(unpacker,data,offset)
-            if type is Chunk and values[0] in (types["Struct"], types["Texture"]):
-                lock_flag = 0x01000000
-                chunk_size = values[1]
-                unlocked_size = chunk_size & ~lock_flag
-                if (chunk_size & lock_flag and unlocked_size <= 0x00100000 and
-                        offset + 12 + unlocked_size <= len(data)):
-                    values = (values[0], unlocked_size, values[2])
-            elif type is Chunk and values[0] == types["Atomic"] and values[1] > 1024:
-                chunk_size = values[1]
-                child_offset = offset + 12
-                chunk_end = min(offset + 12 + chunk_size, len(data))
-                child_types = {
-                    types["Struct"],
-                    types["Geometry"],
-                    types["Extension"]
-                }
-                while child_offset + 12 <= chunk_end:
-                    child_type, child_size, _ = unpack_from(
-                        "<III", data, child_offset
-                    )
-                    if child_type == types["Atomic"]:
-                        corrected_size = child_offset - (offset + 12)
-                        if (corrected_size > 0 and child_size <= len(data) -
-                                (child_offset + 12)):
-                            values = (values[0], corrected_size, values[2])
-                        break
-                    if (child_type not in child_types or child_size >
-                            len(data) - (child_offset + 12)):
-                        break
-                    child_offset += 12 + child_size
-            return type._make(values)
+            section = type._make(unpack_from(unpacker,data,offset))
+
+            if type is Chunk:
+                section = Sections.validate_chunk(section, data, offset)
+
+            return section
 
         elif type is Matrix:
             return Matrix._make(
@@ -320,7 +294,42 @@ class Sections:
     #######################################################
     def set_library_id(version, build):
         Sections.library_id = Sections.get_library_id(version,build)
-        
+
+    #######################################################
+    def validate_chunk(chunk, data, offset):
+        if chunk.type in (types["Struct"], types["Texture"]):
+            lock_flag = 0x01000000
+            chunk_size = chunk.size
+            unlocked_size = chunk_size & ~lock_flag
+            if (chunk_size & lock_flag and unlocked_size <= 0x00100000 and
+                    offset + 12 + unlocked_size <= len(data)):
+                chunk = chunk._replace(size=unlocked_size)
+
+        elif chunk.type == types["Atomic"] and chunk.size > 1024:
+            chunk_size = chunk.size
+            child_offset = offset + 12
+            chunk_end = min(offset + 12 + chunk_size, len(data))
+            child_types = {
+                types["Struct"],
+                types["Geometry"],
+                types["Extension"]
+            }
+            while child_offset + 12 <= chunk_end:
+                child_type, child_size, _ = unpack_from(
+                    "<III", data, child_offset
+                )
+                if child_type == types["Atomic"]:
+                    corrected_size = child_offset - (offset + 12)
+                    if (corrected_size > 0 and child_size <= len(data) - (child_offset + 12)):
+                        chunk = chunk._replace(size=corrected_size)
+                    break
+                if (child_type not in child_types or child_size >
+                        len(data) - (child_offset + 12)):
+                    break
+                child_offset += 12 + child_size
+
+        return chunk
+
 #######################################################
 class Texture:
 
