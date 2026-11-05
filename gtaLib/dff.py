@@ -2768,6 +2768,8 @@ class Clump:
     #######################################################
     def read_geometry_list(self, parent_chunk):
 
+        chunk_end = self.pos + parent_chunk.size
+
         chunk = self.read_chunk()
 
         if chunk.type == types["Struct"]:
@@ -2775,6 +2777,9 @@ class Clump:
 
             # Read geometries
             for _ in range(geometries):
+                if self.pos >= chunk_end:
+                    break
+
                 chunk = self.read_chunk()
 
                 # GEOMETRY
