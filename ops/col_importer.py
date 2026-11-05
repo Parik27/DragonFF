@@ -206,16 +206,13 @@ class col_importer:
         self.__add_mesh_mats(obj, materials)
             
     #######################################################
-    def add_to_scene(self, collection_prefix, link=True):
+    def add_to_scene(self, link=True):
 
         collection_list = []
         
         for model in self.col.models:
 
-            collection = create_collection("%s.%s" % (collection_prefix,
-                                                           model.model_name),
-                                           link
-            )            
+            collection = create_collection(model.model_name, link)
 
             # Store the import bounds as a custom property of the collection
             collection.dff.bounds_min = model.bounds.min
@@ -246,13 +243,13 @@ class col_importer:
         return collection_list
     
 #######################################################
-def import_col_file(filename, collection_prefix, link=True):
+def import_col_file(filename, link=True):
 
     col = col_importer.from_file(filename)
-    return col.add_to_scene(collection_prefix, link)
+    return col.add_to_scene(link)
 
 #######################################################
-def import_col_mem(mem, collection_prefix, link=True):
+def import_col_mem(mem, link=True):
 
     col = col_importer.from_mem(mem)
-    return col.add_to_scene(collection_prefix, link)
+    return col.add_to_scene(link)

@@ -1103,6 +1103,17 @@ class dff_importer:
         # Set imported version
         self.version = "0x%05x" % self.dff.rw_version
 
+        # Add collisions
+        for collision in self.dff.collisions:
+            col = import_col_mem(collision.data, False)
+
+            for collection in col:
+                self.current_collection.children.link(collection)
+
+                # Hide objects
+                for object in collection.objects:
+                    hide_object(object)
+
         State.update_scene()
 
     #######################################################
