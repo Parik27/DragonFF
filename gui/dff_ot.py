@@ -168,6 +168,9 @@ class EXPORT_OT_dff(bpy.types.Operator, ExportHelper):
     
     #######################################################
     def execute(self, context):
+        if self.only_selected and not context.selected_objects:
+            self.report({"WARNING"}, "No objects selected for 'Only Selected' export")
+            return {'CANCELLED'}
 
         if self.export_version == "custom":
             if not self.verify_rw_version():
@@ -706,17 +709,28 @@ class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
         default         = True
     )
 
+    only_selected       : bpy.props.BoolProperty(
+        name            = "Only Selected",
+        description     = "Export only textures used by selected objects",
+        default         = False
+    )
+
     #######################################################
     def draw(self, context):
         layout = self.layout
 
         layout.prop(self, "mass_export")
         layout.prop(self, "only_used_textures")
+        layout.prop(self, "only_selected")
 
         return None
 
     #######################################################
     def execute(self, context):
+        if self.only_selected and not context.selected_objects:
+            self.report({"WARNING"}, "No objects selected for 'Only Selected' export")
+            return {'CANCELLED'}
+
         start = time.time()
         try:
             from ..ops import txd_exporter
@@ -726,6 +740,7 @@ class EXPORT_OT_txd(bpy.types.Operator, ExportHelper):
                     "directory"          : self.directory,
                     "mass_export"        : self.mass_export,
                     "only_used_textures" : self.only_used_textures,
+                    "only_selected"      : self.only_selected,
                     "version"            : 0x36003, # TODO: more versions support
                 }
             )

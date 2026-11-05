@@ -29,6 +29,7 @@ class txd_exporter:
 
     mass_export = False
     only_used_textures = True
+    only_selected = False
     version = None
     file_name = ""
     path = ""
@@ -121,6 +122,9 @@ class txd_exporter:
         if objects_to_scan is not None:
             # Mass export mode: only export textures used by specific objects
             used_textures = self.get_used_textures(objects_to_scan)
+        elif self.only_selected:
+            # Single export with "only selected" option
+            used_textures = self.get_used_textures(bpy.context.selected_objects)
         elif self.only_used_textures:
             # Single export with "only used textures" option
             used_textures = self.get_used_textures()
@@ -208,6 +212,7 @@ def export_txd(options):
 
     txd_exporter.mass_export        = options.get('mass_export', False)
     txd_exporter.only_used_textures = options.get('only_used_textures', True)
+    txd_exporter.only_selected      = options.get('only_selected', False)
     txd_exporter.version            = options.get('version', 0x36003)
 
     txd_exporter.path               = options['directory']
