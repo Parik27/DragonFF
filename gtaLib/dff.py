@@ -2851,6 +2851,10 @@ class Clump:
             elif chunk.type == types["Bone PLG"]:
                 self.read_bone_plg(chunk,geometry)
 
+            # Geometry chunk can be nested — handle recursively
+            elif chunk.type == types["Geometry"]:
+                self.read_geometry(chunk)
+
             else:
                 self._read(chunk.size)
 
