@@ -21,8 +21,7 @@ import mathutils
 
 from bpy_extras import anim_utils
 
-from .exporter_common import (
-    clear_extension, extract_texture_info_from_name)
+from .exporter_common import clear_extension, texture_name_from_image_name
 from .col_exporter import export_col
 
 from ..gtaLib import dff
@@ -66,16 +65,14 @@ class material_helper:
                 if node_label in image_name and node_label != "":
                     image_name = node_label
 
-                texture_name, _ = extract_texture_info_from_name(image_name)
-                texture.name = clear_extension(texture_name)
+                texture.name = texture_name_from_image_name(image_name)
                 return texture
             return None
 
         # Blender Internal
         try:
             image_name = self.material.texture_slots[0].texture.image.name
-            texture_name, _ = extract_texture_info_from_name(image_name)
-            texture.name = clear_extension(texture_name)
+            texture.name = texture_name_from_image_name(image_name)
             return texture
 
         except BaseException:

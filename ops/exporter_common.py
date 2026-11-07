@@ -30,3 +30,11 @@ def extract_texture_info_from_name(name):
         return match.group(1), int(match.group(2))
     else:
         return name, 0
+
+#######################################################
+def texture_name_from_image_name(image_name):
+    """Texture name to write to the DFF for a Blender image name"""
+    # Drop the ".001"-style suffix Blender adds to duplicate datablocks
+    image_name = re.sub(r'\.\d{3}$', '', image_name)
+    texture_name, _ = extract_texture_info_from_name(image_name)
+    return clear_extension(texture_name)
