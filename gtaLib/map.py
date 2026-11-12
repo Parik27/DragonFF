@@ -22,13 +22,16 @@ from io import BytesIO, BufferedReader, StringIO
 
 from .data import map_data
 from .img import img
+from mathutils import Vector
 
 #######################################################
 @dataclass
 class MapData:
     object_instances: list
+    object_map_sections: dict
     object_data: dict
     cull_instances: list
+    map_objects_centroid: Vector
 
 #######################################################
 @dataclass
@@ -354,14 +357,23 @@ class MapDataUtility:
         object_instances = []
         cull_instances = []
         object_data = {}
+        object_map_sections = {}
 
         # Get all insts into a flat list (array)
         # Can't be an ID keyed dictionary, because there's many ipl
         # entries with the same ID - multiple pieces of
         # the same model (lamps, benches, trees etc.)
+        map_objects_centroid = Vector((0.0, 0.0, 0.0))
+        i = 1.0
         if 'inst' in ipl:
             for entry in ipl['inst']:
+                object_map_sections[entry] = ipl_section
                 object_instances.append(entry)
+
+                # Keep a running average of the instance positions to later focus the camera before load
+                map_objects_centroid += (Vector((float(entry.posX), float(entry.posY), float(entry.posZ)))
+                                         - map_objects_centroid) / i
+                i += 1.0
 
         # Get all culls into a flat list (array)
         if 'cull' in ipl:
@@ -384,7 +396,9 @@ class MapDataUtility:
         return MapData(
             object_instances = object_instances,
             object_data = object_data,
-            cull_instances = cull_instances
+            cull_instances = cull_instances,
+            object_map_sections = object_map_sections,
+            map_objects_centroid = map_objects_centroid
         )
 
     ########################################################################

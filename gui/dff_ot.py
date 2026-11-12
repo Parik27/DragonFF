@@ -422,7 +422,7 @@ class IMPORT_OT_dff(bpy.types.Operator, ImportHelper):
         # Import DFF and COL objects
         for file in file_paths:
             if file.lower().endswith(".col"):
-                col_list = col_importer.import_col_file(file, os.path.basename(file))
+                col_list = col_importer.import_col_file(file)
                 # Move all collisions to a top collection named for the file they came from
                 collection = bpy.data.collections.new(os.path.basename(file))
                 context.scene.collection.children.link(collection)
