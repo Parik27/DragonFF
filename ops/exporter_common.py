@@ -22,6 +22,11 @@ def clear_extension(string):
     return string if k < 0 else string[:k]
 
 #######################################################
+def clear_numeric_suffix(string):
+    """Drop the ".001"-style suffix Blender adds to duplicate datablocks"""
+    return re.sub(r'\.\d{3}$', '', string)
+
+#######################################################
 def extract_texture_info_from_name(name):
     """Extract texture info from TXD import naming pattern"""
     pattern = r'^[^/]+\.txd/([^/]+)/(\d+)$'
@@ -34,7 +39,6 @@ def extract_texture_info_from_name(name):
 #######################################################
 def texture_name_from_image_name(image_name):
     """Texture name to write to the DFF for a Blender image name"""
-    # Drop the ".001"-style suffix Blender adds to duplicate datablocks
-    image_name = re.sub(r'\.\d{3}$', '', image_name)
+    image_name = clear_numeric_suffix(image_name)
     texture_name, _ = extract_texture_info_from_name(image_name)
     return clear_extension(texture_name)

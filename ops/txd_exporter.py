@@ -18,7 +18,7 @@ import bpy
 import os
 
 from .exporter_common import (
-    clear_extension, extract_texture_info_from_name)
+    clear_extension, clear_numeric_suffix, extract_texture_info_from_name)
 
 from ..gtaLib import txd
 from ..gtaLib.txd import ImageEncoder
@@ -105,7 +105,12 @@ class txd_exporter:
 
                 for node in node_tree.nodes:
                     if node.type == 'TEX_IMAGE':
-                        texture_name = clear_extension(node.label or node.image.name)
+                        image_name, node_label = node.image.name, node.label
+                        if node_label and node_label in image_name:
+                            image_name = node_label
+
+                        image_name = clear_numeric_suffix(image_name)
+                        texture_name = clear_extension(image_name)
                         used_textures.add((texture_name, node.image))
 
         return used_textures
@@ -136,7 +141,8 @@ class txd_exporter:
                     continue
 
                 # Extract texture name from node.label (in case it follows TXD naming pattern)
-                texture_name, mipmap_level = extract_texture_info_from_name(image.name)
+                image_name = clear_numeric_suffix(image.name)
+                texture_name, mipmap_level = extract_texture_info_from_name(image_name)
 
                 # Skip mipmaps
                 if mipmap_level > 0:
